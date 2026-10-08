@@ -1,7 +1,10 @@
+// types/content.ts
+import { SectionExamConfig, SupportedExamCategory } from "./examConfig";
+
 export type QuestionType = "MC" | "FR";
 
 export interface QuestionOption {
-  id: string; // "A", "B", "C", "D"
+  id: string;
   text: string;
 }
 
@@ -19,6 +22,7 @@ export interface SectionFrontmatter {
   sectionTitle: string;
   sectionOrder: number;
   timeLimit: number;
+  config?: Partial<SectionExamConfig>; // Section-level overrides
   questions: QuestionFrontmatter[];
 }
 
@@ -28,17 +32,19 @@ export interface SectionManifest {
   order: number;
   title: string;
   timeLimit: number;
+  config?: Partial<SectionExamConfig>;
 }
 
 export interface TestMetadata {
   id: string;
   title: string;
-  category: "SAT" | "ACT";
+  category: SupportedExamCategory;
   description: string;
+  config?: Partial<SectionExamConfig>; // Exam-wide overrides
   sections: SectionManifest[];
 }
 
 export interface ParsedSection {
   frontmatter: SectionFrontmatter;
-  content: string; // Raw markdown passage/intro
+  content: string;
 }
