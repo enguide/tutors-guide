@@ -1,0 +1,22 @@
+{
+  "id": "sat-practice-1",
+  "title": "Digital SAT Practice Test 1",
+  "category": "SAT",
+  "description": "Full-length official style diagnostic SAT exam with Reading & Writing and Math modules.",
+  "sections": [
+    {
+      "id": "sat-practice-1-s1",
+      "file": "section-1-reading.md",
+      "order": 1,
+      "title": "Reading and Writing - Module 1",
+      "timeLimit": 1920
+    },
+    {
+      "id": "sat-practice-1-s2",
+      "file": "section-2-math.md",
+      "order": 2,
+      "title": "Math - Module 1",
+      "timeLimit": 2100
+    }
+  ]
+}
