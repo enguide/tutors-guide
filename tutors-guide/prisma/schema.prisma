@@ -1,0 +1,184 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role { 
+  STUDENT 
+  TUTOR 
+  ORG 
+  ADMIN 
+  PARENT 
+}
+
+enum Package { 
+  NONE 
+  SAT 
+  ACT 
+  ALL 
+}
+
+enum ClassYear { 
+  FRESHMAN 
+  SOPHOMORE 
+  JUNIOR 
+  SENIOR 
+  OTHER 
+}
+
+enum Category { 
+  NONE 
+  SAT 
+  ACT 
+  ACADEMIC 
+}
+
+enum QuestionType { 
+  MC 
+  FR 
+}
+
+model Organization {
+  id               String       @id @default(cuid())
+  name             String
+  seatLimit        Int          @default(0)
+  packageType      Package      @default(NONE)
+  stripeCustomerId String?      @unique
+  members          Profile[]    @relation("OrgProfiles")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([stripeCustomerId])
+  @@map("Organization")
+}
+
+model School {
+  id        String    @id @default(cuid())
+  name      String
+  members   Profile[] @relation("SchoolProfiles")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  @@map("School")
+}
+
+model Profile {
+  id                     String         @id @default(cuid())
+  firstName              String
+  lastName               String
+  email                  String         @unique
+  password               String
+  classYear              ClassYear
+  tgpackage              Package        @default(NONE)
+  role                   Role           @default(STUDENT)
+  school                 School?        @relation("SchoolProfiles", fields: [schoolId], references: [id])
+  schoolId               String?
+  org                    Organization?  @relation("OrgProfiles", fields: [orgId], references: [id])
+  orgId                  String?
+  membership             Membership?    @relation("ProfileToMembership")
+  responses              Response[]     @relation("ProfileResponses")
+  results                Result[]       @relation("ProfileResults")
+  twoFactorAuthSecret    String?
+  twoFactorAuthActivated Boolean?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@index([email])
+  @@index([orgId])
+  @@map("Profile")
+}
+
+model Membership {
+  id              String   @id @default(cuid())
+  tgpackage       Package  @default(NONE)
+  stripeSessionId String   @unique
+  profile         Profile  @relation("ProfileToMembership", fields: [profileId], references: [id], onDelete: Cascade)
+  profileId       String   @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@map("Membership")
+}
+
+model Test {
+  id        String     @id @default(cuid())
+  title     String
+  category  Category   @default(NONE)
+  sections  Section[]  @relation("TestSections")
+  responses Response[] @relation("TestResponses")
+  results   Result[]   @relation("ResultTests")
+  @@map("Test")
+}
+
+model Section {
+  id           String     @id @default(cuid())
+  title        String
+  sectionOrder Int
+  timeLimit    Int
+  testId       String
+  test         Test       @relation("TestSections", fields: [testId], references: [id], onDelete: Cascade)
+  responses    Response[] @relation("SectionResponses")
+  results      Result[]   @relation("ResultSections")
+
+  @@index([testId])
+  @@map("Section")
+}
+
+model Response {
+  id                  String       @id @default(cuid())
+  isCorrect           Boolean      @default(false)
+  responseOrder       Int
+  sectionOrder        Int
+  timeSpentOnResponse Int?         @default(0)
+  questionId          String       
+  responseType        QuestionType @default(MC)
+  selectedOptionId    String?
+  frqUserAnswer       String?
+  correctAnswerKey    String
+  usedCalculator      Boolean      @default(false)
+  changedAnswer       Boolean      @default(false)
+  profileId           String
+  profile             Profile      @relation("ProfileResponses", fields: [profileId], references: [id], onDelete: Cascade)
+  testId              String
+  test                Test         @relation("TestResponses", fields: [testId], references: [id], onDelete: Cascade)
+  sectionId           String
+  section             Section      @relation("SectionResponses", fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, questionId])
+  @@index([profileId, testId])
+  @@map("Response")
+}
+
+model Result {
+  id                        String   @id @default(cuid())
+  numCorrect                String
+  totalQuestions            String
+  score                     String?
+  scaledScore               String?
+  navigationHistory         Json?
+  timeRemainingAtCompletion String   @default("")
+  testTitle                 String
+  profileId                 String
+  profile                   Profile  @relation("ProfileResults", fields: [profileId], references: [id], onDelete: Cascade)
+  testId                    String
+  test                      Test     @relation("ResultTests", fields: [testId], references: [id], onDelete: Cascade)
+  sectionId                 String
+  section                   Section  @relation("ResultSections", fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, profileId, sectionId])
+  @@index([profileId])
+  @@map("Result")
+}
+
+model PasswordResetToken {
+  id          String   @id @unique @default(cuid())
+  profileId   String
+  token       String   @unique
+  tokenExpiry DateTime
+
+  @@index([token])
+  @@map("PasswordResetToken")
+}
