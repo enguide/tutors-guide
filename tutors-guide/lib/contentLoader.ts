@@ -14,7 +14,7 @@ const CONTENT_DIR = path.join(process.cwd(), "content", "tests");
  * Loads test metadata JSON
  */
 export async function getTestMetadata(
-  category: "sat" | "act",
+  category: string,
   testId: string
 ): Promise<TestMetadata | null> {
   "use cache";
@@ -32,7 +32,7 @@ export async function getTestMetadata(
  * Loads and parses a section Markdown file with YAML frontmatter
  */
 export async function getSectionContent(
-  category: "sat" | "act",
+  category: string,
   testId: string,
   fileName: string
 ): Promise<ParsedSection | null> {
@@ -58,7 +58,7 @@ export async function getSectionContent(
  * Resolves section by unique database/manifest sectionId
  */
 export async function getSectionById(
-  category: "sat" | "act",
+  category: string,
   testId: string,
   sectionId: string
 ): Promise<ParsedSection | null> {

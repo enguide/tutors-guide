@@ -8,6 +8,8 @@ export interface QuestionOption {
   text: string;
 }
 
+export type QuestionDifficulty = "Easy" | "Medium" | "Hard";
+
 export interface QuestionFrontmatter {
   id: string;
   questionNumber: number;
@@ -15,6 +17,12 @@ export interface QuestionFrontmatter {
   correctAnswer: string;
   prompt: string;
   options?: QuestionOption[];
+  
+  // Granular Diagnostic Analytics Metadata (Optional with fallbacks)
+  domain?: string;              // e.g. "Craft and Structure", "Algebra", "Advanced Math"
+  skill?: string;               // e.g. "Words in Context", "Linear Equations", "Function Notation"
+  difficulty?: QuestionDifficulty | string; // "Easy" | "Medium" | "Hard"
+  explanation?: string;         // Comprehensive rationale for review
 }
 
 export interface SectionFrontmatter {
@@ -22,7 +30,7 @@ export interface SectionFrontmatter {
   sectionTitle: string;
   sectionOrder: number;
   timeLimit: number;
-  config?: Partial<SectionExamConfig>; // Section-level overrides
+  config?: Partial<SectionExamConfig>;
   questions: QuestionFrontmatter[];
 }
 
@@ -40,7 +48,7 @@ export interface TestMetadata {
   title: string;
   category: SupportedExamCategory;
   description: string;
-  config?: Partial<SectionExamConfig>; // Exam-wide overrides
+  config?: Partial<SectionExamConfig>;
   sections: SectionManifest[];
 }
 

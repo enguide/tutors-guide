@@ -8,7 +8,11 @@ questions:
     questionNumber: 1
     questionType: "MC"
     correctAnswer: "B"
+    domain: "Craft and Structure"
+    skill: "Words in Context"
+    difficulty: "Medium"
     prompt: "Which choice best completes the text with the most logical and precise word or phrase?"
+    explanation: "The text explains that continuous sediment deposition has protected salt marshes from erosion and storm surges. 'Fortified' accurately conveys making something stronger or more resilient against attack or natural decay."
     options:
       - id: "A"
         text: "diminished"
@@ -22,7 +26,11 @@ questions:
     questionNumber: 2
     questionType: "MC"
     correctAnswer: "A"
+    domain: "Information and Ideas"
+    skill: "Text Structure and Purpose"
+    difficulty: "Hard"
     prompt: "Which choice best describes the function of the underlined sentence in the text as a whole?"
+    explanation: "The sentence describes early predictive models that contrast with the empirical findings presented in the subsequent sentence, serving as the benchmark against which newer data are compared."
     options:
       - id: "A"
         text: "It establishes the experimental baseline against which the findings are assessed."

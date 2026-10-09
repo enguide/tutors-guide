@@ -1,3 +1,4 @@
+// actions/autosave.ts
 "use server";
 
 import { auth } from "@/lib/auth";
@@ -34,7 +35,6 @@ export async function autosaveResponse(payload: AutosavePayload) {
         : (payload.frqUserAnswer ?? "").trim().toLowerCase() ===
           payload.correctAnswerKey.trim().toLowerCase();
 
-    // Check existing record to update `changedAnswer` telemetry
     const existing = await prisma.response.findUnique({
       where: {
         profileId_questionId: {
@@ -81,9 +81,8 @@ export async function autosaveResponse(payload: AutosavePayload) {
         selectedOptionId: payload.selectedOptionId ?? null,
         frqUserAnswer: payload.frqUserAnswer ?? null,
         isCorrect,
-        timeSpentOnResponse: {
-          increment: payload.timeSpentOnResponse ?? 0,
-        },
+        // Absolute total time — NEVER increment cumulative values
+        timeSpentOnResponse: payload.timeSpentOnResponse ?? 0,
         usedCalculator: payload.usedCalculator ?? undefined,
         changedAnswer: hasChangedAnswer ? true : undefined,
       },

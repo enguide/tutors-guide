@@ -8,39 +8,43 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role { 
-  STUDENT 
-  TUTOR 
-  ORG 
-  ADMIN 
-  PARENT 
+enum Role {
+  STUDENT
+  TUTOR
+  ORG
+  ADMIN
+  PARENT
 }
 
-enum Package { 
-  NONE 
-  SAT 
-  ACT 
-  ALL 
+enum Package {
+  NONE
+  SAT
+  ACT
+  AP_CALC
+  GRE
+  ALL
 }
 
-enum ClassYear { 
-  FRESHMAN 
-  SOPHOMORE 
-  JUNIOR 
-  SENIOR 
-  OTHER 
+enum ClassYear {
+  FRESHMAN
+  SOPHOMORE
+  JUNIOR
+  SENIOR
+  OTHER
 }
 
-enum Category { 
-  NONE 
-  SAT 
-  ACT 
-  ACADEMIC 
+enum Category {
+  NONE
+  SAT
+  ACT
+  AP_CALC
+  GRE
+  ACADEMIC
 }
 
-enum QuestionType { 
-  MC 
-  FR 
+enum QuestionType {
+  MC
+  FR
 }
 
 model Organization {
@@ -63,6 +67,7 @@ model School {
   members   Profile[] @relation("SchoolProfiles")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
   @@map("School")
 }
 
@@ -82,10 +87,11 @@ model Profile {
   membership             Membership?    @relation("ProfileToMembership")
   responses              Response[]     @relation("ProfileResponses")
   results                Result[]       @relation("ProfileResults")
+  summaries              TestSummary[]  @relation("ProfileSummaries")
   twoFactorAuthSecret    String?
   twoFactorAuthActivated Boolean?
   createdAt              DateTime       @default(now())
-  updatedAt              DateTime     @updatedAt
+  updatedAt              DateTime       @updatedAt
 
   @@index([email])
   @@index([orgId])
@@ -100,16 +106,19 @@ model Membership {
   profileId       String   @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
   @@map("Membership")
 }
 
 model Test {
-  id        String     @id @default(cuid())
-  title     String
-  category  Category   @default(NONE)
-  sections  Section[]  @relation("TestSections")
-  responses Response[] @relation("TestResponses")
-  results   Result[]   @relation("ResultTests")
+  id          String        @id @default(cuid())
+  title       String
+  category    Category      @default(NONE)
+  sections    Section[]     @relation("TestSections")
+  responses   Response[]    @relation("TestResponses")
+  results     Result[]      @relation("ResultTests")
+  summaries   TestSummary[] @relation("TestSummaries")
+
   @@map("Test")
 }
 
@@ -132,8 +141,8 @@ model Response {
   isCorrect           Boolean      @default(false)
   responseOrder       Int
   sectionOrder        Int
-  timeSpentOnResponse Int?         @default(0)
-  questionId          String       
+  timeSpentOnResponse Int?         @default(0) // Seconds spent on active question
+  questionId          String       // Markdown frontmatter question identifier
   responseType        QuestionType @default(MC)
   selectedOptionId    String?
   frqUserAnswer       String?
@@ -147,30 +156,54 @@ model Response {
   sectionId           String
   section             Section      @relation("SectionResponses", fields: [sectionId], references: [id], onDelete: Cascade)
 
+  // One response per question per user (one-and-done attempt enforcement)
   @@unique([profileId, questionId])
   @@index([profileId, testId])
   @@map("Response")
 }
 
 model Result {
-  id                        String   @id @default(cuid())
-  numCorrect                String
-  totalQuestions            String
-  score                     String?
-  scaledScore               String?
-  navigationHistory         Json?
-  timeRemainingAtCompletion String   @default("")
-  testTitle                 String
-  profileId                 String
-  profile                   Profile  @relation("ProfileResults", fields: [profileId], references: [id], onDelete: Cascade)
-  testId                    String
-  test                      Test     @relation("ResultTests", fields: [testId], references: [id], onDelete: Cascade)
-  sectionId                 String
-  section                   Section  @relation("ResultSections", fields: [sectionId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  numCorrect           Int      @default(0)
+  totalQuestions       Int      @default(0)
+  rawScore             Int      @default(0)
+  scaledScore          Int?     // Section-scaled score (e.g., 680 Math, 32 Science)
+  timeRemainingSeconds Int      @default(0)
+  navigationHistory    Json?    // Telemetry trace: Array of { time: number, qIdx: number }
+  testTitle            String
+  completedAt          DateTime @default(now())
 
+  profileId            String
+  profile              Profile  @relation("ProfileResults", fields: [profileId], references: [id], onDelete: Cascade)
+  testId               String
+  test                 Test     @relation("ResultTests", fields: [testId], references: [id], onDelete: Cascade)
+  sectionId            String
+  section              Section  @relation("ResultSections", fields: [sectionId], references: [id], onDelete: Cascade)
+
+  // Enforces strict one-and-done completion per section
   @@unique([testId, profileId, sectionId])
   @@index([profileId])
   @@map("Result")
+}
+
+model TestSummary {
+  id             String    @id @default(cuid())
+  testId         String
+  test           Test      @relation("TestSummaries", fields: [testId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile   @relation("ProfileSummaries", fields: [profileId], references: [id], onDelete: Cascade)
+  testTitle      String
+  category       Category  @default(NONE)
+  
+  // Composite score across all exam sections (e.g. 1520 SAT, 34 ACT, 5 AP)
+  compositeScore Int?
+  percentile     String?   // e.g. "98th"
+  completedAt    DateTime  @default(now())
+
+  // One diagnostic composite record per student per test
+  @@unique([testId, profileId])
+  @@index([profileId])
+  @@map("TestSummary")
 }
 
 model PasswordResetToken {
