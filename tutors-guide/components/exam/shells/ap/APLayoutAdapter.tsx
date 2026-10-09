@@ -57,7 +57,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1 bg-stone-100 dark:bg-neutral-800 rounded-[3px] border border-stone-200 dark:border-neutral-700">
             <Clock className="w-3.5 h-3.5 text-stone-600 dark:text-stone-400" />
-            <span className="font-mono text-xs font-semibold text-stone-800 dark:text-stone-200 min-w-[42px] text-center">
+            <span className="font-mono text-xs font-semibold text-stone-800 dark:text-stone-200 min-w-10.5 text-center">
               {isTimerHidden ? "--:--" : formatClock(state.secondsRemaining)}
             </span>
           </div>
@@ -127,7 +127,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
               <div className="max-w-xl mx-auto space-y-6">
                 <div className="space-y-3">
-                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-[2px] bg-stone-100 dark:bg-neutral-800 text-stone-800 dark:text-stone-200">
+                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-xs bg-stone-100 dark:bg-neutral-800 text-stone-800 dark:text-stone-200">
                     Question {state.activeQuestion.questionNumber}
                   </span>
                   <div className="text-stone-900 dark:text-stone-100 text-base leading-relaxed">
@@ -159,9 +159,9 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         ) : (
           <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-stone-50 dark:bg-neutral-950">
             <div className="max-w-3xl mx-auto space-y-6">
-              <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-[4px] p-6 md:p-8 shadow-xs space-y-6">
+              <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-sm p-6 md:p-8 shadow-xs space-y-6">
                 <div className="space-y-3">
-                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-[2px] bg-stone-100 dark:bg-neutral-800 text-stone-800 dark:text-stone-200">
+                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-xs bg-stone-100 dark:bg-neutral-800 text-stone-800 dark:text-stone-200">
                     Question {state.activeQuestion.questionNumber}
                   </span>
                   <div className="text-stone-900 dark:text-stone-100 text-base md:text-lg">

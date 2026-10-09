@@ -67,7 +67,7 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           <div className="max-w-xl mx-auto space-y-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-[2px] bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-xs bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
                   {state.activeQuestion.questionNumber}
                 </span>
                 {state.activeAnswer?.flagged && (
@@ -111,7 +111,7 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             type="button"
             disabled={isFirstQuestion}
             onClick={() => actions.setCurrentIndex((idx) => Math.max(0, idx - 1))}
-            className="flex items-center gap-1.5 px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-[4px] text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-sm text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back
@@ -132,7 +132,7 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             <button
               type="button"
               onClick={actions.openReviewModal}
-              className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-[4px] text-xs font-semibold tracking-tight shadow-sm transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-xs font-semibold tracking-tight shadow-sm transition-colors"
             >
               Review Section
               <ArrowRight className="w-3.5 h-3.5" />
@@ -141,7 +141,7 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             <button
               type="button"
               onClick={() => actions.setCurrentIndex((idx) => Math.min(questions.length - 1, idx + 1))}
-              className="flex items-center gap-1.5 px-5 py-2 bg-neutral-900 hover:bg-black dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-900 rounded-[4px] text-xs font-semibold tracking-tight shadow-sm transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2 bg-neutral-900 hover:bg-black dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-900 rounded-sm text-xs font-semibold tracking-tight shadow-sm transition-colors"
             >
               Next
               <ArrowRight className="w-3.5 h-3.5" />

@@ -13,7 +13,6 @@ import {
   AccommodationDescriptor,
 } from "@/lib/accommodations/registry";
 import {
-  Settings2,
   Play,
   Clock,
   ShieldCheck,
@@ -74,7 +73,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
-      <div className="w-full max-w-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-[4px] shadow-2xl p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-150">
+      <div className="w-full max-w-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm shadow-2xl p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-start justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
           <div>
@@ -94,7 +93,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
 
           {/* Time Badge */}
           <div className="flex flex-col items-end">
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-[4px]">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-sm">
               <Clock className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
               <span className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100">
                 {formatMinutes(effectiveSeconds)}
@@ -109,7 +108,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
         </div>
 
         {/* Info Callout */}
-        <div className="my-4 p-3 bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 rounded-[4px] flex items-start gap-2.5">
+        <div className="my-4 p-3 bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 rounded-sm flex items-start gap-2.5">
           <Info className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
           <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed font-sans">
             Configure testing accommodations for this session. Practice attempts can simulate approved testing accommodations or standard testing conditions.
@@ -117,11 +116,11 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
         </div>
 
         {/* Accommodations Options List */}
-        <div className="space-y-3 my-5 max-h-[340px] overflow-y-auto pr-1">
+        <div className="space-y-3 my-5 max-h-85 overflow-y-auto pr-1">
           {availableAccommodations.map((descriptor: AccommodationDescriptor) => (
             <div
               key={descriptor.key}
-              className="flex items-center justify-between p-3 border border-neutral-200 dark:border-neutral-800 rounded-[4px] bg-white dark:bg-neutral-900 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+              className="flex items-center justify-between p-3 border border-neutral-200 dark:border-neutral-800 rounded-sm bg-white dark:bg-neutral-900 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
             >
               <div className="pr-4">
                 <label
@@ -142,7 +141,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
                     type="checkbox"
                     checked={Boolean(settings[descriptor.key])}
                     onChange={(e) => handleToggle(descriptor.key, e.target.checked)}
-                    className="h-4 w-4 rounded-[2px] border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white focus:ring-0 cursor-pointer"
+                    className="h-4 w-4 rounded-xs border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white focus:ring-0 cursor-pointer"
                   />
                 ) : (
                   <select
@@ -154,7 +153,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
                         parseFloat(e.target.value) as 1.0 | 1.5 | 2.0
                       )
                     }
-                    className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-[4px] px-2.5 py-1 text-neutral-900 dark:text-neutral-100 cursor-pointer focus:outline-none"
+                    className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-sm px-2.5 py-1 text-neutral-900 dark:text-neutral-100 cursor-pointer focus:outline-none"
                   >
                     {descriptor.options?.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -186,7 +185,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
           <button
             type="button"
             onClick={() => onStartExam(settings)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-bold rounded-[4px] shadow-sm transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-bold rounded-sm shadow-sm transition-all"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Begin Section</span>

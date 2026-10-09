@@ -57,10 +57,10 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
 
       {/* Center: Minimalist "Hide" / "Show" Timer */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-[4px]">
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-sm">
           <Clock className={`w-3.5 h-3.5 ${isTimeCritical ? "text-rose-600 animate-pulse" : "text-neutral-500"}`} />
           <span
-            className={`font-mono text-sm font-semibold tracking-tight min-w-[42px] text-center ${
+            className={`font-mono text-sm font-semibold tracking-tight min-w-10.5 text-center ${
               isTimeCritical ? "text-rose-600" : "text-neutral-800 dark:text-neutral-200"
             }`}
           >
@@ -70,7 +70,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
         <button
           type="button"
           onClick={() => setIsTimerHidden((prev) => !prev)}
-          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white border border-neutral-200 dark:border-neutral-700 rounded-[4px] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white border border-neutral-200 dark:border-neutral-700 rounded-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         >
           {isTimerHidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
           {isTimerHidden ? "Show" : "Hide"}
@@ -85,7 +85,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
             type="button"
             onClick={onToggleCalculator}
             title="Calculator"
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-[4px] transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-sm transition-colors"
           >
             <Calculator className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span className="hidden md:inline">Calculator</span>
@@ -98,7 +98,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
             type="button"
             onClick={onToggleFormulaSheet}
             title="Reference Formulas"
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-[4px] transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-sm transition-colors"
           >
             <FileText className="w-3.5 h-3.5 text-neutral-500" />
             <span className="hidden md:inline">Reference</span>
@@ -110,7 +110,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
           type="button"
           onClick={onToggleCrossOut}
           title="Elimination Mode"
-          className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border rounded-[4px] transition-colors ${
+          className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border rounded-sm transition-colors ${
             isCrossOutMode
               ? "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900"
               : "text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -126,7 +126,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
             type="button"
             onClick={onToggleTTS}
             title="Read Question"
-            className={`p-1.5 rounded-[4px] border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
+            className={`p-1.5 rounded-sm border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 ${
               isTTSPlaying ? "text-blue-600 dark:text-blue-400 border-blue-400" : ""
             }`}
           >
@@ -139,7 +139,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
           type="button"
           onClick={onToggleFlag}
           title="Mark for Review"
-          className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border rounded-[4px] transition-colors ${
+          className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border rounded-sm transition-colors ${
             isFlagged
               ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900"
               : "text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"

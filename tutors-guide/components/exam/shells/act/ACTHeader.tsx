@@ -99,7 +99,7 @@ export const ACTHeader: React.FC<ACTHeaderProps> = ({
         <div className="flex items-center gap-1.5 px-3 py-1 bg-[#06182B] border border-[#17375E] rounded-[3px]">
           <Clock className={`w-3.5 h-3.5 ${isTimeCritical ? "text-rose-400 animate-pulse" : "text-white/70"}`} />
           <span
-            className={`font-mono text-xs sm:text-sm font-semibold tracking-tight min-w-[42px] text-center ${
+            className={`font-mono text-xs sm:text-sm font-semibold tracking-tight min-w-10.5 text-center ${
               isTimeCritical ? "text-rose-400" : "text-white"
             }`}
           >

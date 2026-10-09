@@ -14,7 +14,6 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
-  LogOut,
 } from "lucide-react";
 
 function formatClock(seconds: number): string {
@@ -55,7 +54,7 @@ export const GRELayoutAdapter: React.FC<TestShellLayoutProps> = ({
         {/* Center: Timer Toggle */}
         <div className="flex items-center gap-1.5 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-[3px] px-2.5 py-1">
           <Clock className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
-          <span className="font-mono text-xs font-bold tracking-tight min-w-[40px] text-center text-neutral-900 dark:text-neutral-100">
+          <span className="font-mono text-xs font-bold tracking-tight min-w-10 text-center text-neutral-900 dark:text-neutral-100">
             {isTimerHidden ? "--:--" : formatClock(state.secondsRemaining)}
           </span>
           <button
@@ -134,7 +133,7 @@ export const GRELayoutAdapter: React.FC<TestShellLayoutProps> = ({
       <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-neutral-100 dark:bg-neutral-950">
         <div className="max-w-3xl mx-auto space-y-6">
           {passageContent && passageContent.trim().length > 0 && (
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-[4px] p-6 shadow-xs">
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm p-6 shadow-xs">
               <MarkdownQuestionRenderer
                 content={passageContent}
                 category={category}
@@ -144,7 +143,7 @@ export const GRELayoutAdapter: React.FC<TestShellLayoutProps> = ({
             </div>
           )}
 
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-[4px] p-6 md:p-8 shadow-xs space-y-6">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm p-6 md:p-8 shadow-xs space-y-6">
             <div className="space-y-3">
               <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 font-mono">
                 Question {state.activeQuestion.questionNumber}

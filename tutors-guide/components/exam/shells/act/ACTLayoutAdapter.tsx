@@ -76,7 +76,7 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                       Question {state.activeQuestion.questionNumber}
                     </span>
                     {state.activeAnswer?.flagged && (
-                      <span className="text-xs font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-[2px] font-mono">
+                      <span className="text-xs font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-xs font-mono">
                         Bookmarked
                       </span>
                     )}
@@ -113,7 +113,7 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#F9FAFB] dark:bg-neutral-950">
             <div className="max-w-3xl mx-auto space-y-6">
               {passageContent && passageContent.trim().length > 0 && (
-                <div className="p-5 rounded-[4px] border border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
+                <div className="p-5 rounded-sm border border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
                   <MarkdownQuestionRenderer
                     content={passageContent}
                     category={category}
@@ -123,7 +123,7 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                 </div>
               )}
 
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-[4px] p-6 md:p-8 shadow-sm space-y-6">
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm p-6 md:p-8 shadow-sm space-y-6">
                 <div className="space-y-3">
                   <span className="text-sm font-bold text-[#0A2540] dark:text-sky-400 font-mono">
                     Question {state.activeQuestion.questionNumber}
