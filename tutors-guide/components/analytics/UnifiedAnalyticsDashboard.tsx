@@ -269,7 +269,9 @@ export default function UnifiedAnalyticsDashboard({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const navData = activeSectionResult?.navigationHistory || [];
+ const navData = React.useMemo(() => {
+  return activeSectionResult?.navigationHistory || [];
+}, [activeSectionResult?.navigationHistory]);
 
   const yAxisTicks = React.useMemo(() => {
     if (!navData || navData.length === 0) return [0];
@@ -340,7 +342,7 @@ export default function UnifiedAnalyticsDashboard({
          ========================================================================= */}
       <Card
         key={`chart-${activeSectionId}`}
-        className="rounded-none w-full xl:w-[1350px] xl:min-w-[1350px] border border-slate-200 dark:border-slate-800 shadow-sm"
+        className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 border border-slate-200 dark:border-slate-800 shadow-sm"
       >
         <CardHeader className="flex flex-col items-stretch justify-between space-y-0 border-b border-slate-200 dark:border-slate-800 p-0 md:flex-row">
           <div className="flex md:flex-col flex-row justify-between md:justify-center items-center md:items-start gap-1 px-4 py-3">
@@ -352,14 +354,14 @@ export default function UnifiedAnalyticsDashboard({
             <div className="flex flex-row items-center gap-4 mt-1">
               <div className="flex items-center gap-1">
                 <span
-                  className="w-3 h-3 rounded-[2px]"
+                  className="w-3 h-3 rounded-xs"
                   style={{ backgroundColor: "#444444" }}
                 ></span>
                 <span className="text-[10px] sm:text-sm">Correct</span>
               </div>
               <div className="flex items-center gap-1">
                 <span
-                  className="w-3 h-3 rounded-[2px]"
+                  className="w-3 h-3 rounded-xs"
                   style={{ backgroundColor: "#ff9999" }}
                 ></span>
                 <span className="text-[10px] sm:text-sm">Incorrect</span>
@@ -421,7 +423,7 @@ export default function UnifiedAnalyticsDashboard({
     <button
       key={sr.sectionId}
       data-active={activeSectionId === sr.sectionId ? "true" : "false"}
-      className="flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 px-4 py-2 text-center transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l md:min-w-[100px] lg:px-8 lg:py-2"
+      className="flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 px-4 py-2 text-center transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l md:min-w-25 lg:px-8 lg:py-2"
       onClick={() => {
         setSelectedSectionId(sr.sectionId);
         setSelectedQuestionIndex(0);
@@ -517,7 +519,7 @@ export default function UnifiedAnalyticsDashboard({
               <div className="hidden lg:block">
                 <ChartContainer
                   config={topBarConfig}
-                  className="aspect-auto h-[125px] pt-2 w-full"
+                  className="aspect-auto h-31.25 pt-2 w-full"
                 >
                   <BarChart
                     accessibilityLayer
@@ -551,7 +553,7 @@ export default function UnifiedAnalyticsDashboard({
                     <ChartTooltip
                       content={
                         <ChartTooltipContent
-                          className="w-[150px]"
+                          className="w-37.5"
                           nameKey="Time"
                           labelFormatter={(value) => `Question ${value}`}
                         />
@@ -590,7 +592,7 @@ export default function UnifiedAnalyticsDashboard({
       {activeQuestionItem && activeQuestionItem.response && (
         <Card
           key={`${activeSectionId}-q-${activeQuestionItem.question}`}
-          className="rounded-none mt-1 min-h-full w-full xl:min-h-[520px] xl:w-[1350px] bg-primary-foreground border shadow-sm"
+          className="rounded-none mt-1 min-h-full w-full xl:min-h-130 xl:w-337.5 bg-primary-foreground border shadow-sm"
         >
           <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row bg-card">
             <div className="flex flex-1 flex-row justify-between gap-1 px-3 pt-3 pb-2">
@@ -658,7 +660,7 @@ export default function UnifiedAnalyticsDashboard({
 
           <CardContent className="w-full flex flex-col xl:flex-row p-4 bg-primary-foreground gap-6">
             {/* Left Prompt Pane */}
-            <div className="flex-1 flex flex-col p-2 xl:p-4 max-h-[500px] overflow-y-auto">
+            <div className="flex-1 flex flex-col p-2 xl:p-4 max-h-125 overflow-y-auto">
               <div className="text-sm md:text-base leading-relaxed font-serif non-latex-question-content">
                 <ReactMarkdown
                   remarkPlugins={[remarkMath]}
@@ -734,7 +736,7 @@ export default function UnifiedAnalyticsDashboard({
 
               {/* KaTeX Explanations */}
               {responseIsVisible && activeQuestionItem.response.explanation && (
-                <div className="p-4 border rounded-none bg-muted/30 mt-2 text-xs leading-relaxed font-serif overflow-y-auto max-h-[220px]">
+                <div className="p-4 border rounded-none bg-muted/30 mt-2 text-xs leading-relaxed font-serif overflow-y-auto max-h-55">
                   <span className="font-bold text-xs uppercase block text-muted-foreground mb-1">
                     Explanation
                   </span>
@@ -782,7 +784,7 @@ export default function UnifiedAnalyticsDashboard({
           3. SECTION NAVIGATION CHART
          ========================================================================= */}
       {activeSectionResult && (
-        <Card className="rounded-none w-full xl:w-[1350px] xl:min-w-[1350px]">
+        <Card className="rounded-none w-full xl:w-337.5 xl:min-w-337.5">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7 border-b">
             <div className="flex flex-col gap-1">
               <CardTitle className="text-xl font-bold">
@@ -808,7 +810,7 @@ export default function UnifiedAnalyticsDashboard({
             {navData.length > 0 ? (
               <ChartContainer
                 config={navChartConfig}
-                className="aspect-[16/9] sm:aspect-[2/1] md:aspect-[3/1] lg:aspect-[4/1] w-full"
+                className="aspect-video sm:aspect-2/1 md:aspect-3/1 lg:aspect-4/1 w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -885,7 +887,7 @@ export default function UnifiedAnalyticsDashboard({
       {/* =========================================================================
           4. ACCURACY CHARTS
          ========================================================================= */}
-      <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-[1350px] xl:min-w-[1350px]">
+      <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-337.5 xl:min-w-337.5">
         {/* Left Column: Skills */}
         <Card className="rounded-none w-full lg:w-1/2 h-fit">
           <CardHeader className="border-b">

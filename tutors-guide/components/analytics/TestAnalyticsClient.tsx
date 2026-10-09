@@ -92,7 +92,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-foreground pb-20">
       {/* Top Controller Bar */}
       <div className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md sticky top-0 z-30 mb-6">
-        <div className="max-w-[1350px] mx-auto px-4 sm:px-8 flex items-center justify-between h-14">
+        <div className="max-w-337.5 mx-auto px-4 sm:px-8 flex items-center justify-between h-14">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab("analytics")}
@@ -139,7 +139,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
       {activeTab === "review" && (
         <div
           ref={reviewContainerRef}
-          className="max-w-[1350px] mx-auto px-1 sm:px-8 space-y-6 animate-in fade-in duration-200"
+          className="max-w-337.5 mx-auto px-1 sm:px-8 space-y-6 animate-in fade-in duration-200"
         >
           {/* Module Selector Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -242,7 +242,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                     setSelectedDomain(e.target.value);
                     setReviewIndex(0);
                   }}
-                  className="text-xs font-semibold p-2 rounded-none border border-input bg-background max-w-[180px] truncate"
+                  className="text-xs font-semibold p-2 rounded-none border border-input bg-background max-w-45 truncate"
                 >
                   {domainOptions.map((d) => (
                     <option key={d} value={d}>

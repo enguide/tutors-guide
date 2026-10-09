@@ -111,7 +111,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
             
             {/* Passage Column (if present) */}
             {item.passageText && (
-              <div className="border border-slate-200 dark:border-slate-800 p-4 rounded-none bg-slate-50/50 dark:bg-slate-950/40 space-y-2 max-h-[500px] overflow-y-auto">
+              <div className="border border-slate-200 dark:border-slate-800 p-4 rounded-none bg-slate-50/50 dark:bg-slate-950/40 space-y-2 max-h-125 overflow-y-auto">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider pb-1 border-b border-border">
                   <BookOpen size={13} /> Stimulus / Reading Passage
                 </div>
