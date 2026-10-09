@@ -1,6 +1,7 @@
 // lib/contentLoader.ts
 import fs from "fs/promises";
 import path from "path";
+import { cache } from "react";
 import matter from "gray-matter";
 import {
   TestMetadata,
@@ -11,34 +12,42 @@ import {
 const CONTENT_DIR = path.join(process.cwd(), "content", "tests");
 
 /**
- * Loads test metadata JSON
+ * Loads and caches test metadata JSON
  */
-export async function getTestMetadata(
+export const getTestMetadata = cache(async function getTestMetadata(
   category: string,
   testId: string
 ): Promise<TestMetadata | null> {
-  "use cache";
   try {
-    const metaPath = path.join(CONTENT_DIR, category.toLowerCase(), testId, "metadata.json");
+    const metaPath = path.join(
+      CONTENT_DIR,
+      category.toLowerCase(),
+      testId,
+      "metadata.json"
+    );
     const fileContents = await fs.readFile(metaPath, "utf-8");
     return JSON.parse(fileContents) as TestMetadata;
   } catch (error) {
     console.error(`Failed to load metadata for ${category}/${testId}:`, error);
     return null;
   }
-}
+});
 
 /**
- * Loads and parses a section Markdown file with YAML frontmatter
+ * Loads, parses, and caches a section Markdown file with YAML frontmatter
  */
-export async function getSectionContent(
+export const getSectionContent = cache(async function getSectionContent(
   category: string,
   testId: string,
   fileName: string
 ): Promise<ParsedSection | null> {
-  "use cache";
   try {
-    const filePath = path.join(CONTENT_DIR, category.toLowerCase(), testId, fileName);
+    const filePath = path.join(
+      CONTENT_DIR,
+      category.toLowerCase(),
+      testId,
+      fileName
+    );
     const rawFile = await fs.readFile(filePath, "utf-8");
 
     const { data, content } = matter(rawFile);
@@ -47,22 +56,26 @@ export async function getSectionContent(
     return {
       frontmatter,
       content,
+      category: category.toLowerCase(),
+      testId,
     };
   } catch (error) {
-    console.error(`Failed to load section ${fileName} for ${category}/${testId}:`, error);
+    console.error(
+      `Failed to load section ${fileName} for ${category}/${testId}:`,
+      error
+    );
     return null;
   }
-}
+});
 
 /**
- * Resolves section by unique database/manifest sectionId
+ * Resolves section by unique sectionId using the test metadata manifest
  */
-export async function getSectionById(
+export const getSectionById = cache(async function getSectionById(
   category: string,
   testId: string,
   sectionId: string
 ): Promise<ParsedSection | null> {
-  "use cache";
   const metadata = await getTestMetadata(category, testId);
   if (!metadata) return null;
 
@@ -70,4 +83,4 @@ export async function getSectionById(
   if (!sectionEntry) return null;
 
   return getSectionContent(category, testId, sectionEntry.file);
-}
+});

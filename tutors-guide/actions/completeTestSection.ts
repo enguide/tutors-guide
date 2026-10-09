@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { evaluateAnswer } from "@/lib/scoring/mathEvaluator";
 import { QuestionFrontmatter } from "@/types/content";
 import { DEFAULT_SAT_CURVE, lookupScaledScore } from "@/lib/scoring/curveEngine";
-import { Category } from "@prisma/client";
+import { Category, Prisma } from "@prisma/client";
+import { AccommodationSettings } from "@/types/accommodations";
 
 interface CompleteSectionPayload {
   testId: string;
@@ -17,13 +18,17 @@ interface CompleteSectionPayload {
   timeRemainingSeconds: number;
   navigationHistory: { time: number; qIdx: number }[];
   questions: QuestionFrontmatter[];
-  clientAnswers: Record<string, {
-    selectedOptionId?: string;
-    frqUserAnswer?: string;
-    usedCalculator?: boolean;
-    changedAnswer?: boolean;
-    timeSpent?: number;
-  }>;
+  clientAnswers: Record<
+    string,
+    {
+      selectedOptionId?: string;
+      frqUserAnswer?: string;
+      usedCalculator?: boolean;
+      changedAnswer?: boolean;
+      timeSpent?: number;
+    }
+  >;
+  accommodations?: AccommodationSettings;
 }
 
 export async function completeTestSection(payload: CompleteSectionPayload) {
@@ -44,6 +49,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
     navigationHistory,
     questions,
     clientAnswers,
+    accommodations,
   } = payload;
 
   try {
@@ -100,18 +106,18 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
             changedAnswer: student?.changedAnswer ?? false,
           },
           update: {
-  selectedOptionId: student?.selectedOptionId ?? null,
-  frqUserAnswer: student?.frqUserAnswer ?? null,
-  isCorrect,
-  timeSpentOnResponse: student?.timeSpent ?? 0,
-  usedCalculator: student?.usedCalculator ?? undefined,
-  changedAnswer: student?.changedAnswer ?? undefined,
-},
+            selectedOptionId: student?.selectedOptionId ?? null,
+            frqUserAnswer: student?.frqUserAnswer ?? null,
+            isCorrect,
+            timeSpentOnResponse: student?.timeSpent ?? 0,
+            usedCalculator: student?.usedCalculator ?? undefined,
+            changedAnswer: student?.changedAnswer ?? undefined,
+          },
         });
       })
     );
 
-    // 3. Persist the immutable section Result
+    // 3. Persist the Result with cleanly separated navigation & accommodation data
     const totalQuestions = questions.length;
 
     await prisma.result.create({
@@ -124,7 +130,10 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
         totalQuestions,
         rawScore: numCorrect,
         timeRemainingSeconds,
-        navigationHistory,
+        navigationHistory: navigationHistory as unknown as Prisma.InputJsonValue,
+        accommodations: accommodations
+          ? (accommodations as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
       },
     });
 
@@ -142,14 +151,12 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
     const isTestComplete =
       allSections.length > 0 && submittedResults.length === allSections.length;
 
-    // 5. If all sections are finished, compute and persist the immutable TestSummary
+    // 5. If all sections are finished, persist the TestSummary
     if (isTestComplete) {
       let compositeScore: number | null = null;
 
       if (category === "SAT") {
-        // Look up scaled scores using the scoring curves
         const totalCorrect = submittedResults.reduce((acc, r) => acc + r.numCorrect, 0);
-        // Compute math & verbal partitions based on section assignments
         compositeScore = lookupScaledScore(DEFAULT_SAT_CURVE.sectionCurves.English, totalCorrect);
       }
 

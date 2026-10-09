@@ -19,8 +19,8 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
   const { category, testId, sectionId } = await params;
   const examCat = category.toUpperCase() as SupportedExamCategory;
 
-  const metadata = await getTestMetadata(category as "sat" | "act", testId);
-  const section = await getSectionById(category as "sat" | "act", testId, sectionId);
+  const metadata = await getTestMetadata(category, testId);
+  const section = await getSectionById(category, testId, sectionId);
 
   if (!metadata || !section) {
     notFound();
@@ -44,6 +44,8 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
       metadata={metadata}
       section={section}
       effectiveConfig={effectiveConfig}
+      category={category}
+      testId={testId}
     />
   );
 }

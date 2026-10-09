@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "validate:content": "npx tsx scripts/validate-content.ts",
+    "prebuild": "npm run validate:content"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

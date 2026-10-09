@@ -13,6 +13,9 @@ interface SingleColumnLayoutProps {
   frqAnswer?: string;
   eliminatedOptions?: string[];
   isCrossOutMode: boolean;
+  category?: string;
+  testId?: string;
+  manifestBasePath?: string;
   onSelectOption: (optionId: string) => void;
   onSetFrqAnswer: (value: string) => void;
   onToggleEliminate: (optionId: string) => void;
@@ -25,6 +28,9 @@ export const SingleColumnLayout: React.FC<SingleColumnLayoutProps> = ({
   frqAnswer,
   eliminatedOptions,
   isCrossOutMode,
+  category,
+  testId,
+  manifestBasePath,
   onSelectOption,
   onSetFrqAnswer,
   onToggleEliminate,
@@ -38,7 +44,12 @@ export const SingleColumnLayout: React.FC<SingleColumnLayoutProps> = ({
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
               Directions / Context
             </span>
-            <MarkdownQuestionRenderer content={passageContent} />
+            <MarkdownQuestionRenderer
+              content={passageContent}
+              category={category}
+              testId={testId}
+              manifestBasePath={manifestBasePath}
+            />
           </div>
         )}
 
@@ -49,7 +60,12 @@ export const SingleColumnLayout: React.FC<SingleColumnLayoutProps> = ({
               Question {activeQuestion.questionNumber}
             </span>
             <div className="text-slate-900 dark:text-slate-100 text-base md:text-lg">
-              <MarkdownQuestionRenderer content={activeQuestion.prompt} />
+              <MarkdownQuestionRenderer
+                content={activeQuestion.prompt}
+                category={category}
+                testId={testId}
+                manifestBasePath={manifestBasePath}
+              />
             </div>
           </div>
 

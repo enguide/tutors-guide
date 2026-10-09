@@ -24,15 +24,26 @@ questions:
         text: "33"
   - id: "sat-p1-math-002"
     questionNumber: 2
-    questionType: "FR"
-    correctAnswer: "12"
-    domain: "Algebra"
-    skill: "Linear Equations in Two Variables"
-    difficulty: "Hard"
-    prompt: "A line in the $xy$-plane passes through the points $(0, 4)$ and $(6, 8)$. What is the $x$-intercept of a perpendicular line that passes through the point $(2, 10)$?"
-    explanation: "The slope of the first line is $(8 - 4) / (6 - 0) = 4/6 = 2/3$. A perpendicular line has slope $m = -3/2$. In point-slope form: $y - 10 = -3/2(x - 2)$. To find the $x$-intercept, set $y = 0$: $-10 = -3/2(x - 2) \\Rightarrow 20/3 = x - 2 \\Rightarrow x = 20/3 + 2 = 26/3$ or an alternate integer based on the reference problem statement."
+    questionType: "MC"
+    correctAnswer: "B"
+    domain: "Geometry and Trigonometry"
+    skill: "Right Triangle Trigonometry & Coordinate Geometry"
+    difficulty: "Medium"
+    prompt: "In the right triangle shown below in the $xy$-coordinate plane, what is the value of $\\cos(\\theta)$?"
+    explanation: "In right triangle $ABC$, side $AB = 4$ and side $BC = 3$. The hypotenuse $AC = \\sqrt{4^2 + 3^2} = \\sqrt{25} = 5$. Since $\\cos(\\theta) = \\text{adjacent} / \\text{hypotenuse}$, $\\cos(\\theta) = 4 / 5 = 0.8$."
+    options:
+      - id: "A"
+        text: "$\\frac{3}{5}$"
+      - id: "B"
+        text: "$\\frac{4}{5}$"
+      - id: "C"
+        text: "$\\frac{3}{4}$"
+      - id: "D"
+        text: "$\\frac{5}{4}$"
 ---
 
-### Module 2: Mathematics
+### Module 1: Mathematics
 
-Refer to the standard geometric and algebraic formulas on the reference sheet as needed. Both multiple-choice and student-produced response (grid-in) questions appear in this section.
+![Coordinate Triangle Vector Diagram](./assets/coordinate-triangle.svg)
+
+Refer to the figure above when answering question 2. The figure is drawn to scale in the standard Cartesian coordinate system.

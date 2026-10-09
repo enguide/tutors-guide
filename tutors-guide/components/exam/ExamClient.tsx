@@ -1,26 +1,31 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/exam/ExamClient.tsx
 "use client";
 
 import React, { useState, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ParsedSection, TestMetadata } from "@/types/content";
-import { SectionExamConfig } from "@/types/examConfig";
+import { SectionExamConfig, SupportedExamCategory } from "@/types/examConfig";
+import {
+  AccommodationSettings,
+  DEFAULT_ACCOMMODATIONS,
+} from "@/types/accommodations";
 import { useTestProgress } from "@/hooks/useTestProgress";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
-import { ExamHeader } from "./ExamHeader";
-import { ExamFooter } from "./ExamFooter";
-import { SplitPassageLayout } from "./layouts/SplitPassageLayout";
-import { SingleColumnLayout } from "./layouts/SingleColumnLayout";
 import { CalculatorToolbar } from "../tools/CalculatorToolbar";
 import { FormulaSheetModal } from "../tools/FormulaSheetModal";
 import { SectionReviewModal } from "./SectionReviewModal";
+import { TestPreFlightModal } from "./TestPreFlightModal";
 import { completeTestSection } from "@/actions/completeTestSection";
 import { Category } from "@prisma/client";
+import { TestShellLayout } from "./shells/TestShellLayout";
 
 interface ExamClientProps {
   metadata: TestMetadata;
   section: ParsedSection;
   effectiveConfig: SectionExamConfig;
+  category?: string;
+  testId?: string;
 }
 
 const emptySubscribe = () => () => {};
@@ -29,24 +34,48 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   metadata,
   section,
   effectiveConfig,
+  category = metadata.category,
+  testId = metadata.id,
 }) => {
   const router = useRouter();
 
-  // Mount detection: server returns false, client immediately returns true
   const isMounted = useSyncExternalStore(
     emptySubscribe,
     () => true,
     () => false
   );
 
-  const { frontmatter, content: passageContent } = section;
+  const { frontmatter } = section;
   const questions = frontmatter.questions;
+  const manifestBasePath = (metadata as any).assetBasePath;
+  const examCat = (category.toUpperCase() || metadata.category) as SupportedExamCategory;
+
+  const storageKey = `attempt_accommodations_${testId}`;
+
+  // Pre-flight & accommodations state with lazy localStorage hydration
+  const [isPreFlightOpen, setIsPreFlightOpen] = useState(true);
+  const [accommodations, setAccommodations] = useState<AccommodationSettings>(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_ACCOMMODATIONS;
+    }
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? JSON.parse(stored) : DEFAULT_ACCOMMODATIONS;
+    } catch {
+      return DEFAULT_ACCOMMODATIONS;
+    }
+  });
 
   // Submission & Review modal states
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Core Exam State Management
+  // Scaled time based on selected multiplier
+  const effectiveTimeLimitSeconds = Math.round(
+    frontmatter.timeLimit * accommodations.timeMultiplier
+  );
+
+  // Core Exam State Hook
   const {
     activeQuestion,
     currentIndex,
@@ -68,36 +97,46 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     getFinalizedAnswers,
     clearLocalBuffer,
   } = useTestProgress({
-    testId: metadata.id,
+    testId,
     sectionId: frontmatter.sectionId,
     sectionOrder: frontmatter.sectionOrder,
-    timeLimitSeconds: frontmatter.timeLimit,
+    timeLimitSeconds: effectiveTimeLimitSeconds,
     questions,
     onTimeExpired: () => {
-      // Auto-submit immediately if time expires
       handleSubmitSection();
     },
   });
 
-  // 2. Finalize Section Action Handler
+  // Start Section from Pre-Flight
+  const handleStartExam = (selected: AccommodationSettings) => {
+    setAccommodations(selected);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(selected));
+    } catch {
+      // Local storage full or private browsing
+    }
+    setIsPreFlightOpen(false);
+  };
+
+  // Finalize Section Action Handler
   const handleSubmitSection = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      // Flush in-flight active question deliberation time before sending
       const finalAnswers = getFinalizedAnswers();
 
       const result = await completeTestSection({
-        testId: metadata.id,
+        testId,
         testTitle: metadata.title,
         category: metadata.category as Category,
         sectionId: frontmatter.sectionId,
         sectionOrder: frontmatter.sectionOrder,
-        timeRemainingSeconds: secondsRemaining,
+        timeRemainingSeconds: secondsRemaining, // <-- map secondsRemaining to the payload property
         navigationHistory,
         questions,
         clientAnswers: finalAnswers,
+        accommodations,
       });
 
       if (!result.success) {
@@ -106,25 +145,25 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         return;
       }
 
-      // Clear the local cache for this completed section
       clearLocalBuffer();
       setIsReviewOpen(false);
 
-      // Determine routing: next section vs test results
       const currentSectionIndex = metadata.sections.findIndex(
         (s) => s.id === frontmatter.sectionId
       );
       const nextSection = metadata.sections[currentSectionIndex + 1];
 
       if (result.isTestComplete || !nextSection) {
-        // All sections finished -> go to analytics results dashboard
+        // Clear accommodations cache at the conclusion of the entire exam
+        try {
+          localStorage.removeItem(storageKey);
+        } catch {}
         router.push(
-          `/tests/${metadata.category.toLowerCase()}/${metadata.id}/results`
+          `/tests/${metadata.category.toLowerCase()}/${testId}/results`
         );
       } else {
-        // Move to subsequent section
         router.push(
-          `/tests/${metadata.category.toLowerCase()}/${metadata.id}/${nextSection.id}`
+          `/tests/${metadata.category.toLowerCase()}/${testId}/${nextSection.id}`
         );
       }
     } catch (error) {
@@ -134,17 +173,20 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   }, [
     isSubmitting,
+    testId,
     metadata,
     frontmatter,
     secondsRemaining,
     navigationHistory,
     questions,
+    accommodations,
+    storageKey,
     getFinalizedAnswers,
     clearLocalBuffer,
     router,
   ]);
 
-  // 3. TTS Accessibility
+  // TTS Accessibility
   const { speak, stop, isPlaying: isTTSPlaying, isSupported: isTTSSupported } =
     useTextToSpeech();
 
@@ -156,104 +198,83 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   };
 
-  // If not yet mounted on client, render a clean shell that matches SSR perfectly
   if (!isMounted) {
     return (
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
-        <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 flex items-center justify-between">
-          <div className="h-4 w-48 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
-          <div className="h-6 w-20 bg-slate-100 dark:bg-slate-800 rounded-full animate-pulse" />
+        <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 flex items-center justify-between">
+          <div className="h-4 w-48 bg-neutral-200 dark:border-neutral-800 rounded animate-pulse" />
+          <div className="h-6 w-20 bg-neutral-100 dark:bg-neutral-800 rounded-full animate-pulse" />
         </header>
-        <main className="flex-1 bg-slate-50/50 dark:bg-slate-950/50" />
-        <footer className="h-16 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900" />
+        <main className="flex-1 bg-neutral-50 dark:bg-neutral-950" />
+        <footer className="h-16 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900" />
       </div>
+    );
+  }
+
+  // Pre-Flight Check-in Overlay
+  if (isPreFlightOpen) {
+    return (
+      <TestPreFlightModal
+        category={examCat}
+        testTitle={metadata.title}
+        sectionTitle={frontmatter.sectionTitle}
+        baseTimeLimitSeconds={frontmatter.timeLimit}
+        initialAccommodations={accommodations}
+        onStartExam={handleStartExam}
+      />
     );
   }
 
   const activeAnswer = activeQuestion ? answers[activeQuestion.id] : undefined;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background select-none">
-      {/* Top Header */}
-      <ExamHeader
-        sectionTitle={frontmatter.sectionTitle}
-        category={metadata.category}
-        config={effectiveConfig}
-        secondsRemaining={secondsRemaining}
-        isFlagged={Boolean(activeAnswer?.flagged)}
-        isCrossOutMode={isCrossOutMode}
-        isTTSPlaying={isTTSPlaying}
-        isTTSSupported={isTTSSupported}
-        onToggleFlag={toggleFlag}
-        onToggleCrossOut={() => setIsCrossOutMode((prev) => !prev)}
-        onToggleCalculator={toggleCalculator}
-        onToggleFormulaSheet={() => setIsFormulaSheetOpen(true)}
-        onToggleTTS={handleToggleTTS}
-      />
-
-      {/* Main Presentation View via Strategy Dispatcher */}
-      <main className="flex-1 flex overflow-hidden">
-        {effectiveConfig.layout === "split-passage" ? (
-          <SplitPassageLayout
-            passageContent={passageContent}
-            activeQuestion={activeQuestion}
-            selectedOptionId={activeAnswer?.selectedOptionId}
-            frqAnswer={activeAnswer?.frqUserAnswer}
-            eliminatedOptions={activeAnswer?.eliminatedOptions}
-            isCrossOutMode={isCrossOutMode}
-            onSelectOption={selectOption}
-            onSetFrqAnswer={setFrqAnswer}
-            onToggleEliminate={toggleEliminateOption}
-          />
-        ) : (
-          <SingleColumnLayout
-            passageContent={passageContent}
-            activeQuestion={activeQuestion}
-            selectedOptionId={activeAnswer?.selectedOptionId}
-            frqAnswer={activeAnswer?.frqUserAnswer}
-            eliminatedOptions={activeAnswer?.eliminatedOptions}
-            isCrossOutMode={isCrossOutMode}
-            onSelectOption={selectOption}
-            onSetFrqAnswer={setFrqAnswer}
-            onToggleEliminate={toggleEliminateOption}
-          />
-        )}
-      </main>
-
-      {/* Bottom Footer Navigator */}
-      <ExamFooter
-        currentIndex={currentIndex}
-        totalQuestions={questions.length}
-        questions={questions}
-        answers={answers}
-        allowBacktracking={effectiveConfig.allowBacktracking}
-        onPrev={() => setCurrentIndex((idx) => Math.max(0, idx - 1))}
-        onNext={() => {
-          if (currentIndex >= questions.length - 1) {
-            setIsReviewOpen(true);
-          } else {
-            setCurrentIndex((idx) => Math.min(questions.length - 1, idx + 1));
-          }
+    <>
+      {/* Category Layout Adapter */}
+      <TestShellLayout
+        category={examCat}
+        metadata={metadata}
+        section={section}
+        effectiveConfig={effectiveConfig}
+        manifestBasePath={manifestBasePath}
+        state={{
+          currentIndex,
+          totalQuestions: questions.length,
+          secondsRemaining,
+          activeQuestion,
+          activeAnswer,
+          answers,
+          isCrossOutMode,
+          isTTSPlaying,
+          isTTSSupported,
+          accommodations,
         }}
-        onSelectIndex={(idx) => setCurrentIndex(idx)}
-        onOpenReview={() => setIsReviewOpen(true)}
+        actions={{
+          setCurrentIndex,
+          selectOption,
+          setFrqAnswer,
+          toggleEliminateOption,
+          toggleFlag,
+          toggleCrossOut: () => setIsCrossOutMode((prev) => !prev),
+          toggleCalculator,
+          openFormulaSheet: () => setIsFormulaSheetOpen(true),
+          toggleTTS: handleToggleTTS,
+          openReviewModal: () => setIsReviewOpen(true),
+        }}
       />
 
-      {/* Config-driven Calculator Toolbar Overlay */}
+      {/* Global Modals & Overlays */}
       <CalculatorToolbar
         type={effectiveConfig.calculator}
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
       />
 
-      {/* Config-driven Formula Sheet Overlay */}
       <FormulaSheetModal
         sheetId={effectiveConfig.formulaSheetId}
         isOpen={isFormulaSheetOpen}
         onClose={() => setIsFormulaSheetOpen(false)}
       />
 
-      {/* Category-Adaptive Section Review & Submit Modal */}
       <SectionReviewModal
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
@@ -265,6 +286,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         answers={answers}
         onJumpToQuestion={(idx) => setCurrentIndex(idx)}
       />
-    </div>
+    </>
   );
 };

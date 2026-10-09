@@ -2,7 +2,8 @@
   "id": "sat-practice-1",
   "title": "Digital SAT Practice Test 1",
   "category": "SAT",
-  "description": "Full-length official style diagnostic SAT exam.",
+  "description": "Full-length official style diagnostic SAT exam with vector and raster stimuli.",
+  "assetBasePath": "/content/tests/sat/sat-practice-1/assets",
   "sections": [
     {
       "id": "sat-practice-1-s1",

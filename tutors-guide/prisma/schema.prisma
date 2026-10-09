@@ -169,7 +169,8 @@ model Result {
   rawScore             Int      @default(0)
   scaledScore          Int?     // Section-scaled score (e.g., 680 Math, 32 Science)
   timeRemainingSeconds Int      @default(0)
-  navigationHistory    Json?    // Telemetry trace: Array of { time: number, qIdx: number }
+  navigationHistory    Json?    // Strictly [{ time: number, qIdx: number }]
+  accommodations       Json?    // Dedicated audit payload for accommodations
   testTitle            String
   completedAt          DateTime @default(now())
 

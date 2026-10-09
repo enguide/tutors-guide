@@ -52,7 +52,10 @@ export interface TestMetadata {
   sections: SectionManifest[];
 }
 
+// types/content.ts
 export interface ParsedSection {
   frontmatter: SectionFrontmatter;
   content: string;
+  category?: string;
+  testId?: string;
 }

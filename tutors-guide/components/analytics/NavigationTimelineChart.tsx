@@ -55,7 +55,8 @@ export const NavigationTimelineChart: React.FC<NavigationTimelineChartProps> = (
     return Array.from(new Set(ticks));
   }, [totalQuestions]);
 
-  if (!data || data.length === 0) {
+  // Clean, strict array guard
+  if (!Array.isArray(data) || data.length === 0) {
     return (
       <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
         No chronological navigation telemetry available for this section.
@@ -90,15 +91,15 @@ export const NavigationTimelineChart: React.FC<NavigationTimelineChartProps> = (
         <div className="h-64 sm:h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-  data={data}
-  margin={{ top: 15, right: 25, left: 0, bottom: 20 }}
-  onClick={(e: any) => {
-    const payload = e?.activePayload?.[0]?.payload;
-    if (payload?.qIdx !== undefined && onSelectQuestionIndex) {
-      onSelectQuestionIndex(Number(payload.qIdx));
-    }
-  }}
->
+              data={data}
+              margin={{ top: 15, right: 25, left: 0, bottom: 20 }}
+              onClick={(e: any) => {
+                const payload = e?.activePayload?.[0]?.payload;
+                if (payload?.qIdx !== undefined && onSelectQuestionIndex) {
+                  onSelectQuestionIndex(Number(payload.qIdx));
+                }
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
               <XAxis
                 dataKey="time"

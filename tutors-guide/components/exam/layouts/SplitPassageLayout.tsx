@@ -13,6 +13,9 @@ interface SplitPassageLayoutProps {
   frqAnswer?: string;
   eliminatedOptions?: string[];
   isCrossOutMode: boolean;
+  category?: string;
+  testId?: string;
+  manifestBasePath?: string;
   onSelectOption: (optionId: string) => void;
   onSetFrqAnswer: (value: string) => void;
   onToggleEliminate: (optionId: string) => void;
@@ -25,6 +28,9 @@ export const SplitPassageLayout: React.FC<SplitPassageLayoutProps> = ({
   frqAnswer,
   eliminatedOptions,
   isCrossOutMode,
+  category,
+  testId,
+  manifestBasePath,
   onSelectOption,
   onSetFrqAnswer,
   onToggleEliminate,
@@ -37,7 +43,12 @@ export const SplitPassageLayout: React.FC<SplitPassageLayoutProps> = ({
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
             Reference Passage
           </span>
-          <MarkdownQuestionRenderer content={passageContent} />
+          <MarkdownQuestionRenderer
+            content={passageContent}
+            category={category}
+            testId={testId}
+            manifestBasePath={manifestBasePath}
+          />
         </div>
       </div>
 
@@ -50,7 +61,12 @@ export const SplitPassageLayout: React.FC<SplitPassageLayoutProps> = ({
               Question {activeQuestion.questionNumber}
             </span>
             <div className="text-slate-900 dark:text-slate-100 text-base">
-              <MarkdownQuestionRenderer content={activeQuestion.prompt} />
+              <MarkdownQuestionRenderer
+                content={activeQuestion.prompt}
+                category={category}
+                testId={testId}
+                manifestBasePath={manifestBasePath}
+              />
             </div>
           </div>
 
