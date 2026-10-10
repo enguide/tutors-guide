@@ -1,0 +1,33 @@
+{
+  "id": "act-practice-1",
+  "title": "ACT Diagnostic Practice Test 1",
+  "category": "ACT",
+  "description": "Standard ACT practice exam testing TestNav chrome, split-screen reading, and math problem solving.",
+  "assetBasePath": "/content/tests/act/act-practice-1/assets",
+  "sections": [
+    {
+      "id": "act-practice-1-s1",
+      "file": "section-1-english.md",
+      "order": 1,
+      "title": "English - Section 1",
+      "timeLimit": 2700,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false
+      }
+    },
+    {
+      "id": "act-practice-1-s2",
+      "file": "section-2-math.md",
+      "order": 2,
+      "title": "Mathematics - Section 2",
+      "timeLimit": 3600,
+      "config": {
+        "layout": "single-column",
+        "calculator": "scientific",
+        "hasFormulaSheet": false
+      }
+    }
+  ]
+}

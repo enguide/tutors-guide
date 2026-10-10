@@ -8,6 +8,8 @@ import {
   SectionFrontmatter,
   ParsedSection,
 } from "@/types/content";
+import { prisma } from "@/lib/prisma";
+import { Category } from "@prisma/client";
 
 const CONTENT_DIR = path.join(process.cwd(), "content", "tests");
 
@@ -84,3 +86,50 @@ export const getSectionById = cache(async function getSectionById(
 
   return getSectionContent(category, testId, sectionEntry.file);
 });
+
+/**
+ * Ensures that the Markdown-defined Test and all its Sections exist in PostgreSQL.
+ * Synchronizes metadata changes (titles, order, timeLimit) into the DB on demand.
+ */
+export async function ensureTestInDatabase(metadata: TestMetadata) {
+  try {
+    const dbCategory = (metadata.category.toUpperCase() as Category) || Category.NONE;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Upsert the master Test record
+      await tx.test.upsert({
+        where: { id: metadata.id },
+        create: {
+          id: metadata.id,
+          title: metadata.title,
+          category: dbCategory,
+        },
+        update: {
+          title: metadata.title,
+          category: dbCategory,
+        },
+      });
+
+      // 2. Upsert each Section listed in the manifest
+      for (const s of metadata.sections) {
+        await tx.section.upsert({
+          where: { id: s.id },
+          create: {
+            id: s.id,
+            testId: metadata.id,
+            title: s.title,
+            sectionOrder: s.order,
+            timeLimit: s.timeLimit,
+          },
+          update: {
+            title: s.title,
+            sectionOrder: s.order,
+            timeLimit: s.timeLimit,
+          },
+        });
+      }
+    });
+  } catch (error) {
+    console.error(`Failed to ensure test ${metadata.id} in database:`, error);
+  }
+}

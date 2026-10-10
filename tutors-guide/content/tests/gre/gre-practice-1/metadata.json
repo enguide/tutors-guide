@@ -1,0 +1,21 @@
+{
+  "id": "gre-practice-1",
+  "title": "GRE Diagnostic Practice Test 1",
+  "category": "GRE",
+  "description": "ETS PowerPrep simulation with top-action toolbar, single-column quant layout, and on-screen calculator.",
+  "assetBasePath": "/content/tests/gre/gre-practice-1/assets",
+  "sections": [
+    {
+      "id": "gre-practice-1-s1",
+      "file": "section-1-quant.md",
+      "order": 1,
+      "title": "Quantitative Reasoning - Section 1",
+      "timeLimit": 2100,
+      "config": {
+        "layout": "single-column",
+        "calculator": "scientific",
+        "hasFormulaSheet": false
+      }
+    }
+  ]
+}

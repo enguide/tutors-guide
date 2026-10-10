@@ -1,0 +1,21 @@
+{
+  "id": "ap-calc-practice-1",
+  "title": "AP Calculus AB Practice Exam 1",
+  "category": "AP_CALC",
+  "description": "College Board AP Academic layout featuring split document stimulus, calculus reference sheets, and graphing calculator gating.",
+  "assetBasePath": "/content/tests/ap_calc/ap-calc-practice-1/assets",
+  "sections": [
+    {
+      "id": "ap-calc-practice-1-s1",
+      "file": "section-1-part-a.md",
+      "order": 1,
+      "title": "Section I, Part A: Multiple Choice (No Calculator)",
+      "timeLimit": 3600,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": true
+      }
+    }
+  ]
+}

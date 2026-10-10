@@ -1,33 +1,27 @@
-
+// prisma/seed.ts
 import bcrypt from "bcryptjs";
-import {
-  Role,
-  Package,
-  ClassYear,
-  Category,
-} from "@prisma/client";
+import { Role, ClassYear, Category } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 async function main() {
   console.log("Starting database seed...");
 
-  // 1. Clean existing records (in reverse dependency order)
+  // 1. Clean existing records in reverse dependency order
+  await prisma.enrollment.deleteMany();
+  await prisma.licensePool.deleteMany();
   await prisma.result.deleteMany();
   await prisma.response.deleteMany();
   await prisma.section.deleteMany();
   await prisma.test.deleteMany();
-  await prisma.membership.deleteMany();
   await prisma.profile.deleteMany();
   await prisma.organization.deleteMany();
   await prisma.school.deleteMany();
 
-  // 2. Seed Default Organization & School for B2B testing
+  // 2. Default Organization & School
   const defaultOrg = await prisma.organization.create({
     data: {
       id: "org-apex-prep",
       name: "Apex Prep Academy",
-      seatLimit: 25,
-      packageType: Package.ALL,
     },
   });
 
@@ -38,10 +32,10 @@ async function main() {
     },
   });
 
-  // 3. Seed Mock Admin & Student Profiles
+  // 3. User Profiles
   const hashedPassword = await bcrypt.hash("AdminPass123!", 10);
 
-  const adminProfile = await prisma.profile.create({
+  await prisma.profile.create({
     data: {
       id: "prof-admin-01",
       firstName: "Platform",
@@ -50,7 +44,6 @@ async function main() {
       password: hashedPassword,
       classYear: ClassYear.OTHER,
       role: Role.ADMIN,
-      tgpackage: Package.ALL,
       orgId: defaultOrg.id,
       schoolId: defaultSchool.id,
     },
@@ -65,57 +58,45 @@ async function main() {
       password: hashedPassword,
       classYear: ClassYear.JUNIOR,
       role: Role.STUDENT,
-      tgpackage: Package.SAT,
       schoolId: defaultSchool.id,
     },
   });
 
-  // 4. Seed Mock Test & Sections matching content/tests/sat/sat-practice-1/
-  const testId = "sat-practice-1";
-
-  const test = await prisma.test.create({
+  // 4. Create an Individual License Pool (SAT + ACT Bundle) for Jane Doe
+  const studentPool = await prisma.licensePool.create({
     data: {
-      id: testId,
-      title: "Digital SAT Practice Test 1",
-      category: Category.SAT,
-      sections: {
-        create: [
-          {
-            id: `${testId}-s1`,
-            title: "Reading and Writing - Module 1",
-            sectionOrder: 1,
-            timeLimit: 1920, // 32 minutes in seconds
-          },
-          {
-            id: `${testId}-s2`,
-            title: "Reading and Writing - Module 2",
-            sectionOrder: 2,
-            timeLimit: 1920,
-          },
-          {
-            id: `${testId}-s3`,
-            title: "Math - Module 1",
-            sectionOrder: 3,
-            timeLimit: 2100, // 35 minutes in seconds
-          },
-          {
-            id: `${testId}-s4`,
-            title: "Math - Module 2",
-            sectionOrder: 4,
-            timeLimit: 2100,
-          },
-        ],
-      },
-    },
-    include: {
-      sections: true,
+      name: "Jane Doe - SAT & ACT Combo",
+      seatLimit: 1,
+      categories: [Category.SAT, Category.ACT],
+      startsAt: new Date(),
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      purchaserId: studentProfile.id,
     },
   });
 
-  console.log(`Database seeded successfully:`);
-  console.log(` - Admin: ${adminProfile.email}`);
-  console.log(` - Student: ${studentProfile.email}`);
-  console.log(` - Test: ${test.title} (${test.sections.length} sections)`);
+  // 5. Enroll student into their pool
+  await prisma.enrollment.create({
+    data: {
+      profileId: studentProfile.id,
+      licensePoolId: studentPool.id,
+      status: "ACTIVE",
+    },
+  });
+
+  // 6. Create an Organization License Pool (Apex Prep - 25 Seats for SAT)
+  await prisma.licensePool.create({
+    data: {
+      name: "Apex Prep Academy - Fall 2026 Cohort",
+      orgId: defaultOrg.id,
+      seatLimit: 25,
+      categories: [Category.SAT],
+      inviteCode: "APEX-SAT-2026",
+      startsAt: new Date(),
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  console.log("Database seeded successfully with LicensePools & Enrollments.");
 }
 
 main()

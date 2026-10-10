@@ -1,6 +1,10 @@
 // app/tests/[category]/[testId]/[sectionId]/page.tsx
 import { notFound } from "next/navigation";
-import { getTestMetadata, getSectionById } from "@/lib/contentLoader";
+import {
+  getTestMetadata,
+  getSectionById,
+  ensureTestInDatabase,
+} from "@/lib/contentLoader";
 import { resolveSectionConfig } from "@/lib/examConfigRegistry";
 import { SupportedExamCategory } from "@/types/examConfig";
 import { ExamClient } from "@/components/exam/ExamClient";
@@ -25,6 +29,9 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
   if (!metadata || !section) {
     notFound();
   }
+
+  // Auto-sync: Guarantee this Test & Section exist in PostgreSQL before client boots
+  await ensureTestInDatabase(metadata);
 
   // 1. Locate the section entry in metadata.json to pull its manifest config
   const manifestSection = metadata.sections.find((s) => s.id === sectionId);
