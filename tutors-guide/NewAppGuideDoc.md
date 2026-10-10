@@ -168,8 +168,6 @@ Refer to the figure above when answering question 2. The figure is drawn to scal
 
 ## 3. Database Architecture (Prisma & PostgreSQL)
 
-The schema has been stripped of redundant content tables (`Block`, `Option`, duplicate categories), retaining user telemetry, organization seat pooling, memberships, string-keyed relational references, and diagnostic composite test summaries.
-
 ```prisma
 datasource db {
   provider  = "postgresql"
@@ -184,18 +182,9 @@ generator client {
 enum Role {
   STUDENT
   TUTOR
-  ORG
+  ORG_ADMIN
   ADMIN
   PARENT
-}
-
-enum Package {
-  NONE
-  SAT
-  ACT
-  AP_CALC
-  GRE
-  ALL
 }
 
 enum ClassYear {
@@ -220,15 +209,20 @@ enum QuestionType {
   FR
 }
 
+enum EnrollmentStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
 model Organization {
-  id               String       @id @default(cuid())
+  id               String        @id @default(cuid())
   name             String
-  seatLimit        Int          @default(0) // Total seats purchased via Stripe B2B checkout
-  packageType      Package      @default(NONE)
-  stripeCustomerId String?      @unique
-  members          Profile[]    @relation("OrgProfiles")
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  stripeCustomerId String?       @unique
+  members          Profile[]     @relation("OrgProfiles")
+  licensePools     LicensePool[] @relation("OrgLicensePools")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   @@index([stripeCustomerId])
   @@map("Organization")
@@ -251,13 +245,18 @@ model Profile {
   email                  String         @unique
   password               String
   classYear              ClassYear
-  tgpackage              Package        @default(NONE)
   role                   Role           @default(STUDENT)
   school                 School?        @relation("SchoolProfiles", fields: [schoolId], references: [id])
   schoolId               String?
   org                    Organization?  @relation("OrgProfiles", fields: [orgId], references: [id])
   orgId                  String?
-  membership             Membership?    @relation("ProfileToMembership")
+  
+  // Directly purchased pools (for individual students or self-serve org buyers)
+  ownedLicensePools      LicensePool[]  @relation("PurchaserLicensePools")
+  
+  // Active entitlements (seats allocated to this student)
+  enrollments            Enrollment[]   @relation("ProfileEnrollments")
+
   responses              Response[]     @relation("ProfileResponses")
   results                Result[]       @relation("ProfileResults")
   summaries              TestSummary[]  @relation("ProfileSummaries")
@@ -271,17 +270,70 @@ model Profile {
   @@map("Profile")
 }
 
-model Membership {
-  id              String   @id @default(cuid())
-  tgpackage       Package  @default(NONE)
-  stripeSessionId String   @unique
-  profile         Profile  @relation("ProfileToMembership", fields: [profileId], references: [id], onDelete: Cascade)
-  profileId       String   @unique
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// -------------------------------------------------------------
+// ENTITLEMENTS & BILLING
+// -------------------------------------------------------------
 
-  @@map("Membership")
+model LicensePool {
+  id                   String        @id @default(cuid())
+  name                 String        // e.g. "Individual SAT Prep", "Apex Prep ACT Fall 2026"
+  stripeSessionId      String?       @unique
+  stripeSubscriptionId String?
+  
+  // Seat configuration: 1 for direct student purchase, X for Organization
+  seatLimit            Int           @default(1)
+  
+  // Array of allowed categories: [SAT], [ACT], or [SAT, ACT] for bundles
+  categories           Category[]
+  
+  // Expiration: Set to now() + 365 days at checkout
+  startsAt             DateTime      @default(now())
+  expiresAt            DateTime
+  
+  // Either an individual buyer OR an Organization owns this pool
+  purchaserId          String?
+  purchaser            Profile?      @relation("PurchaserLicensePools", fields: [purchaserId], references: [id], onDelete: SetNull)
+  orgId                String?
+  org                  Organization? @relation("OrgLicensePools", fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Students occupying seats
+  enrollments          Enrollment[]  @relation("PoolEnrollments")
+
+  // Optional join code for self-serve B2B student registration
+  inviteCode           String?       @unique
+
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([purchaserId])
+  @@index([orgId])
+  @@index([inviteCode])
+  @@map("LicensePool")
 }
+
+model Enrollment {
+  id              String           @id @default(cuid())
+  status          EnrollmentStatus @default(ACTIVE)
+  
+  profileId       String
+  profile         Profile          @relation("ProfileEnrollments", fields: [profileId], references: [id], onDelete: Cascade)
+  
+  licensePoolId   String
+  licensePool     LicensePool      @relation("PoolEnrollments", fields: [licensePoolId], references: [id], onDelete: Cascade)
+  
+  firstAccessedAt DateTime?        // Populated on their first test launch
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([profileId, licensePoolId])
+  @@index([profileId])
+  @@index([licensePoolId])
+  @@map("Enrollment")
+}
+
+// -------------------------------------------------------------
+// EXAM CORE (Unchanged)
+// -------------------------------------------------------------
 
 model Test {
   id          String        @id @default(cuid())
@@ -314,8 +366,8 @@ model Response {
   isCorrect           Boolean      @default(false)
   responseOrder       Int
   sectionOrder        Int
-  timeSpentOnResponse Int?         @default(0) // Seconds spent on active question
-  questionId          String       // Links to Markdown frontmatter ID
+  timeSpentOnResponse Int?         @default(0)
+  questionId          String       
   responseType        QuestionType @default(MC)
   selectedOptionId    String?
   frqUserAnswer       String?
@@ -329,7 +381,6 @@ model Response {
   sectionId           String
   section             Section      @relation("SectionResponses", fields: [sectionId], references: [id], onDelete: Cascade)
 
-  // One response per question per user (one-and-done attempt enforcement)
   @@unique([profileId, questionId])
   @@index([profileId, testId])
   @@map("Response")
@@ -340,9 +391,10 @@ model Result {
   numCorrect           Int      @default(0)
   totalQuestions       Int      @default(0)
   rawScore             Int      @default(0)
-  scaledScore          Int?     // Section-scaled score (e.g., 680 Math, 32 Science)
+  scaledScore          Int?     
   timeRemainingSeconds Int      @default(0)
-  navigationHistory    Json?    // Telemetry trace: Array of { time: number, qIdx: number }
+  navigationHistory    Json?    
+  accommodations       Json?    
   testTitle            String
   completedAt          DateTime @default(now())
 
@@ -353,7 +405,6 @@ model Result {
   sectionId            String
   section              Section  @relation("ResultSections", fields: [sectionId], references: [id], onDelete: Cascade)
 
-  // Enforces strict one-and-done completion per section
   @@unique([testId, profileId, sectionId])
   @@index([profileId])
   @@map("Result")
@@ -367,13 +418,10 @@ model TestSummary {
   profile        Profile   @relation("ProfileSummaries", fields: [profileId], references: [id], onDelete: Cascade)
   testTitle      String
   category       Category  @default(NONE)
-  
-  // Composite score across all exam sections (e.g., 1520 SAT, 34 ACT, 5 AP)
   compositeScore Int?
-  percentile     String?   // e.g., "98th"
+  percentile     String?   
   completedAt    DateTime  @default(now())
 
-  // One diagnostic composite record per student per test
   @@unique([testId, profileId])
   @@index([profileId])
   @@map("TestSummary")
@@ -389,7 +437,6 @@ model PasswordResetToken {
   @@map("PasswordResetToken")
 }
 ```
-
 ---
 
 ## 4. State Resilience & Autosave Architecture

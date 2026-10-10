@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { TOTP } from "otplib";
 import { prisma } from "./prisma";
 import { authConfig } from "./auth.config";
+import { Category, EnrollmentStatus } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -15,9 +16,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         twoFactorCode: { label: "2FA Code", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
+        if (!credentials?.email || !credentials?.password) return null;
 
         const email = String(credentials.email).toLowerCase().trim();
         const password = String(credentials.password);
@@ -27,30 +26,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const profile = await prisma.profile.findUnique({
           where: { email },
+          include: {
+            enrollments: {
+              where: {
+                status: EnrollmentStatus.ACTIVE,
+                licensePool: {
+                  expiresAt: { gt: new Date() },
+                },
+              },
+              include: {
+                licensePool: {
+                  select: { categories: true },
+                },
+              },
+            },
+          },
         });
 
-        if (!profile || !profile.password) {
-          return null;
-        }
+        if (!profile || !profile.password) return null;
 
         const isValidPassword = await bcrypt.compare(password, profile.password);
-        if (!isValidPassword) {
-          return null;
-        }
+        if (!isValidPassword) return null;
 
-        // Two-factor authentication verification if activated
         if (profile.twoFactorAuthActivated) {
           if (!profile.twoFactorAuthSecret || !twoFactorCode) {
             throw new Error("2FA_REQUIRED");
           }
-
           const totp = new TOTP();
           const isValidToken = await totp.verify(twoFactorCode, {
             secret: profile.twoFactorAuthSecret,
           });
+          if (!isValidToken) throw new Error("INVALID_2FA_CODE");
+        }
 
-          if (!isValidToken) {
-            throw new Error("INVALID_2FA_CODE");
+        // Aggregate unique entitled categories across all active license pools
+        const categorySet = new Set<Category>();
+        for (const enrollment of profile.enrollments) {
+          for (const cat of enrollment.licensePool.categories) {
+            categorySet.add(cat);
           }
         }
 
@@ -59,8 +72,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: profile.email,
           name: `${profile.firstName} ${profile.lastName}`,
           role: profile.role,
-          tgpackage: profile.tgpackage,
           orgId: profile.orgId,
+          entitlements: Array.from(categorySet),
         };
       },
     }),

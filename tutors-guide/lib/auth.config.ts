@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
-  // pages: {
-  //   signIn: "/login",
-  // },
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
   session: {
     strategy: "jwt",
   },
@@ -12,20 +14,20 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        token.tgpackage = user.tgpackage;
         token.orgId = user.orgId;
+        token.entitlements = user.entitlements || [];
       }
       return token;
     },
     session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id;
+        session.user.id = token.id as string;
         session.user.role = token.role;
-        session.user.tgpackage = token.tgpackage;
-        session.user.orgId = token.orgId;
+        session.user.orgId = token.orgId as string | null;
+        session.user.entitlements = (token.entitlements as any[]) || [];
       }
       return session;
     },
   },
-  providers: [], // Configured with Node dependencies in auth.ts
+  providers: [],
 } satisfies NextAuthConfig;
