@@ -676,6 +676,44 @@ _Goal: Implement category-specific testing interfaces that accurately mirror the
 
 ---
 
+## Epic 8: Frictionless Onboarding & Automated Provisioning
+
+### Overview
+
+Established an automated, role-gated onboarding and entitlement lifecycle for both B2C self-enrolled students and B2B institutional cohorts. The system guarantees that post-checkout provisioning requires zero manual administrative intervention while enforcing strict separation between instructional staff and student testing surfaces.
+
+---
+
+### Key Deliverables & Architectural Changes
+
+* **Automated Webhook Entitlement & Provisioning:**
+* Configured Stripe webhook fulfillment to differentiate individual student purchases from institutional seat pools.
+* B2C transactions provision individual user credentials and exam category entitlements immediately.
+* B2B transactions generate dedicated `LicensePool` records linked to the purchaser's organization, creating unique, shareable join codes (`ORG-XXXXXX`) and managing seat capacities.
+
+
+* **Secure Post-Checkout Handoff (`/checkout/success`):**
+* Dynamic, server-rendered handoff utilizing Next.js 16 Dynamic IO (`await connection()` with `<Suspense>` boundaries and `export const instant = false`).
+* **B2B Experience:** Surfaces organization entitlement counts, access validity windows, and the active student claim URL with one-click clipboard copying.
+* **B2C Experience:** Identifies provisioned exam categories and directs new accounts straight into the credential establishment flow.
+
+
+* **Tokenized Credential Setup & Password Recovery:**
+* Leveraged the existing `PasswordResetToken` relational schema (`profileId`, `token`, `tokenExpiry`).
+* Implemented server actions (`requestPasswordReset`, `resetPasswordWithToken`) enforcing one-hour expiration, cryptographic generation (`crypto.randomBytes`), previous token invalidation, and bcrypt password updates within an atomic Prisma transaction.
+* Created `/forgot-password` and `/reset-password` UI views wrapped in client-side `<Suspense>` boundaries to handle query parameter hydration without prerender warnings.
+
+
+* **Strict Role-Based Access Control (RBAC) at the Test Boundary:**
+* Locked down the exam runner (`app/tests/[category]/[testId]/[sectionId]/page.tsx`).
+* Enforced that `ORG_ADMIN` and `TUTOR` roles are barred from entering test sections or generating student test submissions, redirecting restricted staff accounts to `/dashboard?notice=staff_restricted`.
+* Verified category entitlement verification so students can only access licensed diagnostic exams (e.g., SAT vs. ACT).
+
+
+* **Next.js 16 Platform Conformance:**
+* Migrated root edge logic from the deprecated `middleware.ts` to `proxy.ts` to align with Next.js 16.4+ file conventions.
+* Resolved prerendering and dynamic timing errors (`Date.now()`, `searchParams`) by enforcing streaming `<Suspense>` patterns across all auth and checkout flows.
+
 ## Epic 9: Multi-Stage Adaptive Testing (CAT) Routing Engine
 
 _Goal: Build the algorithmic routing engine to support multistage computer-adaptive testing for the digital SAT and GRE._
