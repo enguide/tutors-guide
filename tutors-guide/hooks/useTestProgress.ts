@@ -37,6 +37,7 @@ interface UseTestProgressProps {
   timeLimitSeconds: number;
   questions: QuestionFrontmatter[];
   timeExtensionMultiplier?: number;
+  isTimerRunning?: boolean;
   onTimeExpired?: () => void;
 }
 
@@ -57,6 +58,7 @@ export function useTestProgress({
   timeLimitSeconds,
   questions,
   timeExtensionMultiplier = 1.0,
+  isTimerRunning = true,
   onTimeExpired,
 }: UseTestProgressProps) {
   const storageKey = `test_progress_${testId}_${sectionId}`;
@@ -102,7 +104,8 @@ export function useTestProgress({
       activeIdx: number,
       navHistory: NavigationHistoryEntry[]
     ) => {
-      if (typeof window === "undefined") return;
+      // Guard: Never write to localStorage if timer is stopped / submitted / unmounted
+      if (typeof window === "undefined" || !isTimerRunning) return;
       try {
         localStorage.setItem(
           storageKey,
@@ -118,41 +121,56 @@ export function useTestProgress({
         console.error("Failed writing progress to localStorage:", e);
       }
     },
-    [storageKey]
+    [storageKey, isTimerRunning]
   );
 
-  // Flushes pending ticking seconds for a given question index into the answers state
-  const flushQuestionTime = useCallback(
-    (idx: number): StudentAnswers => {
-      const q = questions[idx];
-      if (!q) return answers;
+  const clearLocalBuffer = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(`timer_${testId}_${sectionId}`);
+      localStorage.removeItem(`answers_${testId}_${sectionId}`);
+      localStorage.removeItem(`seconds_remaining_${testId}_${sectionId}`);
+    } catch (e) {
+      console.error("Failed clearing local storage buffer:", e);
+    }
+  }, [storageKey, testId, sectionId]);
 
-      const uncommitted = timePerQuestionRef.current[q.id] || 0;
-      if (uncommitted === 0) return answers;
+  // Purges all cached sections and attempt buffers associated with this testId
+  const clearAllTestBuffers = useCallback((targetTestId: string) => {
+    if (typeof window === "undefined") return;
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (
+          key &&
+          (key.startsWith(`test_progress_${targetTestId}`) ||
+            key.startsWith(`timer_${targetTestId}`) ||
+            key.startsWith(`answers_${targetTestId}`) ||
+            key.startsWith(`seconds_remaining_${targetTestId}`))
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {
+      console.error("Failed clearing all test buffers:", e);
+    }
+  }, []);
 
-      timePerQuestionRef.current[q.id] = 0;
-      const prevAns = answers[q.id] || {};
-      const updatedAns: StudentAnswers = {
-        ...answers,
-        [q.id]: {
-          ...prevAns,
-          timeSpent: (prevAns.timeSpent || 0) + uncommitted,
-        },
-      };
+  // Synchronously resets the timer countdown when accommodations change pre-start
+  const resetTimeLimit = useCallback((newTotalSeconds: number) => {
+    setSecondsRemaining(newTotalSeconds);
+  }, []);
 
-      setAnswers(updatedAns);
-      return updatedAns;
-    },
-    [questions, answers]
-  );
-
-  // Step Dispatcher: Flushes leaving question time, logs navigation event
   const setCurrentIndex = useCallback(
     (updater: number | ((prev: number) => number)) => {
       setCurrentIndexState((prevIdx) => {
         const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
+
+        // Strict guard: Do not append duplicate transition if index did not change
         if (nextIdx !== prevIdx) {
-          // 1. Commit time spent on previous question
           const leavingQ = questions[prevIdx];
           let updatedAnswers = answers;
           if (leavingQ) {
@@ -169,11 +187,15 @@ export function useTestProgress({
             setAnswers(updatedAnswers);
           }
 
-          // 2. Append navigation event
           const elapsed = totalAdjustedSeconds - secondsRemaining;
           const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
 
           setNavigationHistory((prevHistory) => {
+            const lastEntry = prevHistory[prevHistory.length - 1];
+            if (lastEntry && lastEntry.qIdx === nextIdx) {
+              return prevHistory;
+            }
+
             const updatedHistory = [...prevHistory, nextEntry];
             persistToLocalStorage(
               updatedAnswers,
@@ -190,8 +212,10 @@ export function useTestProgress({
     [questions, answers, totalAdjustedSeconds, secondsRemaining, persistToLocalStorage]
   );
 
-  // 1-second interval timer
+  // Gated 1-second interval timer
   useEffect(() => {
+    if (!isTimerRunning) return;
+
     const timer = setInterval(() => {
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
@@ -210,11 +234,11 @@ export function useTestProgress({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [currentIndex, questions, onTimeExpired]);
+  }, [isTimerRunning, currentIndex, questions, onTimeExpired]);
 
-  // Periodic backup of time counter
+  // Periodic backup of time counter (only while timer is running)
   useEffect(() => {
-    if (secondsRemaining % 5 === 0) {
+    if (isTimerRunning && secondsRemaining % 5 === 0) {
       persistToLocalStorage(
         answers,
         secondsRemaining,
@@ -222,9 +246,8 @@ export function useTestProgress({
         navigationHistory
       );
     }
-  }, [secondsRemaining, answers, currentIndex, navigationHistory, persistToLocalStorage]);
+  }, [isTimerRunning, secondsRemaining, answers, currentIndex, navigationHistory, persistToLocalStorage]);
 
-  // Debounced Server Autosave with absolute time
   const scheduleAutosave = useCallback(
     (questionId: string, updatedAnswer: StudentAnswers[string], index: number) => {
       if (autosaveTimeoutRef.current[questionId]) {
@@ -267,7 +290,6 @@ export function useTestProgress({
         Boolean(currentAnswer.selectedOptionId) &&
         currentAnswer.selectedOptionId !== optionId;
 
-      // Accumulate ticking seconds
       const currentSpent =
         (currentAnswer.timeSpent || 0) + (timePerQuestionRef.current[qId] || 0);
       timePerQuestionRef.current[qId] = 0;
@@ -416,7 +438,6 @@ export function useTestProgress({
     });
   }, [currentIndex, questions, answers, scheduleAutosave]);
 
-  // Exposed helper so ExamClient can finalize all accumulated seconds before submit
   const getFinalizedAnswers = useCallback((): StudentAnswers => {
     const activeQ = questions[currentIndex];
     if (!activeQ) return answers;
@@ -431,6 +452,25 @@ export function useTestProgress({
       },
     };
   }, [currentIndex, questions, answers]);
+
+  // Appends a terminal exit entry with final elapsed time when section completes
+  const getFinalizedNavigationHistory = useCallback((): NavigationHistoryEntry[] => {
+    const finalElapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
+    const lastEntry = navigationHistory[navigationHistory.length - 1];
+
+    if (!lastEntry) {
+      return [{ time: 0, qIdx: 0 }, { time: finalElapsed, qIdx: currentIndex }];
+    }
+
+    if (lastEntry.time === finalElapsed && lastEntry.qIdx === currentIndex) {
+      return navigationHistory;
+    }
+
+    return [
+      ...navigationHistory,
+      { time: finalElapsed, qIdx: currentIndex },
+    ];
+  }, [totalAdjustedSeconds, secondsRemaining, navigationHistory, currentIndex]);
 
   return {
     activeQuestion: questions[currentIndex],
@@ -451,6 +491,9 @@ export function useTestProgress({
     toggleEliminateOption,
     toggleFlag,
     getFinalizedAnswers,
-    clearLocalBuffer: () => localStorage.removeItem(storageKey),
+    getFinalizedNavigationHistory,
+    clearLocalBuffer,
+    clearAllTestBuffers,
+    resetTimeLimit,
   };
 }

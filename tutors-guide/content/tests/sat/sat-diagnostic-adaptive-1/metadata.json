@@ -1,0 +1,127 @@
+{
+  "id": "sat-diagnostic-adaptive-1",
+  "title": "Digital SAT Diagnostic Practice 1 (Adaptive)",
+  "category": "SAT",
+  "description": "Full-length 2-stage computer-adaptive diagnostic exam with automatic routing and intermission.",
+  "assetBasePath": "/content/tests/sat/sat-diagnostic-adaptive-1/assets",
+  "isAdaptive": true,
+  "stages": [
+    {
+      "stageIndex": 1,
+      "sectionId": "sat-diag-rw-m1",
+      "routing": {
+        "threshold": 3,
+        "onPass": "sat-diag-rw-m2-hard",
+        "onFail": "sat-diag-rw-m2-easy"
+      }
+    },
+    {
+      "stageIndex": 2,
+      "sectionId": "sat-diag-math-m1",
+      "routing": {
+        "threshold": 3,
+        "onPass": "sat-diag-math-m2-hard",
+        "onFail": "sat-diag-math-m2-easy"
+      }
+    }
+  ],
+  "sections": [
+    {
+      "id": "sat-diag-rw-m1",
+      "file": "rw-m1.md",
+      "order": 1,
+      "title": "Reading and Writing - Module 1 (Baseline)",
+      "timeLimit": 300,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-diag-rw-m2-hard",
+      "file": "rw-m2-hard.md",
+      "order": 2,
+      "title": "Reading and Writing - Module 2 (Hard Tier)",
+      "timeLimit": 300,
+      "hasIntermissionAfter": true,
+      "intermissionDuration": 600,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-diag-rw-m2-easy",
+      "file": "rw-m2-easy.md",
+      "order": 2,
+      "title": "Reading and Writing - Module 2 (Standard Tier)",
+      "timeLimit": 300,
+      "hasIntermissionAfter": true,
+      "intermissionDuration": 600,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-diag-math-m1",
+      "file": "math-m1.md",
+      "order": 3,
+      "title": "Math - Module 1 (Baseline)",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "sat-standard",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-diag-math-m2-hard",
+      "file": "math-m2-hard.md",
+      "order": 4,
+      "title": "Math - Module 2 (Hard Tier)",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "sat-standard",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-diag-math-m2-easy",
+      "file": "math-m2-easy.md",
+      "order": 4,
+      "title": "Math - Module 2 (Standard Tier)",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "sat-standard",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    }
+  ]
+}

@@ -1,11 +1,15 @@
 // actions/completeTestSection.ts
 "use server";
 
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { evaluateAnswer } from "@/lib/scoring/mathEvaluator";
 import { QuestionFrontmatter } from "@/types/content";
 import { DEFAULT_SAT_CURVE, lookupScaledScore } from "@/lib/scoring/curveEngine";
+import { getTestMetadata } from "@/lib/contentLoader";
+import { evaluateNextExamRoute } from "@/lib/adaptive/branchingController";
+import { synthesizeAdaptiveTestScores } from "@/lib/scoring/adaptiveScorer";
 import { Category, Prisma } from "@prisma/client";
 import { AccommodationSettings } from "@/types/accommodations";
 
@@ -53,7 +57,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
   } = payload;
 
   try {
-    // 1. Enforce one-and-done: Check if this section was already finalized
+    // 1. Strict one-way guard: Verify section has not already been finalized
     const existingResult = await prisma.result.findUnique({
       where: {
         testId_profileId_sectionId: {
@@ -117,9 +121,8 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       })
     );
 
-    // 3. Persist the Result with cleanly separated navigation & accommodation data
+    // 3. Persist the immutable Result row
     const totalQuestions = questions.length;
-
     await prisma.result.create({
       data: {
         profileId,
@@ -137,25 +140,56 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       },
     });
 
-    // 4. Check if the test is fully completed across all sections
-    const testRecord = await prisma.test.findUnique({
-      where: { id: testId },
-      include: { sections: true },
-    });
+    // 4. Resolve next exam route (linear or adaptive branching)
+    const metadata = await getTestMetadata(category.toLowerCase(), testId);
+    if (!metadata) {
+      throw new Error("Unable to resolve test metadata for routing.");
+    }
 
-    const allSections = testRecord?.sections || [];
     const submittedResults = await prisma.result.findMany({
       where: { testId, profileId },
+      select: { sectionId: true, numCorrect: true, totalQuestions: true },
     });
 
-    const isTestComplete =
-      allSections.length > 0 && submittedResults.length === allSections.length;
+    const submittedSectionIds = submittedResults.map((r) => r.sectionId);
 
-    // 5. If all sections are finished, persist the TestSummary
-    if (isTestComplete) {
+    const routingDecision = evaluateNextExamRoute(
+      metadata,
+      sectionId,
+      numCorrect,
+      submittedSectionIds
+    );
+
+    // 5. If an intermission follows this section, set the HTTP-only server cookie
+    if (routingDecision.isIntermission) {
+      const duration = routingDecision.intermissionDuration || 600;
+      const breakEndsAt = Date.now() + duration * 1000;
+
+      const cookieStore = await cookies();
+      cookieStore.set(`break_${testId}`, breakEndsAt.toString(), {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: duration,
+      });
+    }
+
+    // 6. Check whether the full exam is completed across all stages
+    if (routingDecision.isTestComplete) {
       let compositeScore: number | null = null;
 
-      if (category === "SAT") {
+      const resultsMap = new Map<string, { numCorrect: number; totalQuestions: number }>();
+      submittedResults.forEach((r) => {
+        resultsMap.set(r.sectionId, {
+          numCorrect: r.numCorrect,
+          totalQuestions: r.totalQuestions,
+        });
+      });
+
+      if (metadata.isAdaptive) {
+        const adaptiveSynthesis = synthesizeAdaptiveTestScores(metadata, resultsMap);
+        compositeScore = adaptiveSynthesis.compositeScore;
+      } else if (category === "SAT") {
         const totalCorrect = submittedResults.reduce((acc, r) => acc + r.numCorrect, 0);
         compositeScore = lookupScaledScore(DEFAULT_SAT_CURVE.sectionCurves.English, totalCorrect);
       }
@@ -182,7 +216,11 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
 
     return {
       success: true,
-      isTestComplete,
+      nextSectionId: routingDecision.nextSectionId,
+      isIntermission: routingDecision.isIntermission,
+      intermissionDuration: routingDecision.intermissionDuration,
+      isTestComplete: routingDecision.isTestComplete,
+      tierSelected: routingDecision.tierSelected,
       stats: {
         numCorrect,
         totalQuestions,

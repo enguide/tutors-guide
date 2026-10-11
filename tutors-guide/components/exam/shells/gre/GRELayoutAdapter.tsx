@@ -37,6 +37,12 @@ export const GRELayoutAdapter: React.FC<TestShellLayoutProps> = ({
   const isFirstQuestion = state.currentIndex === 0;
   const isLastQuestion = state.currentIndex === questions.length - 1;
 
+  // Resolve discrete question stimulus first, then fall back to section content
+  const activeStimulus =
+    state.activeQuestion.stimulus ||
+    state.activeQuestion.passage ||
+    (passageContent && passageContent.trim().length > 0 ? passageContent : null);
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-neutral-100 dark:bg-neutral-950 select-none font-sans">
       {/* 1. Classic GRE Header Toolbar */}
@@ -132,10 +138,10 @@ export const GRELayoutAdapter: React.FC<TestShellLayoutProps> = ({
       {/* 2. Single-Column Work Area */}
       <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-neutral-100 dark:bg-neutral-950">
         <div className="max-w-3xl mx-auto space-y-6">
-          {passageContent && passageContent.trim().length > 0 && (
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm p-6 shadow-xs">
+          {activeStimulus && (
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm p-6 shadow-xs font-serif leading-relaxed text-sm">
               <MarkdownQuestionRenderer
-                content={passageContent}
+                content={activeStimulus}
                 category={category}
                 testId={metadata.id}
                 manifestBasePath={manifestBasePath}

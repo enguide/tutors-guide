@@ -16,6 +16,7 @@ import { CalculatorToolbar } from "../tools/CalculatorToolbar";
 import { FormulaSheetModal } from "../tools/FormulaSheetModal";
 import { SectionReviewModal } from "./SectionReviewModal";
 import { TestPreFlightModal } from "./TestPreFlightModal";
+import { SectionDirectionsModal } from "./SectionDirectionsModal";
 import { completeTestSection } from "@/actions/completeTestSection";
 import { Category } from "@prisma/client";
 import { TestShellLayout } from "./shells/TestShellLayout";
@@ -50,21 +51,29 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const manifestBasePath = (metadata as any).assetBasePath;
   const examCat = (category.toUpperCase() || metadata.category) as SupportedExamCategory;
 
-  const storageKey = `attempt_accommodations_${testId}`;
+  const accommodationsKey = `attempt_accommodations_${testId}`;
 
-  // Pre-flight & accommodations state with lazy localStorage hydration
-  const [isPreFlightOpen, setIsPreFlightOpen] = useState(true);
+  // 1. Accommodations State: Only prompt once per full test attempt
+  const [hasStoredAccommodations, setHasStoredAccommodations] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(localStorage.getItem(accommodationsKey));
+  });
+
   const [accommodations, setAccommodations] = useState<AccommodationSettings>(() => {
-    if (typeof window === "undefined") {
-      return DEFAULT_ACCOMMODATIONS;
-    }
+    if (typeof window === "undefined") return DEFAULT_ACCOMMODATIONS;
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = localStorage.getItem(accommodationsKey);
       return stored ? JSON.parse(stored) : DEFAULT_ACCOMMODATIONS;
     } catch {
       return DEFAULT_ACCOMMODATIONS;
     }
   });
+
+  // Only open Pre-Flight if not already configured for this attempt
+  const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(!hasStoredAccommodations);
+
+  // 2. Section Directions State: Keeps clock frozen until user clicks "Begin / Resume Section"
+  const [isSectionStarted, setIsSectionStarted] = useState<boolean>(false);
 
   // Submission & Review modal states
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -75,7 +84,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     frontmatter.timeLimit * accommodations.timeMultiplier
   );
 
-  // Core Exam State Hook
+  // Core Exam State Hook: isTimerRunning gated to isSectionStarted
   const {
     activeQuestion,
     currentIndex,
@@ -95,36 +104,58 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     toggleEliminateOption,
     toggleFlag,
     getFinalizedAnswers,
+    getFinalizedNavigationHistory,
     clearLocalBuffer,
+    clearAllTestBuffers,
+    resetTimeLimit,
   } = useTestProgress({
     testId,
     sectionId: frontmatter.sectionId,
     sectionOrder: frontmatter.sectionOrder,
     timeLimitSeconds: effectiveTimeLimitSeconds,
     questions,
+    isTimerRunning: isSectionStarted,
     onTimeExpired: () => {
       handleSubmitSection();
     },
   });
 
-  // Start Section from Pre-Flight
-  const handleStartExam = (selected: AccommodationSettings) => {
+  // Detect whether this is an in-progress session being resumed
+  const isResuming =
+    secondsRemaining < effectiveTimeLimitSeconds ||
+    Object.keys(answers).length > 0 ||
+    navigationHistory.length > 1;
+
+  // Test-Level Accommodations Confirmed
+  const handleAccommodationsConfirmed = (selected: AccommodationSettings) => {
     setAccommodations(selected);
     try {
-      localStorage.setItem(storageKey, JSON.stringify(selected));
-    } catch {
-      // Local storage full or private browsing
-    }
+      localStorage.setItem(accommodationsKey, JSON.stringify(selected));
+    } catch {}
+
+    // Resynchronize the timer countdown with the newly chosen multiplier
+    const newEffectiveSeconds = Math.round(frontmatter.timeLimit * selected.timeMultiplier);
+    resetTimeLimit(newEffectiveSeconds);
+
+    setHasStoredAccommodations(true);
     setIsPreFlightOpen(false);
+  };
+
+  // User begins or resumes section from Directions screen
+  const handleBeginSection = () => {
+    setIsSectionStarted(true);
   };
 
   // Finalize Section Action Handler
   const handleSubmitSection = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
+    // 1. Immediately freeze timer so no background intervals write back during network latency
+    setIsSectionStarted(false);
 
     try {
       const finalAnswers = getFinalizedAnswers();
+      const finalNavHistory = getFinalizedNavigationHistory();
 
       const result = await completeTestSection({
         testId,
@@ -132,8 +163,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         category: metadata.category as Category,
         sectionId: frontmatter.sectionId,
         sectionOrder: frontmatter.sectionOrder,
-        timeRemainingSeconds: secondsRemaining, // <-- map secondsRemaining to the payload property
-        navigationHistory,
+        timeRemainingSeconds: secondsRemaining,
+        navigationHistory: finalNavHistory,
         questions,
         clientAnswers: finalAnswers,
         accommodations,
@@ -142,34 +173,43 @@ export const ExamClient: React.FC<ExamClientProps> = ({
       if (!result.success) {
         alert(result.error || "Failed to submit section.");
         setIsSubmitting(false);
+        setIsSectionStarted(true); // Re-enable timer if submission failed
         return;
       }
 
+      // 2. Clear current section buffer from localStorage
       clearLocalBuffer();
       setIsReviewOpen(false);
 
-      const currentSectionIndex = metadata.sections.findIndex(
-        (s) => s.id === frontmatter.sectionId
-      );
-      const nextSection = metadata.sections[currentSectionIndex + 1];
-
-      if (result.isTestComplete || !nextSection) {
-        // Clear accommodations cache at the conclusion of the entire exam
+      // 3. Entire Exam Concluded -> Purge all section and accommodations buffers
+      if (result.isTestComplete || !result.nextSectionId) {
         try {
-          localStorage.removeItem(storageKey);
+          clearAllTestBuffers(testId);
+          localStorage.removeItem(accommodationsKey);
         } catch {}
         router.push(
           `/tests/${metadata.category.toLowerCase()}/${testId}/results`
         );
-      } else {
-        router.push(
-          `/tests/${metadata.category.toLowerCase()}/${testId}/${nextSection.id}`
-        );
+        return;
       }
+
+      // Transition to Intermission Break Route
+      if (result.isIntermission) {
+        router.push(
+          `/tests/${metadata.category.toLowerCase()}/${testId}/break`
+        );
+        return;
+      }
+
+      // Advance to Next Routed Section
+      router.push(
+        `/tests/${metadata.category.toLowerCase()}/${testId}/${result.nextSectionId}`
+      );
     } catch (error) {
       console.error("Submission failed:", error);
       alert("An unexpected error occurred while finalizing the section.");
       setIsSubmitting(false);
+      setIsSectionStarted(true);
     }
   }, [
     isSubmitting,
@@ -177,12 +217,13 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     metadata,
     frontmatter,
     secondsRemaining,
-    navigationHistory,
     questions,
     accommodations,
-    storageKey,
+    accommodationsKey,
     getFinalizedAnswers,
+    getFinalizedNavigationHistory,
     clearLocalBuffer,
+    clearAllTestBuffers,
     router,
   ]);
 
@@ -211,7 +252,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // Pre-Flight Check-in Overlay
+  // Phase 1: Test-Level Accommodations Modal (Prompts once at attempt start)
   if (isPreFlightOpen) {
     return (
       <TestPreFlightModal
@@ -220,16 +261,32 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         sectionTitle={frontmatter.sectionTitle}
         baseTimeLimitSeconds={frontmatter.timeLimit}
         initialAccommodations={accommodations}
-        onStartExam={handleStartExam}
+        onStartExam={handleAccommodationsConfirmed}
+      />
+    );
+  }
+
+  // Phase 2: Section Directions / Resumption Screen (Clock paused, shows remaining or allotted duration)
+  if (!isSectionStarted) {
+    return (
+      <SectionDirectionsModal
+        category={examCat}
+        testTitle={metadata.title}
+        sectionTitle={frontmatter.sectionTitle}
+        questionCount={questions.length}
+        timeLimitSeconds={isResuming ? secondsRemaining : effectiveTimeLimitSeconds}
+        config={effectiveConfig}
+        isResuming={isResuming}
+        onBeginSection={handleBeginSection}
       />
     );
   }
 
   const activeAnswer = activeQuestion ? answers[activeQuestion.id] : undefined;
 
+  // Phase 3: Active Section Runner
   return (
     <>
-      {/* Category Layout Adapter */}
       <TestShellLayout
         category={examCat}
         metadata={metadata}
@@ -262,7 +319,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         }}
       />
 
-      {/* Global Modals & Overlays */}
       <CalculatorToolbar
         type={effectiveConfig.calculator}
         isOpen={isCalculatorOpen}

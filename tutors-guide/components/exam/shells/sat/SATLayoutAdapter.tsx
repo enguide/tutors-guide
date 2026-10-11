@@ -18,10 +18,18 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   state,
   actions,
 }) => {
-  const { frontmatter, content: passageContent } = section;
+  const { frontmatter, content: sectionPassageContent } = section;
   const questions = frontmatter.questions;
   const isFirstQuestion = state.currentIndex === 0;
   const isLastQuestion = state.currentIndex === questions.length - 1;
+
+  // Discrete question stimulus takes priority over section-level markdown
+  const activeStimulus =
+    state.activeQuestion.stimulus ||
+    state.activeQuestion.passage ||
+    (sectionPassageContent && sectionPassageContent.trim().length > 0 ? sectionPassageContent : null);
+
+  const isSplitView = effectiveConfig.layout === "split-passage" || Boolean(activeStimulus);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-neutral-950 select-none">
@@ -41,67 +49,114 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         onToggleTTS={actions.toggleTTS}
       />
 
-      {/* 2. Independent Split-Pane Work Area */}
+      {/* 2. Work Area */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/50">
-        {/* Left Pane: Stimulus / Reading Passage */}
-        <div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-          <div className="max-w-2xl mx-auto space-y-4">
-            {passageContent && passageContent.trim().length > 0 ? (
-              <MarkdownQuestionRenderer
-  content={passageContent}
-  category={category}
-  testId={metadata.id}
-  manifestBasePath={manifestBasePath}
-  enableLightbox={state.accommodations.imageMagnification}
-/>
-            ) : (
-              <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
-                No reference stimulus required for this module.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Pane: Question & Interactive Options */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-          <div className="max-w-xl mx-auto space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-xs bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                  {state.activeQuestion.questionNumber}
-                </span>
-                {state.activeAnswer?.flagged && (
-                  <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 font-mono">
-                    Flagged for review
-                  </span>
+        {isSplitView ? (
+          <>
+            {/* Left Pane: Stimulus / Reading Passage */}
+            <div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
+              <div className="max-w-2xl mx-auto space-y-4 font-serif text-[15px] leading-relaxed text-neutral-900 dark:text-neutral-100">
+                {activeStimulus ? (
+                  <MarkdownQuestionRenderer
+                    content={activeStimulus}
+                    category={category}
+                    testId={metadata.id}
+                    manifestBasePath={manifestBasePath}
+                    enableLightbox={state.accommodations.imageMagnification}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
+                    No reference stimulus required for this item.
+                  </div>
                 )}
-              </div>
-
-              <div className="text-neutral-900 dark:text-neutral-100 text-base leading-relaxed">
-                <MarkdownQuestionRenderer
-  content={state.activeQuestion.prompt}
-  category={category}
-  testId={metadata.id}
-  manifestBasePath={manifestBasePath}
-  enableLightbox={state.accommodations.imageMagnification}
-/>
               </div>
             </div>
 
-            <hr className="border-neutral-200 dark:border-neutral-800" />
+            {/* Right Pane: Question Stem & Choices */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
+              <div className="max-w-xl mx-auto space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-xs bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                      {state.activeQuestion.questionNumber}
+                    </span>
+                    {state.activeAnswer?.flagged && (
+                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 font-mono">
+                        Flagged for review
+                      </span>
+                    )}
+                  </div>
 
-            <QuestionOptions
-              question={state.activeQuestion}
-              selectedOptionId={state.activeAnswer?.selectedOptionId}
-              frqAnswer={state.activeAnswer?.frqUserAnswer}
-              eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-              isCrossOutMode={state.isCrossOutMode}
-              onSelectOption={actions.selectOption}
-              onSetFrqAnswer={actions.setFrqAnswer}
-              onToggleEliminate={actions.toggleEliminateOption}
-            />
+                  <div className="text-neutral-900 dark:text-neutral-100 text-sm md:text-base font-sans font-medium leading-normal">
+                    <MarkdownQuestionRenderer
+                      content={state.activeQuestion.prompt}
+                      category={category}
+                      testId={metadata.id}
+                      manifestBasePath={manifestBasePath}
+                      enableLightbox={state.accommodations.imageMagnification}
+                    />
+                  </div>
+                </div>
+
+                <hr className="border-neutral-200 dark:border-neutral-800" />
+
+                <QuestionOptions
+                  question={state.activeQuestion}
+                  selectedOptionId={state.activeAnswer?.selectedOptionId}
+                  frqAnswer={state.activeAnswer?.frqUserAnswer}
+                  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+                  isCrossOutMode={state.isCrossOutMode}
+                  onSelectOption={actions.selectOption}
+                  onSetFrqAnswer={actions.setFrqAnswer}
+                  onToggleEliminate={actions.toggleEliminateOption}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Single Column (Math) */
+          <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-neutral-50 dark:bg-neutral-950">
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm p-6 md:p-8 shadow-xs space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-xs bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                      {state.activeQuestion.questionNumber}
+                    </span>
+                    {state.activeAnswer?.flagged && (
+                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 font-mono">
+                        Flagged for review
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-neutral-900 dark:text-neutral-100 text-base leading-relaxed font-sans">
+                    <MarkdownQuestionRenderer
+                      content={state.activeQuestion.prompt}
+                      category={category}
+                      testId={metadata.id}
+                      manifestBasePath={manifestBasePath}
+                      enableLightbox={state.accommodations.imageMagnification}
+                    />
+                  </div>
+                </div>
+
+                <hr className="border-neutral-200 dark:border-neutral-800" />
+
+                <QuestionOptions
+                  question={state.activeQuestion}
+                  selectedOptionId={state.activeAnswer?.selectedOptionId}
+                  frqAnswer={state.activeAnswer?.frqUserAnswer}
+                  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+                  isCrossOutMode={state.isCrossOutMode}
+                  onSelectOption={actions.selectOption}
+                  onSetFrqAnswer={actions.setFrqAnswer}
+                  onToggleEliminate={actions.toggleEliminateOption}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* 3. Bluebook Bottom Bar */}
@@ -118,7 +173,6 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           </button>
         </div>
 
-        {/* Center Question Navigator Popover */}
         <SATQuestionNavigatorPopover
           currentIndex={state.currentIndex}
           questions={questions}

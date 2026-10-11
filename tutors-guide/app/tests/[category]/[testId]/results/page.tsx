@@ -2,13 +2,22 @@
 // app/tests/[category]/[testId]/results/page.tsx
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
+import { connection } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTestMetadata, getSectionById } from "@/lib/contentLoader";
+import { synthesizeAdaptiveTestScores } from "@/lib/scoring/adaptiveScorer";
 import { TestAnalyticsClient } from "@/components/analytics/TestAnalyticsClient";
 import { Category, QuestionType } from "@prisma/client";
 import { QuestionFrontmatter } from "@/types/content";
-import { EnrichedResponseItem, SectionResultData, TestSummaryData } from "@/types/analytics";
+import {
+  EnrichedResponseItem,
+  SectionResultData,
+  TestSummaryData,
+  AdaptiveTrajectoryData,
+} from "@/types/analytics";
+
+export const instant = false;
 
 interface ResultsPageProps {
   params: Promise<{
@@ -30,6 +39,8 @@ async function ResultsContent({
 }: {
   paramsPromise: Promise<{ category: string; testId: string }>;
 }) {
+  await connection();
+
   const { category: rawCategory, testId } = await paramsPromise;
 
   const categoryEnum = parseCategorySlug(rawCategory);
@@ -109,7 +120,7 @@ async function ResultsContent({
       for (const q of secData.frontmatter.questions) {
         questionMap.set(q.id, {
           question: q,
-          passageText: (q as any).passage || sectionPassage || "",
+          passageText: q.stimulus || (q as any).passage || sectionPassage || "",
         });
       }
     }
@@ -134,7 +145,7 @@ async function ResultsContent({
       usedCalculator: r.usedCalculator,
       changedAnswer: r.changedAnswer,
       prompt: qMeta?.prompt ?? "",
-      passageText: entry?.passageText || null, // <--- PASS DOWN PASSAGE
+      passageText: entry?.passageText || null,
       options: qMeta?.options ?? [],
       domain: qMeta?.domain ?? "General",
       skill: qMeta?.skill ?? "General",
@@ -177,14 +188,27 @@ async function ResultsContent({
       }
     : null;
 
+  // 8. Compute adaptive trajectory data if test is adaptive
+  let adaptiveTrajectory: AdaptiveTrajectoryData | null = null;
+  if (metadata.isAdaptive) {
+    const resultsMap = new Map<string, { numCorrect: number; totalQuestions: number }>();
+    sectionResultRecords.forEach((sr) => {
+      resultsMap.set(sr.sectionId, {
+        numCorrect: sr.numCorrect,
+        totalQuestions: sr.totalQuestions,
+      });
+    });
+    adaptiveTrajectory = synthesizeAdaptiveTestScores(metadata, resultsMap);
+  }
+
   return (
     <TestAnalyticsClient
       metadata={metadata}
       testSummary={formattedTestSummary}
       sectionResults={formattedSectionResults}
       responses={enrichedResponses}
+      adaptiveTrajectory={adaptiveTrajectory}
     />
-
   );
 }
 

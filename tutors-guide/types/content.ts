@@ -16,13 +16,13 @@ export interface QuestionFrontmatter {
   questionType: QuestionType;
   correctAnswer: string;
   prompt: string;
+  stimulus?: string; // Discrete per-question stimulus / passage
+  passage?: string;  // Alias for backward compatibility
   options?: QuestionOption[];
-  
-  // Granular Diagnostic Analytics Metadata (Optional with fallbacks)
-  domain?: string;              // e.g. "Craft and Structure", "Algebra", "Advanced Math"
-  skill?: string;               // e.g. "Words in Context", "Linear Equations", "Function Notation"
-  difficulty?: QuestionDifficulty | string; // "Easy" | "Medium" | "Hard"
-  explanation?: string;         // Comprehensive rationale for review
+  domain?: string;
+  skill?: string;
+  difficulty?: QuestionDifficulty | string;
+  explanation?: string;
 }
 
 export interface SectionFrontmatter {
@@ -41,6 +41,20 @@ export interface SectionManifest {
   title: string;
   timeLimit: number;
   config?: Partial<SectionExamConfig>;
+  hasIntermissionAfter?: boolean;
+  intermissionDuration?: number;
+}
+
+export interface AdaptiveRoutingRule {
+  threshold: number;
+  onPass: string;
+  onFail: string;
+}
+
+export interface AdaptiveStage {
+  stageIndex: number;
+  sectionId: string;
+  routing: AdaptiveRoutingRule;
 }
 
 export interface TestMetadata {
@@ -49,10 +63,11 @@ export interface TestMetadata {
   category: SupportedExamCategory;
   description: string;
   config?: Partial<SectionExamConfig>;
+  isAdaptive?: boolean;
+  stages?: AdaptiveStage[];
   sections: SectionManifest[];
 }
 
-// types/content.ts
 export interface ParsedSection {
   frontmatter: SectionFrontmatter;
   content: string;

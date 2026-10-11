@@ -37,7 +37,13 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   const isFirstQuestion = state.currentIndex === 0;
   const isLastQuestion = state.currentIndex === questions.length - 1;
 
-  const hasStimulus = Boolean(passageContent && passageContent.trim().length > 0);
+  // Resolve discrete question stimulus first, then fall back to section content
+  const activeStimulus =
+    state.activeQuestion.stimulus ||
+    state.activeQuestion.passage ||
+    (passageContent && passageContent.trim().length > 0 ? passageContent : null);
+
+  const hasStimulus = Boolean(activeStimulus);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-stone-50 dark:bg-neutral-950 select-none font-sans">
@@ -115,7 +121,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                   Reference Context & Data
                 </span>
                 <MarkdownQuestionRenderer
-                  content={passageContent}
+                  content={activeStimulus!}
                   category={category}
                   testId={metadata.id}
                   manifestBasePath={manifestBasePath}

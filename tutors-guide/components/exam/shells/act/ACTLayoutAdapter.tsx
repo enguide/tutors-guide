@@ -22,14 +22,15 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   const isFirstQuestion = state.currentIndex === 0;
   const isLastQuestion = state.currentIndex === questions.length - 1;
 
-  // Determine layout: split-passage for reading/English stimuli vs single-column for math
-  const isSplitLayout =
-    effectiveConfig.layout === "split-passage" &&
-    Boolean(passageContent && passageContent.trim().length > 0);
+  const activeStimulus =
+    state.activeQuestion.stimulus ||
+    state.activeQuestion.passage ||
+    (passageContent && passageContent.trim().length > 0 ? passageContent : null);
+
+  const isSplitLayout = effectiveConfig.layout === "split-passage" && Boolean(activeStimulus);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F3F4F6] dark:bg-neutral-950 select-none">
-      {/* 1. TestNav Blue Header */}
       <ACTHeader
         sectionTitle={frontmatter.sectionTitle}
         config={effectiveConfig}
@@ -47,27 +48,24 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         onOpenReviewModal={actions.openReviewModal}
       />
 
-      {/* 2. Main Work Area */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {isSplitLayout ? (
           <>
-            {/* Left Stimulus Pane */}
             <div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-8 bg-white dark:bg-neutral-900">
               <div className="max-w-2xl mx-auto space-y-4">
                 <div className="text-xs uppercase tracking-wider font-bold text-neutral-500 pb-1 border-b border-neutral-200 dark:border-neutral-800">
                   Passage
                 </div>
                 <MarkdownQuestionRenderer
-  content={passageContent}
-  category={category}
-  testId={metadata.id}
-  manifestBasePath={manifestBasePath}
-  enableLightbox={state.accommodations.imageMagnification}
-/>
+                  content={activeStimulus!}
+                  category={category}
+                  testId={metadata.id}
+                  manifestBasePath={manifestBasePath}
+                  enableLightbox={state.accommodations.imageMagnification}
+                />
               </div>
             </div>
 
-            {/* Right Question Prompt & Choices */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-white dark:bg-neutral-900">
               <div className="max-w-xl mx-auto space-y-6">
                 <div className="space-y-3">
@@ -84,12 +82,12 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
 
                   <div className="text-neutral-900 dark:text-neutral-100 text-base leading-relaxed">
                     <MarkdownQuestionRenderer
-  content={state.activeQuestion.prompt}
-  category={category}
-  testId={metadata.id}
-  manifestBasePath={manifestBasePath}
-  enableLightbox={state.accommodations.imageMagnification}
-/>
+                      content={state.activeQuestion.prompt}
+                      category={category}
+                      testId={metadata.id}
+                      manifestBasePath={manifestBasePath}
+                      enableLightbox={state.accommodations.imageMagnification}
+                    />
                   </div>
                 </div>
 
@@ -109,13 +107,12 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             </div>
           </>
         ) : (
-          /* Single Column Layout (ACT Math Problem Solving) */
           <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#F9FAFB] dark:bg-neutral-950">
             <div className="max-w-3xl mx-auto space-y-6">
-              {passageContent && passageContent.trim().length > 0 && (
+              {activeStimulus && (
                 <div className="p-5 rounded-sm border border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
                   <MarkdownQuestionRenderer
-                    content={passageContent}
+                    content={activeStimulus}
                     category={category}
                     testId={metadata.id}
                     manifestBasePath={manifestBasePath}
@@ -156,7 +153,6 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         )}
       </main>
 
-      {/* 3. TestNav Bottom Action Bar */}
       <footer className="h-14 border-t border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 flex items-center justify-between select-none z-30">
         <div className="text-xs text-neutral-600 dark:text-neutral-400 font-mono font-medium">
           Question <strong className="text-foreground">{state.currentIndex + 1}</strong> of {questions.length}

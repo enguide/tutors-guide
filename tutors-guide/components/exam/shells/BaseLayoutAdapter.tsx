@@ -20,6 +20,12 @@ export const BaseLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   const { frontmatter, content: passageContent } = section;
   const questions = frontmatter.questions;
 
+  // Resolve discrete question stimulus first, then fall back to section content
+  const activeStimulus =
+    state.activeQuestion.stimulus ||
+    state.activeQuestion.passage ||
+    (passageContent && passageContent.trim().length > 0 ? passageContent : "");
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background select-none">
       {/* Top Header */}
@@ -43,7 +49,7 @@ export const BaseLayoutAdapter: React.FC<TestShellLayoutProps> = ({
       <main className="flex-1 flex overflow-hidden">
         {effectiveConfig.layout === "split-passage" ? (
           <SplitPassageLayout
-            passageContent={passageContent}
+            passageContent={activeStimulus}
             activeQuestion={state.activeQuestion}
             selectedOptionId={state.activeAnswer?.selectedOptionId}
             frqAnswer={state.activeAnswer?.frqUserAnswer}
@@ -58,7 +64,7 @@ export const BaseLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           />
         ) : (
           <SingleColumnLayout
-            passageContent={passageContent}
+            passageContent={activeStimulus}
             activeQuestion={state.activeQuestion}
             selectedOptionId={state.activeAnswer?.selectedOptionId}
             frqAnswer={state.activeAnswer?.frqUserAnswer}

@@ -16,7 +16,7 @@ export interface EnrichedResponseItem {
   usedCalculator?: boolean;
   changedAnswer?: boolean;
   prompt: string;
-  passageText?: string | null; // <--- ADD THIS
+  passageText?: string | null;
   options: { id: string; text: string }[];
   domain: string;
   skill: string;
@@ -50,6 +50,24 @@ export interface TestSummaryData {
   compositeScore: number | null;
   percentile: string | null;
   completedAt: Date;
+}
+
+export interface AdaptiveStageTelemetry {
+  stageIndex: number;
+  baselineSectionId: string;
+  baselineRaw: number;
+  baselineTotal: number;
+  routedSectionId: string;
+  routedTier: "hard" | "easy";
+  routedRaw: number;
+  routedTotal: number;
+  domainScore: number;
+}
+
+export interface AdaptiveTrajectoryData {
+  compositeScore: number;
+  stageSummaries: AdaptiveStageTelemetry[];
+  trajectoryDescription: string;
 }
 
 // Category pacing benchmarks in seconds per question

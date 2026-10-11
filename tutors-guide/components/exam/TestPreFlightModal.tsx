@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/exam/TestPreFlightModal.tsx
 "use client";
 
@@ -29,9 +28,13 @@ interface TestPreFlightModalProps {
   onStartExam: (accommodations: AccommodationSettings) => void;
 }
 
-function formatMinutes(seconds: number): string {
-  const mins = Math.round(seconds / 60);
-  return `${mins} min${mins === 1 ? "" : "s"}`;
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (secs === 0) {
+    return `${mins} min${mins === 1 ? "" : "s"}`;
+  }
+  return `${mins}m ${secs}s`;
 }
 
 export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
@@ -64,7 +67,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
     settings.colorInversion ||
     settings.reducedMotion;
 
-  const handleToggle = (key: keyof AccommodationSettings, value: any) => {
+  const handleToggle = (key: keyof AccommodationSettings, value: unknown) => {
     setSettings((prev) => ({
       ...prev,
       [key]: value,
@@ -96,7 +99,7 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
             <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-sm">
               <Clock className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
               <span className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                {formatMinutes(effectiveSeconds)}
+                {formatDuration(effectiveSeconds)}
               </span>
             </div>
             {settings.timeMultiplier !== 1.0 && (

@@ -676,7 +676,7 @@ _Goal: Implement category-specific testing interfaces that accurately mirror the
 
 ---
 
-## Epic 8: Frictionless Onboarding & Automated Provisioning
+## Epic 8*: Frictionless Onboarding & Automated Provisioning
 
 ### Overview
 
@@ -764,3 +764,107 @@ _Goal: Build the algorithmic routing engine to support multistage computer-adapt
 3. **Performance & Cold-Start Protections:**
    - Markdown parsing is isolated behind React's `cache()` and server-side component boundaries.
    - Avoid remote object storage hops (S3/Supabase Storage) for test-critical markdown files during live exams to ensure sub-millisecond section transitions and complete offline resilience in unstable network environments.
+
+---
+
+# Production Beta Epics & Release Specifications
+
+---
+
+## Epic 9*: Multi-Section Progression & Full-Length Exam Orchestration
+
+*Goal: Transition from isolated, single-section execution to continuous, multi-stage diagnostic exams, handling section transitions, mandatory breaks, session resumption, and cumulative score synthesis.*
+
+### Task 9.1: Sequential Section State Machine & Transitions
+
+* Implement an exam session state machine managing ordered section execution based on `metadata.sections` configuration.
+* Handle automated routing upon section submission: if subsequent sections exist, advance the student directly into the next module or scheduled intermission rather than routing to `/dashboard`.
+* Enforce hard section boundaries preventing navigation back to previous modules once submitted or expired, mirroring official SAT/ACT test security rules.
+
+### Task 9.2: Timed Intermission Engine (Scheduled Breaks)
+
+* Build the standardized intermission screen triggered between major exam stages (e.g., 10-minute break between SAT Reading/Writing and Math; ACT Section 2 and Section 3).
+* Support an unskippable or student-dismissible countdown timer that halts exam section clocks until the break window concludes or the student elects to resume early.
+* Secure state persistence during breaks, allowing page reloads without forfeiting progress or corrupting the global attempt timer.
+
+### Task 9.3: Mid-Exam Resumption & Incomplete Attempt Guards
+
+* Track active attempt checkpoints in PostgreSQL so students experiencing device failure or session drops can resume where they left off.
+* Protect root exam entry routes (`/tests/[category]/[testId]`): automatically detect ongoing attempts and redirect students to the current incomplete section rather than restarting at Section 1.
+* Invalidate or auto-submit expired attempts where total allowable elapsed time has passed while offline.
+
+### Task 9.4: Cumulative Composite Scoring & Synthesis
+
+* Build a cross-section aggregation engine that synthesizes individual section `Result` records into a single composite test attempt summary.
+* Map raw scores to official scaled composites (SAT 400–1600 composite scale; ACT 1–36 composite scale).
+* Store the aggregated summary for unified retrieval on `/dashboard` and downstream cohort reporting views.
+
+---
+
+## Epic 10: Institutional & Tutor Observability Portal
+
+*Goal: Deliver dedicated management, roster analytics, and diagnostic visibility for school administrators (`ORG_ADMIN`) and instructional staff (`TUTOR`).*
+
+### Task 10.1: Institutional Cohort & Seat Management Dashboard
+
+* Build the `/tgadmin` / institutional overview interface for `ORG_ADMIN` accounts.
+* Display real-time seat utilization metrics: total purchased licenses, claimed seats, and active vacancies.
+* Provide an administrative student roster table displaying student names, emails, registration dates, and active category enrollments.
+* Implement seat management controls: generate supplemental invite links, refresh codes, or deactivate departed students to reclaim seats.
+
+### Task 10.2: Tutor Cohort Diagnostic & Review Access
+
+* Provide authorized tutors and organization admins read-only inspection access to their assigned students' completed exams.
+* Wire the `UnifiedAnalyticsDashboard` and dual-pane question triage review to accept an optional student/attempt parameter, allowing instructors to review pacing charts, answer choices, and error patterns during instructional sessions.
+* Enforce strict tenancy isolation ensuring tutors and admins can only view students belonging to their shared `Organization` or `School`.
+
+### Task 10.3: Roster Export & Institutional Reporting
+
+* Build a server action to generate standard CSV exports of cohort diagnostic data (student name, email, exam ID, completion timestamp, section scores, and composite score).
+* Provide summary metrics for classes or cohorts (average composite score, lowest-performing skill domains, and pacing bottlenecks).
+
+---
+
+## Epic 11: Production Transactional Email Infrastructure
+
+*Goal: Replace local console-logged tokens and links with an enterprise-grade transactional email pipeline featuring high deliverability and spam resistance.*
+
+### Task 11.1: Provider Integration & Environment Configuration
+
+* Integrate Postmark or Resend API clients via environment-bound secrets (`POSTMARK_SERVER_TOKEN` or `RESEND_API_KEY`).
+* Configure isolated transactional sending addresses using an authorized subdomain (e.g., `auth@mail.highmountainprep.com`).
+* Verify DNS authentication records (SPF, DKIM, DMARC, and MX return-path) against provider validation tools.
+
+### Task 11.2: Transactional Email Templates & Dispatch Hooks
+
+* Construct responsive, multipart (HTML and plaintext fallback) email templates:
+* **Password Setup / Reset:** Deliver one-hour expiring tokens directly to purchasers and students requesting credential recovery.
+* **Student Institutional Claim Confirmation:** Confirm seat enrollment when a student redeems an `ORG-` invite code.
+* **B2B Purchaser Order Confirmation:** Deliver purchase receipts, total seat limits, and shareable join URLs directly to billing contacts.
+
+
+* Replace console log intercepts in `actions/passwordReset.ts` and Stripe fulfillment webhooks with asynchronous dispatch routines.
+
+---
+
+## Epic 12: Production Hardening, Session Resilience & Telemetry
+
+*Goal: Prepare the client and edge infrastructure for live student beta testing across varied network qualities, school firewalls, operating systems, and viewport constraints.*
+
+### Task 12.1: Network Interruption Buffering & Recovery UI
+
+* Add network reachability monitors within `useTestProgress.ts` to detect offline states or dropped WebSocket/HTTP connections.
+* Display an unobtrusive status pill in the test runner header (`"Reconnecting... progress saved locally"`) during transient drops.
+* Implement automatic exponential backoff retries to flush local answer queues to the server as soon as connection is restored, preventing student panic.
+
+### Task 12.2: Application Error Telemetry & Exception Tracking
+
+* Integrate Sentry or a lightweight OpenTelemetry client for Next.js App Router to track unhandled client exceptions and server action failures.
+* Capture breadcrumbs for exam runner lifecycle events (e.g., question transitions, option selections, and autosave calls) to triage student-reported anomalies during beta runs.
+
+### Task 12.3: Static Asset & Content Integrity Audit
+
+* Execute automated build validation (`scripts/validate-content.ts`) across all active SAT and ACT test sets:
+* Verify 100% of frontmatter fields, answer keys, and options match schema rules.
+* Assert all referenced diagram SVGs, graphs, and WebP stimuli resolve to valid files under `public/content/tests/...`.
+* Validate KaTeX syntax balance across all markdown bodies to eliminate client-side math rendering errors.
