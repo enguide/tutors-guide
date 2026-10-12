@@ -1,0 +1,40 @@
+{
+  "id": "ap-calc-mini-1",
+  "title": "AP Calculus AB Diagnostic Mini-Practice 1",
+  "category": "AP_CALC",
+  "description": "Abridged AP Calculus exam testing Section I Part A (No Calculator) and Section I Part B (Graphing Calculator Active).",
+  "isAdaptive": false,
+  "sections": [
+    {
+      "id": "ap-calc-sec1a",
+      "file": "ap-calc-part-a.md",
+      "order": 1,
+      "title": "Section I, Part A (No Calculator)",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "ap-calc-sec1b",
+      "file": "ap-calc-part-b.md",
+      "order": 2,
+      "title": "Section I, Part B (Calculator Active)",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "ap-calc",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    }
+  ]
+}

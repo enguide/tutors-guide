@@ -1,0 +1,39 @@
+{
+  "id": "gre-practice-mini-1",
+  "title": "GRE General Diagnostic Mini-Practice 1",
+  "category": "GRE",
+  "description": "Abridged GRE General Test featuring Verbal Reasoning reading comprehension and Quantitative Reasoning.",
+  "isAdaptive": false,
+  "sections": [
+    {
+      "id": "gre-mini-verbal",
+      "file": "gre-verbal.md",
+      "order": 1,
+      "title": "Verbal Reasoning",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "gre-mini-quant",
+      "file": "gre-quant.md",
+      "order": 2,
+      "title": "Quantitative Reasoning",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "gre-basic",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    }
+  ]
+}

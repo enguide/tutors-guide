@@ -1,0 +1,39 @@
+{
+  "id": "act-practice-mini-1",
+  "title": "ACT Digital Diagnostic Mini-Practice 1",
+  "category": "ACT",
+  "description": "Abridged ACT exam covering English (split-view editing) and Mathematics (5-choice single-column).",
+  "isAdaptive": false,
+  "sections": [
+    {
+      "id": "act-mini-english",
+      "file": "act-english.md",
+      "order": 1,
+      "title": "English",
+      "timeLimit": 300,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "act-mini-math",
+      "file": "act-math.md",
+      "order": 2,
+      "title": "Mathematics",
+      "timeLimit": 300,
+      "config": {
+        "layout": "single-column",
+        "calculator": "scientific",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    }
+  ]
+}

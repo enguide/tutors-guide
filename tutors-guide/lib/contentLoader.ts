@@ -13,6 +13,17 @@ import { Category } from "@prisma/client";
 
 const CONTENT_DIR = path.join(process.cwd(), "content", "tests");
 
+export interface DiscoveredTestItem {
+  testId: string;
+  category: string;
+  title: string;
+  description: string;
+  isAdaptive: boolean;
+  sectionCount: number;
+  totalTimeMinutes: number;
+  firstSectionId: string;
+}
+
 /**
  * Loads and caches test metadata JSON
  */
@@ -133,3 +144,59 @@ export async function ensureTestInDatabase(metadata: TestMetadata) {
     console.error(`Failed to ensure test ${metadata.id} in database:`, error);
   }
 }
+
+/**
+ * Scans the filesystem content directory and discovers all valid tests
+ * across all categories, parsing their metadata manifests.
+ */
+export const getAllAvailableTests = cache(async function getAllAvailableTests(): Promise<
+  Record<string, DiscoveredTestItem[]>
+> {
+  const result: Record<string, DiscoveredTestItem[]> = {};
+
+  try {
+    const categories = await fs.readdir(CONTENT_DIR, { withFileTypes: true });
+
+    for (const catDirent of categories) {
+      if (!catDirent.isDirectory()) continue;
+      const categoryKey = catDirent.name.toUpperCase();
+      const catPath = path.join(CONTENT_DIR, catDirent.name);
+
+      const testDirs = await fs.readdir(catPath, { withFileTypes: true });
+
+      for (const testDirent of testDirs) {
+        if (!testDirent.isDirectory()) continue;
+        const testId = testDirent.name;
+
+        const metadata = await getTestMetadata(catDirent.name, testId);
+        if (metadata && metadata.sections && metadata.sections.length > 0) {
+          const totalSecs = metadata.sections.reduce(
+            (acc, s) => acc + (s.timeLimit || 0),
+            0
+          );
+          const firstSection = metadata.sections[0]?.id || "";
+
+          const item: DiscoveredTestItem = {
+            testId: metadata.id,
+            category: categoryKey,
+            title: metadata.title,
+            description: metadata.description || "",
+            isAdaptive: Boolean(metadata.isAdaptive),
+            sectionCount: metadata.sections.length,
+            totalTimeMinutes: Math.round(totalSecs / 60),
+            firstSectionId: firstSection,
+          };
+
+          if (!result[categoryKey]) {
+            result[categoryKey] = [];
+          }
+          result[categoryKey].push(item);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Failed to discover available tests:", error);
+  }
+
+  return result;
+});
