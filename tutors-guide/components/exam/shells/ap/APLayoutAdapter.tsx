@@ -184,15 +184,16 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                 <hr className="border-stone-200 dark:border-neutral-800" />
 
                 <QuestionOptions
-                  question={state.activeQuestion}
-                  selectedOptionId={state.activeAnswer?.selectedOptionId}
-                  frqAnswer={state.activeAnswer?.frqUserAnswer}
-                  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-                  isCrossOutMode={state.isCrossOutMode}
-                  onSelectOption={actions.selectOption}
-                  onSetFrqAnswer={actions.setFrqAnswer}
-                  onToggleEliminate={actions.toggleEliminateOption}
-                />
+  variant="ap"
+  question={state.activeQuestion}
+  selectedOptionId={state.activeAnswer?.selectedOptionId}
+  frqAnswer={state.activeAnswer?.frqUserAnswer}
+  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+  isCrossOutMode={state.isCrossOutMode}
+  onSelectOption={actions.selectOption}
+  onSetFrqAnswer={actions.setFrqAnswer}
+  onToggleEliminate={actions.toggleEliminateOption}
+/>
               </div>
             </div>
           </div>

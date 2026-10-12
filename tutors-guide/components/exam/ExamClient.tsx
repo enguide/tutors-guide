@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/exam/ExamClient.tsx
 "use client";
 
@@ -27,6 +26,7 @@ interface ExamClientProps {
   effectiveConfig: SectionExamConfig;
   category?: string;
   testId?: string;
+  studentName?: string;
 }
 
 const emptySubscribe = () => () => {};
@@ -37,6 +37,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   effectiveConfig,
   category = metadata.category,
   testId = metadata.id,
+  studentName,
 }) => {
   const router = useRouter();
 
@@ -48,12 +49,12 @@ export const ExamClient: React.FC<ExamClientProps> = ({
 
   const { frontmatter } = section;
   const questions = frontmatter.questions;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const manifestBasePath = (metadata as any).assetBasePath;
   const examCat = (category.toUpperCase() || metadata.category) as SupportedExamCategory;
 
   const accommodationsKey = `attempt_accommodations_${testId}`;
 
-  // 1. Accommodations State: Only prompt once per full test attempt
   const [hasStoredAccommodations, setHasStoredAccommodations] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return Boolean(localStorage.getItem(accommodationsKey));
@@ -69,22 +70,15 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   });
 
-  // Only open Pre-Flight if not already configured for this attempt
   const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(!hasStoredAccommodations);
-
-  // 2. Section Directions State: Keeps clock frozen until user clicks "Begin / Resume Section"
   const [isSectionStarted, setIsSectionStarted] = useState<boolean>(false);
-
-  // Submission & Review modal states
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Scaled time based on selected multiplier
   const effectiveTimeLimitSeconds = Math.round(
     frontmatter.timeLimit * accommodations.timeMultiplier
   );
 
-  // Core Exam State Hook: isTimerRunning gated to isSectionStarted
   const {
     activeQuestion,
     currentIndex,
@@ -97,6 +91,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     isCalculatorOpen,
     setIsCalculatorOpen,
     toggleCalculator,
+    markCalculatorUsed,
     isFormulaSheetOpen,
     setIsFormulaSheetOpen,
     selectOption,
@@ -120,20 +115,17 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     },
   });
 
-  // Detect whether this is an in-progress session being resumed
   const isResuming =
     secondsRemaining < effectiveTimeLimitSeconds ||
     Object.keys(answers).length > 0 ||
     navigationHistory.length > 1;
 
-  // Test-Level Accommodations Confirmed
   const handleAccommodationsConfirmed = (selected: AccommodationSettings) => {
     setAccommodations(selected);
     try {
       localStorage.setItem(accommodationsKey, JSON.stringify(selected));
     } catch {}
 
-    // Resynchronize the timer countdown with the newly chosen multiplier
     const newEffectiveSeconds = Math.round(frontmatter.timeLimit * selected.timeMultiplier);
     resetTimeLimit(newEffectiveSeconds);
 
@@ -141,16 +133,13 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     setIsPreFlightOpen(false);
   };
 
-  // User begins or resumes section from Directions screen
   const handleBeginSection = () => {
     setIsSectionStarted(true);
   };
 
-  // Finalize Section Action Handler
   const handleSubmitSection = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    // 1. Immediately freeze timer so no background intervals write back during network latency
     setIsSectionStarted(false);
 
     try {
@@ -173,15 +162,13 @@ export const ExamClient: React.FC<ExamClientProps> = ({
       if (!result.success) {
         alert(result.error || "Failed to submit section.");
         setIsSubmitting(false);
-        setIsSectionStarted(true); // Re-enable timer if submission failed
+        setIsSectionStarted(true);
         return;
       }
 
-      // 2. Clear current section buffer from localStorage
       clearLocalBuffer();
       setIsReviewOpen(false);
 
-      // 3. Entire Exam Concluded -> Purge all section and accommodations buffers
       if (result.isTestComplete || !result.nextSectionId) {
         try {
           clearAllTestBuffers(testId);
@@ -193,7 +180,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         return;
       }
 
-      // Transition to Intermission Break Route
       if (result.isIntermission) {
         router.push(
           `/tests/${metadata.category.toLowerCase()}/${testId}/break`
@@ -201,7 +187,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         return;
       }
 
-      // Advance to Next Routed Section
       router.push(
         `/tests/${metadata.category.toLowerCase()}/${testId}/${result.nextSectionId}`
       );
@@ -227,7 +212,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     router,
   ]);
 
-  // TTS Accessibility
   const { speak, stop, isPlaying: isTTSPlaying, isSupported: isTTSSupported } =
     useTextToSpeech();
 
@@ -252,7 +236,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // Phase 1: Test-Level Accommodations Modal (Prompts once at attempt start)
   if (isPreFlightOpen) {
     return (
       <TestPreFlightModal
@@ -266,7 +249,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // Phase 2: Section Directions / Resumption Screen (Clock paused, shows remaining or allotted duration)
   if (!isSectionStarted) {
     return (
       <SectionDirectionsModal
@@ -284,7 +266,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
 
   const activeAnswer = activeQuestion ? answers[activeQuestion.id] : undefined;
 
-  // Phase 3: Active Section Runner
   return (
     <>
       <TestShellLayout
@@ -293,6 +274,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         section={section}
         effectiveConfig={effectiveConfig}
         manifestBasePath={manifestBasePath}
+        studentName={studentName}
         state={{
           currentIndex,
           totalQuestions: questions.length,
@@ -323,6 +305,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         type={effectiveConfig.calculator}
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
+        onInteract={markCalculatorUsed}
       />
 
       <FormulaSheetModal

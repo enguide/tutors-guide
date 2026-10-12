@@ -38,6 +38,7 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
   }
 
   const userRole = session.user.role;
+  const studentName = session.user.name || "Student Preview";
   const isAdmin = userRole === "ADMIN";
   const isStudent = userRole === "STUDENT";
 
@@ -100,6 +101,7 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
       effectiveConfig={effectiveConfig}
       category={category}
       testId={testId}
+      studentName={studentName}
     />
   );
 }

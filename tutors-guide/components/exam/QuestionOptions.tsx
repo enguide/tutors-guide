@@ -4,7 +4,8 @@
 import React from "react";
 import { QuestionFrontmatter } from "@/types/content";
 import { MarkdownQuestionRenderer } from "@/components/MarkdownQuestionRenderer";
-import { Strikethrough } from "lucide-react";
+
+export type QuestionOptionVariant = "sat" | "ap" | "act" | "gre";
 
 interface QuestionOptionsProps {
   question: QuestionFrontmatter;
@@ -12,6 +13,7 @@ interface QuestionOptionsProps {
   frqAnswer?: string;
   eliminatedOptions?: string[];
   isCrossOutMode: boolean;
+  variant?: QuestionOptionVariant;
   onSelectOption: (optionId: string) => void;
   onSetFrqAnswer: (value: string) => void;
   onToggleEliminate: (optionId: string) => void;
@@ -23,6 +25,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   frqAnswer = "",
   eliminatedOptions = [],
   isCrossOutMode,
+  variant = "sat",
   onSelectOption,
   onSetFrqAnswer,
   onToggleEliminate,
@@ -30,12 +33,12 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   // Free Response / Grid-In Handling
   if (question.questionType === "FR") {
     return (
-      <div className="pt-4 space-y-3">
+      <div className="pt-4 space-y-3 font-sans">
         <label
           htmlFor="frq-input"
-          className="block text-xs font-semibold uppercase tracking-wider text-slate-500"
+          className="block text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
         >
-          Enter Your Answer
+          Answer
         </label>
         <div className="max-w-xs">
           <input
@@ -43,93 +46,116 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
             type="text"
             value={frqAnswer}
             onChange={(e) => onSetFrqAnswer(e.target.value)}
-            placeholder="Type answer or fraction..."
-            className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono text-base focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter answer"
+            className="w-full px-4 py-2.5 rounded-sm border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 font-mono text-base focus:outline-hidden focus:border-neutral-900 dark:focus:border-neutral-100"
           />
         </div>
-        <p className="text-xs text-slate-400">
-          Accepts decimals (e.g. <code>3.5</code>) or fractions (e.g. <code>7/2</code>).
-        </p>
       </div>
     );
   }
 
-  // Multiple Choice Handling
-  return (
-    <div className="space-y-3 pt-2">
-      {question.options?.map((option) => {
-        const isSelected = selectedOptionId === option.id;
-        const isEliminated = eliminatedOptions.includes(option.id);
+  // Handle Option Card Selection
+  const handleCardClick = (optionId: string) => {
+    // Unconditionally select - useTestProgress now handles clearing elimination atomically
+    onSelectOption(optionId);
+  };
 
-        return (
+  // Handle Dedicated Elimination Button Trigger (on the right)
+  const handleEliminateTrigger = (e: React.MouseEvent, optionId: string) => {
+    e.stopPropagation();
+
+    // If student strikes out the currently selected option, deselect it
+    if (selectedOptionId === optionId) {
+      onSelectOption("");
+    }
+
+    onToggleEliminate(optionId);
+  };
+
+  return (
+  <div className={`space-y-3 pt-2 ${variant === "sat" ? "" : "font-sans"}`}>
+    {question.options?.map((option) => {
+      const isSelected = selectedOptionId === option.id;
+      const isEliminated = !isSelected && eliminatedOptions.includes(option.id);
+
+      return (
+        <div key={option.id} className="flex items-center gap-3">
+          {/* Main Option Card */}
           <div
-            key={option.id}
             role="button"
             tabIndex={0}
-            onClick={() => {
-              if (isCrossOutMode) {
-                onToggleEliminate(option.id);
-              } else if (!isEliminated) {
-                onSelectOption(option.id);
-              }
-            }}
+            onClick={() => handleCardClick(option.id)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                if (isCrossOutMode) onToggleEliminate(option.id);
-                else if (!isEliminated) onSelectOption(option.id);
+                handleCardClick(option.id);
               }
             }}
-            className={`group relative flex items-start justify-between gap-3.5 p-4 rounded-xl border cursor-pointer select-none transition-all duration-150 ${
-              isEliminated
-                ? "opacity-45 bg-slate-100 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                : isSelected
-                ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 ring-2 ring-blue-600 text-slate-900 dark:text-slate-100"
-                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600"
+            className={`relative flex-1 flex items-center px-4 py-3 rounded-xl border text-left cursor-pointer select-none transition-all ${
+              isSelected
+                ? "border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-900 dark:ring-neutral-100 bg-white dark:bg-neutral-900 opacity-100"
+                : isEliminated
+                ? "opacity-40 bg-neutral-50 dark:bg-neutral-900/40 border-neutral-200 dark:border-neutral-800"
+                : "border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600"
             }`}
           >
-            {/* Left: Letter bubble + text */}
-            <div className="flex items-start gap-3.5 flex-1 pointer-events-none">
+            {isEliminated && (
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-b-2 border-neutral-900 dark:border-neutral-100 z-10 pointer-events-none" />
+            )}
+
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              {/* Option Letter Disc: Stays clean sans-serif */}
               <div
-                className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  isSelected && !isEliminated
-                    ? "bg-blue-600 text-white"
-                    : "border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 group-hover:border-slate-500"
+                className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-sans font-bold transition-colors ${
+                  isSelected
+                    ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                    : "border-2 border-neutral-500 dark:border-neutral-400 text-neutral-800 dark:text-neutral-200"
                 }`}
               >
                 {option.id}
               </div>
 
+              {/* Option Text: Conditionally set to font-serif when variant === 'sat' */}
               <div
-                className={`flex-1 text-sm pt-0.5 leading-relaxed text-slate-800 dark:text-slate-200 ${
-                  isEliminated ? "line-through text-slate-400 dark:text-slate-500" : ""
+                className={`text-[15px] leading-normal text-neutral-900 dark:text-neutral-100 ${
+                  variant === "sat" ? "font-serif" : "font-sans"
                 }`}
               >
-                <MarkdownQuestionRenderer content={option.text} />
+                <MarkdownQuestionRenderer
+                  content={option.text}
+                  className={variant === "sat" ? "font-serif prose-p:font-serif" : undefined}
+                />
               </div>
             </div>
-
-            {/* Right: In-Line Elimination Trigger */}
-            {isCrossOutMode && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleEliminate(option.id);
-                }}
-                className={`p-1.5 rounded-md border text-xs shrink-0 transition-colors ${
-                  isEliminated
-                    ? "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
-                    : "border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                }`}
-                title="Toggle strikeout"
-              >
-                <Strikethrough size={14} />
-              </button>
-            )}
           </div>
-        );
-      })}
-    </div>
-  );
+
+          {/* Right Action: Cross-out trigger */}
+          {isCrossOutMode && (
+            <div className="shrink-0 w-12 flex items-center justify-center">
+              {isEliminated ? (
+                <button
+                  type="button"
+                  onClick={(e) => handleEliminateTrigger(e, option.id)}
+                  className="text-xs font-bold font-sans text-neutral-900 dark:text-neutral-100 underline underline-offset-2 hover:opacity-75"
+                >
+                  Undo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => handleEliminateTrigger(e, option.id)}
+                  className="group relative w-6 h-6 rounded-full border border-neutral-700 dark:border-neutral-300 flex items-center justify-center text-[12px] font-sans font-bold text-neutral-800 dark:text-neutral-200 transition-colors"
+                  title={`Eliminate option ${option.id}`}
+                >
+                  <span>{option.id}</span>
+                  <span className="absolute -left-1 -right-1 top-1/2 -translate-y-1/2 h-[1.5px] bg-neutral-700 dark:border-neutral-300 bg-neutral-700 dark:bg-neutral-300 pointer-events-none group-hover:bg-black dark:group-hover:bg-white" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
 };

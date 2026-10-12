@@ -15,13 +15,13 @@ questions:
     explanation: "Substitute $-2$ for $x$: $f(-2) = 3(-2)^2 - 4(-2) + 7 = 3(4) + 8 + 7 = 12 + 8 + 7 = 27$."
     options:
       - id: "A"
-        text: "11"
+        text: "$11$"
       - id: "B"
-        text: "19"
+        text: "$19$"
       - id: "C"
-        text: "27"
+        text: "$27$"
       - id: "D"
-        text: "33"
+        text: "$33$"
   - id: "sat-p1-math-002"
     questionNumber: 2
     questionType: "MC"

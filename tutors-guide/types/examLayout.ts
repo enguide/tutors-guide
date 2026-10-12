@@ -42,6 +42,7 @@ export interface TestShellLayoutProps {
   section: ParsedSection;
   effectiveConfig: SectionExamConfig;
   manifestBasePath?: string;
+  studentName?: string;
   state: TestShellExamState;
   actions: TestShellExamActions;
   children?: React.ReactNode;
