@@ -148,7 +148,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                   title={`Eliminate option ${option.id}`}
                 >
                   <span>{option.id}</span>
-                  <span className="absolute -left-1 -right-1 top-1/2 -translate-y-1/2 h-[1.5px] bg-neutral-700 dark:border-neutral-300 bg-neutral-700 dark:bg-neutral-300 pointer-events-none group-hover:bg-black dark:group-hover:bg-white" />
+                  <span className="absolute -left-1 -right-1 top-1/2 -translate-y-1/2 h-[1.5px] dark:border-neutral-300 bg-neutral-700 dark:bg-neutral-300 pointer-events-none group-hover:bg-black dark:group-hover:bg-white" />
                 </button>
               )}
             </div>

@@ -7,7 +7,7 @@
 
 @theme inline {
   --font-sans: var(--font-sans);
-  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-serif: Georgia, Cambria, "Times New Roman", var(--font-serif), serif;
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

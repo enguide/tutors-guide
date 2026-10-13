@@ -104,83 +104,87 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         {isSplitView ? (
           <>
             {/* Left Pane: Stimulus / Reading Passage (Serif) */}
-            <div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-              <div className="max-w-2xl mx-auto font-serif text-[15px] leading-relaxed text-neutral-900 dark:text-neutral-100">
-                {activeStimulus ? (
-                  <MarkdownQuestionRenderer
-                    content={activeStimulus}
-                    category={category}
-                    testId={metadata.id}
-                    manifestBasePath={manifestBasePath}
-                    enableLightbox={state.accommodations.imageMagnification}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
-                    No reference stimulus required for this item.
-                  </div>
-                )}
-              </div>
-            </div>
+<div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
+  <div className="max-w-2xl mx-auto font-serif text-[15.5px] leading-[1.65] font-normal text-neutral-900 dark:text-neutral-100">
+    {activeStimulus ? (
+      <MarkdownQuestionRenderer
+        content={activeStimulus}
+        category={category}
+        testId={metadata.id}
+        manifestBasePath={manifestBasePath}
+        enableLightbox={state.accommodations.imageMagnification}
+        className="prose-p:leading-[1.65] prose-p:my-2"
+      />
+    ) : (
+      <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
+        No reference stimulus required for this item.
+      </div>
+    )}
+  </div>
+</div>
 
             {/* Right Pane: Question Stem & Choices */}
             <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-              <div className="max-w-xl mx-auto space-y-6">
-                {renderItemActionBar()}
+  <div className="max-w-xl mx-auto space-y-4">
+    {renderItemActionBar()}
 
-                {/* Prompt: Serif text per authentic Bluebook standard */}
-                <div className="text-neutral-900 dark:text-neutral-100 text-[15px] leading-relaxed font-serif">
-                  <MarkdownQuestionRenderer
-                    content={state.activeQuestion.prompt}
-                    category={category}
-                    testId={metadata.id}
-                    manifestBasePath={manifestBasePath}
-                    enableLightbox={state.accommodations.imageMagnification}
-                  />
-                </div>
+    {/* Prompt */}
+    <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15.5px] leading-[1.65] font-normal">
+      <MarkdownQuestionRenderer
+        content={state.activeQuestion.prompt}
+        category={category}
+        testId={metadata.id}
+        manifestBasePath={manifestBasePath}
+        enableLightbox={state.accommodations.imageMagnification}
+        className="prose-p:mb-0"
+      />
+    </div>
 
-                {/* Options: Sans-serif text bubbles */}
-                <QuestionOptions
-                  variant="sat"
-                  question={state.activeQuestion}
-                  selectedOptionId={state.activeAnswer?.selectedOptionId}
-                  frqAnswer={state.activeAnswer?.frqUserAnswer}
-                  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-                  isCrossOutMode={state.isCrossOutMode}
-                  onSelectOption={actions.selectOption}
-                  onSetFrqAnswer={actions.setFrqAnswer}
-                  onToggleEliminate={actions.toggleEliminateOption}
-                />
-              </div>
-            </div>
+    {/* Options */}
+    <QuestionOptions
+      variant="sat"
+      question={state.activeQuestion}
+      selectedOptionId={state.activeAnswer?.selectedOptionId}
+      frqAnswer={state.activeAnswer?.frqUserAnswer}
+      eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+      isCrossOutMode={state.isCrossOutMode}
+      onSelectOption={actions.selectOption}
+      onSetFrqAnswer={actions.setFrqAnswer}
+      onToggleEliminate={actions.toggleEliminateOption}
+    />
+  </div>
+</div>
           </>
         ) : (
           /* Single Column (Math) */
           <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-            <div className="max-w-2xl mx-auto space-y-6">
-              {renderItemActionBar()}
+  <div className="max-w-2xl mx-auto space-y-6">
+    {renderItemActionBar()}
 
-              <div className="text-neutral-900 dark:text-neutral-100 text-[15px] leading-relaxed font-serif">
-                <MarkdownQuestionRenderer
-                  content={state.activeQuestion.prompt}
-                  category={category}
-                  testId={metadata.id}
-                  manifestBasePath={manifestBasePath}
-                  enableLightbox={state.accommodations.imageMagnification}
-                />
-              </div>
+    <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15.5px] leading-[1.65] font-normal">
+      <MarkdownQuestionRenderer
+        content={state.activeQuestion.prompt}
+        category={category}
+        testId={metadata.id}
+        manifestBasePath={manifestBasePath}
+        enableLightbox={state.accommodations.imageMagnification}
+        className="prose-p:leading-[1.65] prose-p:my-2"
+      />
+    </div>
 
-              <QuestionOptions
-                question={state.activeQuestion}
-                selectedOptionId={state.activeAnswer?.selectedOptionId}
-                frqAnswer={state.activeAnswer?.frqUserAnswer}
-                eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-                isCrossOutMode={state.isCrossOutMode}
-                onSelectOption={actions.selectOption}
-                onSetFrqAnswer={actions.setFrqAnswer}
-                onToggleEliminate={actions.toggleEliminateOption}
-              />
-            </div>
-          </div>
+    <QuestionOptions
+      variant="sat"
+      question={state.activeQuestion}
+      selectedOptionId={state.activeAnswer?.selectedOptionId}
+      frqAnswer={state.activeAnswer?.frqUserAnswer}
+      eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+      isCrossOutMode={state.isCrossOutMode}
+      onSelectOption={actions.selectOption}
+      onSetFrqAnswer={actions.setFrqAnswer}
+      onToggleEliminate={actions.toggleEliminateOption}
+    />
+  </div>
+</div>
         )}
       </main>
 
