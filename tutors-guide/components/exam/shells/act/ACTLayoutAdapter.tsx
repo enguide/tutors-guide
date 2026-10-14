@@ -27,7 +27,12 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
     state.activeQuestion.passage ||
     (passageContent && passageContent.trim().length > 0 ? passageContent : null);
 
-  const isSplitLayout = effectiveConfig.layout === "split-passage" && Boolean(activeStimulus);
+  const isSplitView =
+  state.activeQuestion.layout === "split"
+    ? true
+    : state.activeQuestion.layout === "single"
+    ? false
+    : effectiveConfig.layout === "split-passage" || Boolean(activeStimulus);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F3F4F6] dark:bg-neutral-950 select-none">
@@ -49,7 +54,7 @@ export const ACTLayoutAdapter: React.FC<TestShellLayoutProps> = ({
       />
 
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {isSplitLayout ? (
+        {isSplitView ? (
           <>
             <div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-8 bg-white dark:bg-neutral-900">
               <div className="max-w-2xl mx-auto space-y-4">

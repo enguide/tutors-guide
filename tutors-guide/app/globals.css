@@ -137,3 +137,47 @@
     scrollbar-width: none;
   }
 }
+
+/* ==========================================================================
+   KaTeX Typography & Exam Math Tuning
+   ========================================================================== */
+
+/* 1. Reset Tailwind Typography collisions on math exponents */
+.prose .katex sup,
+.prose .katex sub {
+  top: auto !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+}
+
+/* 2. Scale exponents, subscripts, and prime tick marks proportionally */
+.katex .msupsub {
+  font-size: 0.8em !important;
+}
+
+.katex .msupsub .vlist-t .vlist-r .vlist > span {
+  line-height: 1 !important;
+}
+
+/* Specifically tune derivative primes (f', f'', g') */
+.katex .mord .accent,
+.katex symbol.prime {
+  font-size: 0.8em !important;
+}
+
+/* 3. Scale down the underscript specifically for text-based operators (lim) */
+/* Targets the .mtight span of the lower limit inside non-symbol operators */
+.katex .op-limits:not(:has(.op-symbol)) > .vlist-t > .vlist-r > .vlist > span:first-child .mtight {
+  font-size: 0.9em !important;
+}
+
+/* Adjust only the top-level outer upper limit container */
+.katex .mop.op-symbol.large-op + .msupsub > .vlist-t > .vlist-r > .vlist > span:last-child {
+  transform: translate(0.1em, -0.3em);
+}
+
+/* Adjust only the top-level outer lower limit container */
+.katex .mop.op-symbol.large-op + .msupsub > .vlist-t > .vlist-r > .vlist > span:first-child {
+  transform: translate(-0.1em, 0.1em);
+}

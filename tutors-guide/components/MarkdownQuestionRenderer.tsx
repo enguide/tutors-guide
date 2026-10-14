@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
+import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import Image from "next/image";
 import { Maximize2, X, ZoomIn, ZoomOut } from "lucide-react";
@@ -63,8 +64,18 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         className={`prose prose-slate dark:prose-invert max-w-none text-base leading-relaxed ${className}`}
       >
         <ReactMarkdown
-          remarkPlugins={[remarkMath]}
-          rehypePlugins={[rehypeKatex]}
+          remarkPlugins={[remarkMath, remarkGfm]}
+          rehypePlugins={[
+            [
+              rehypeKatex,
+              {
+                output: "htmlAndMathml",
+                strict: false,
+                trust: true,
+                throwOnError: false,
+              },
+            ],
+          ]}
           components={{
             // Prevents <p><figure>...</figure></p> invalid HTML hydration mismatches
             p: ({ children }) => {
@@ -103,6 +114,39 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
             ),
             strong: ({ children }) => (
               <strong className="font-semibold text-foreground">{children}</strong>
+            ),
+            // Custom Table styling with inner vertical & horizontal demarcations
+            table: ({ children }) => (
+              <div className="my-5 overflow-x-auto">
+                <table className="border-collapse border border-border mx-auto text-center font-sans not-prose">
+                  {children}
+                </table>
+              </div>
+            ),
+            thead: ({ children }) => (
+              <thead className="border-b border-border">
+                {children}
+              </thead>
+            ),
+            tbody: ({ children }) => (
+              <tbody className="divide-y divide-border">
+                {children}
+              </tbody>
+            ),
+            tr: ({ children }) => (
+              <tr className="border-b border-border last:border-b-0">
+                {children}
+              </tr>
+            ),
+            th: ({ children }) => (
+              <th className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
+                {children}
+              </th>
+            ),
+            td: ({ children }) => (
+              <td className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
+                {children}
+              </td>
             ),
             img: ({ src, alt = "" }) => {
               if (typeof src !== "string" || !src.trim()) {

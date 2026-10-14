@@ -31,7 +31,12 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
     state.activeQuestion.passage ||
     (sectionPassageContent && sectionPassageContent.trim().length > 0 ? sectionPassageContent : null);
 
-  const isSplitView = effectiveConfig.layout === "split-passage" || Boolean(activeStimulus);
+  const isSplitView =
+  state.activeQuestion.layout === "split"
+    ? true
+    : state.activeQuestion.layout === "single"
+    ? false
+    : effectiveConfig.layout === "split-passage" || Boolean(activeStimulus);
 
   // Reusable Bluebook Question Top Bar (Question #, Mark for Review, Cross-out trigger)
   // Inside components/exam/shells/sat/SATLayoutAdapter.tsx
@@ -142,16 +147,19 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
 
     {/* Options */}
     <QuestionOptions
-      variant="sat"
-      question={state.activeQuestion}
-      selectedOptionId={state.activeAnswer?.selectedOptionId}
-      frqAnswer={state.activeAnswer?.frqUserAnswer}
-      eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-      isCrossOutMode={state.isCrossOutMode}
-      onSelectOption={actions.selectOption}
-      onSetFrqAnswer={actions.setFrqAnswer}
-      onToggleEliminate={actions.toggleEliminateOption}
-    />
+  variant="sat"
+  question={state.activeQuestion}
+  category={category}
+  testId={metadata.id}
+  manifestBasePath={manifestBasePath}
+  selectedOptionId={state.activeAnswer?.selectedOptionId}
+  frqAnswer={state.activeAnswer?.frqUserAnswer}
+  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+  isCrossOutMode={state.isCrossOutMode}
+  onSelectOption={actions.selectOption}
+  onSetFrqAnswer={actions.setFrqAnswer}
+  onToggleEliminate={actions.toggleEliminateOption}
+/>
   </div>
 </div>
           </>
@@ -173,16 +181,19 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
     </div>
 
     <QuestionOptions
-      variant="sat"
-      question={state.activeQuestion}
-      selectedOptionId={state.activeAnswer?.selectedOptionId}
-      frqAnswer={state.activeAnswer?.frqUserAnswer}
-      eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-      isCrossOutMode={state.isCrossOutMode}
-      onSelectOption={actions.selectOption}
-      onSetFrqAnswer={actions.setFrqAnswer}
-      onToggleEliminate={actions.toggleEliminateOption}
-    />
+  variant="sat"
+  question={state.activeQuestion}
+  category={category}
+  testId={metadata.id}
+  manifestBasePath={manifestBasePath}
+  selectedOptionId={state.activeAnswer?.selectedOptionId}
+  frqAnswer={state.activeAnswer?.frqUserAnswer}
+  eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+  isCrossOutMode={state.isCrossOutMode}
+  onSelectOption={actions.selectOption}
+  onSetFrqAnswer={actions.setFrqAnswer}
+  onToggleEliminate={actions.toggleEliminateOption}
+/>
   </div>
 </div>
         )}

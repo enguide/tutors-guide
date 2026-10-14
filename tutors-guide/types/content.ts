@@ -3,6 +3,8 @@ import { SectionExamConfig, SupportedExamCategory } from "./examConfig";
 
 export type QuestionType = "MC" | "FR";
 
+export type QuestionLayoutMode = "split" | "single";
+
 export interface QuestionOption {
   id: string;
   text: string;
@@ -18,6 +20,7 @@ export interface QuestionFrontmatter {
   prompt: string;
   stimulus?: string; // Discrete per-question stimulus / passage
   passage?: string;  // Alias for backward compatibility
+  layout?: QuestionLayoutMode;
   options?: QuestionOption[];
   domain?: string;
   skill?: string;
