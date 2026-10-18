@@ -1,5 +1,5 @@
 ---
-sectionId: "ap-calc-sec1a"
+sectionId: "ap-calc-ab-t1-s1a"
 sectionTitle: "Section I, Part A (No Calculator)"
 sectionOrder: 1
 timeLimit: 3600

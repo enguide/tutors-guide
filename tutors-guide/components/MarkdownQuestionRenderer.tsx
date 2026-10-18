@@ -107,10 +107,46 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
               <h3 className="text-lg font-medium mb-2">{children}</h3>
             ),
             ul: ({ children }) => (
-              <ul className="list-disc pl-5 space-y-1 mb-3">{children}</ul>
+              <ul className="list-none my-3 pl-6 sm:pl-8 space-y-2 not-prose">{children}</ul>
             ),
+
+            li: ({ children }) => {
+  const childrenArray = React.Children.toArray(children);
+  const firstChild = childrenArray[0];
+
+  // Match Roman numerals like "I.", "II.", "III.", "IV.", "V."
+  if (typeof firstChild === "string") {
+    const match = firstChild.match(/^([IVXLCDM]+\.)\s*(.*)/);
+    if (match) {
+      const romanLabel = match[1];
+      const remainingFirstChild = match[2];
+
+      return (
+        <li className="flex items-start text-base leading-relaxed">
+          {/* text-right aligns the decimals vertically; pr-3 sets a clean gap to the text */}
+          <span className="w-8 shrink-0 text-right pr-3 font-serif font-normal select-none">
+            {romanLabel}
+          </span>
+          <div className="flex-1 min-w-0">
+            {remainingFirstChild}
+            {childrenArray.slice(1)}
+          </div>
+        </li>
+      );
+    }
+  }
+
+  // Fallback for standard unordered bullets
+  return (
+    <li className="flex items-start text-base leading-relaxed">
+      <span className="w-8 shrink-0 text-right pr-3 text-neutral-400 select-none">•</span>
+      <div className="flex-1 min-w-0">{children}</div>
+    </li>
+  );
+},
+
             ol: ({ children }) => (
-              <ol className="list-decimal pl-5 space-y-1 mb-3">{children}</ol>
+              <ol className="list-decimal pl-6 space-y-1 my-3">{children}</ol>
             ),
             strong: ({ children }) => (
               <strong className="font-semibold text-foreground">{children}</strong>

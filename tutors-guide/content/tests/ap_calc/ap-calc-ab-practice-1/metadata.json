@@ -25,6 +25,22 @@
         "allowSectionReview": true
       },
       "hasIntermissionAfter": false
+    },
+    {
+      "id": "ap-calc-ab-t1-s1b",
+      "file": "ap-calc-ab-t1-s1b.md",
+      "order": 2,
+      "title": "Section I, Part B (Calculator Active)",
+      "timeLimit": 3600,
+      "config": {
+        "layout": "single-column",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      },
+      "hasIntermissionAfter": false
     }
   ]
 }

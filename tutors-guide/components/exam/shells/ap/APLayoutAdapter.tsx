@@ -1,27 +1,13 @@
 // components/exam/shells/ap/APLayoutAdapter.tsx
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { TestShellLayoutProps } from "@/types/examLayout";
+import { APHeader } from "./APHeader";
+import { APQuestionNavigatorPopover } from "./APQuestionNavigatorPopover";
 import { MarkdownQuestionRenderer } from "@/components/MarkdownQuestionRenderer";
 import { QuestionOptions } from "../../QuestionOptions";
-import {
-  Clock,
-  Eye,
-  EyeOff,
-  FileText,
-  Calculator,
-  ArrowLeft,
-  ArrowRight,
-  Bookmark,
-  BookOpen,
-} from "lucide-react";
-
-function formatClock(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s < 10 ? "0" : ""}${s}`;
-}
+import { ArrowLeft, ArrowRight, Bookmark } from "lucide-react";
 
 export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   category,
@@ -33,7 +19,6 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   state,
   actions,
 }) => {
-  const [isTimerHidden, setIsTimerHidden] = useState(false);
   const { frontmatter, content: passageContent } = section;
   const questions = frontmatter.questions;
   const isFirstQuestion = state.currentIndex === 0;
@@ -60,12 +45,10 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
     <div className="flex items-stretch justify-between bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden">
       {/* Left: Question Badge & Mark for Review */}
       <div className="flex items-center">
-        {/* Stout, bold sans-serif question number */}
         <div className="w-9 h-full flex items-center justify-center bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-lg font-sans font-bold">
           {state.activeQuestion.questionNumber}
         </div>
 
-        {/* Mark for Review Button */}
         <button
           type="button"
           onClick={actions.toggleFlag}
@@ -76,7 +59,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           }`}
         >
           <Bookmark
-            className={`w-5 h-5 shrink-0 ${
+            className={`w-6 h-6 shrink-0 ${
               isFlagged
                 ? "fill-neutral-900 dark:fill-neutral-100 text-neutral-900 dark:text-neutral-100"
                 : "text-neutral-700 dark:text-neutral-300"
@@ -108,69 +91,17 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-neutral-950 select-none">
-      {/* 1. Academic Header */}
-      <header className="h-14 bg-white dark:bg-neutral-900 border-b border-neutral-300 dark:border-neutral-800 px-4 sm:px-6 flex items-center justify-between z-30 select-none">
-        <div className="flex items-center gap-3">
-          <BookOpen className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
-          <span className="text-xs font-bold font-serif tracking-tight text-neutral-900 dark:text-neutral-100">
-            {frontmatter.sectionTitle}
-          </span>
-          <span className="text-xs font-mono text-neutral-500 border-l border-neutral-300 dark:border-neutral-800 pl-3">
-            Item {state.currentIndex + 1} of {questions.length}
-          </span>
-        </div>
-
-        {/* Center: Timer */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-sm border border-neutral-300 dark:border-neutral-700">
-            <Clock className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
-            <span className="font-mono text-xs font-semibold text-neutral-800 dark:text-neutral-200 min-w-10.5 text-center">
-              {isTimerHidden ? "--:--" : formatClock(state.secondsRemaining)}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsTimerHidden((prev) => !prev)}
-            className="p-1 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-            title="Toggle timer visibility"
-          >
-            {isTimerHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* Right: Tools & Overlays */}
-        <div className="flex items-center gap-2">
-          {effectiveConfig.hasFormulaSheet && (
-            <button
-              type="button"
-              onClick={actions.openFormulaSheet}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 rounded-sm text-xs font-medium text-neutral-800 dark:text-neutral-200"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Formula Sheet</span>
-            </button>
-          )}
-
-          {effectiveConfig.calculator !== "none" && (
-            <button
-              type="button"
-              onClick={actions.toggleCalculator}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-700 rounded-sm text-xs font-medium text-neutral-800 dark:text-neutral-200"
-            >
-              <Calculator className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Calculator</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={actions.openReviewModal}
-            className="px-3 py-1.5 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded-sm text-xs font-medium hover:opacity-90"
-          >
-            Review Items
-          </button>
-        </div>
-      </header>
+      {/* 1. Header */}
+      <APHeader
+        sectionTitle={frontmatter.sectionTitle}
+        config={effectiveConfig}
+        secondsRemaining={state.secondsRemaining}
+        isTTSPlaying={state.isTTSPlaying}
+        isTTSSupported={state.isTTSSupported}
+        onToggleCalculator={actions.toggleCalculator}
+        onToggleFormulaSheet={actions.openFormulaSheet}
+        onToggleTTS={actions.toggleTTS}
+      />
 
       {/* 2. Main Work Area (Split or Academic Single-Column) */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/50">
@@ -198,7 +129,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
 
             {/* Right Pane: Question Stem & Choices */}
             <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-              <div className="max-w-xl mx-auto space-y-6">
+              <div className="max-w-xl mx-auto space-y-4">
                 {renderItemActionBar()}
 
                 {/* Prompt */}
@@ -274,9 +205,15 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           {studentName || "Student Preview"}
         </div>
 
-        {/* Center Column: Question Position Label */}
-        <div className="justify-self-center text-xs font-mono text-neutral-500">
-          Question {state.currentIndex + 1} of {questions.length}
+        {/* Center Column: Exactly Centered Question Navigator */}
+        <div className="justify-self-center">
+          <APQuestionNavigatorPopover
+            currentIndex={state.currentIndex}
+            questions={questions}
+            answers={state.answers}
+            onSelectIndex={(idx) => actions.setCurrentIndex(idx)}
+            onOpenReviewModal={actions.openReviewModal}
+          />
         </div>
 
         {/* Right Column: Navigation Controls */}
