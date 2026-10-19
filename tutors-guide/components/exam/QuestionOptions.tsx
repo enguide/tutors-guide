@@ -128,12 +128,12 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
 
                 {/* Option Content: Render with category/testId context */}
                 <div
-                  className={`flex-1 min-w-0 text-neutral-900 dark:text-neutral-100 ${
-                    isAcademicSerif
-                      ? "font-serif text-[15.5px] leading-[1.6] font-normal"
-                      : "font-sans text-[15px] leading-normal"
-                  }`}
-                >
+  className={`flex-1 min-w-0 text-neutral-900 dark:text-neutral-100 [&:has(.large-op,.op-limits)]:pt-1 ${
+    isAcademicSerif
+      ? "font-serif text-[15.5px] leading-[1.6] font-normal"
+      : "font-sans text-[15px] leading-normal"
+  }`}
+>
                   <MarkdownQuestionRenderer
                     content={option.text}
                     category={category}

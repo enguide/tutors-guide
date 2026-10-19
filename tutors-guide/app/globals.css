@@ -181,3 +181,47 @@
 .katex .mop.op-symbol.large-op + .msupsub > .vlist-t > .vlist-r > .vlist > span:first-child {
   transform: translate(-0.1em, 0.1em);
 }
+
+/* ==========================================================================
+   Summation (Σ) Bounds Tuning
+   Targets .op-limits containing an .op-symbol (e.g., \sum, \prod)
+   ========================================================================== */
+
+/* 1. Scale font size of summation bounds if desired (analogous to your lim rule) */
+.katex .op-limits:has(.op-symbol) > .vlist-t > .vlist-r > .vlist > span:first-child .mtight,
+.katex .op-limits:has(.op-symbol) > .vlist-t > .vlist-r > .vlist > span:last-child .mtight {
+  font-size: 0.9em !important;
+}
+
+/* 2. Adjust upper bound of summation (shift up/down or left/right) */
+.katex .op-limits:has(.op-symbol) > .vlist-t > .vlist-r > .vlist > span:last-child {
+  transform: translate(0em, 0em);
+}
+
+/* 3. Adjust lower bound of summation (shift up/down or left/right) */
+.katex .op-limits:has(.op-symbol) > .vlist-t > .vlist-r > .vlist > span:first-child {
+  transform: translate(0em, 0em);
+}
+/* ==========================================================================
+   Root Index Tuning (\sqrt[n]{x})
+   ========================================================================== */
+
+/* Scale root index proportionally */
+.katex .root {
+  font-size: 0.6em !important;
+}
+
+/* Fine-tune position into the radical crook if needed */
+.katex .root > .vlist-t {
+  transform: translate(0.9em, -0.15em);
+}
+
+/* Prevent inline KaTeX equations from wrapping across lines mid-formula */
+.katex {
+  white-space: nowrap;
+}
+
+/* Allow block display math ($$...$$) to remain block-formatted */
+.katex-display .katex {
+  white-space: normal;
+}

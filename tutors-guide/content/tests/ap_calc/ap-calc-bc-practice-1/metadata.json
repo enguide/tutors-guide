@@ -1,0 +1,46 @@
+{
+  "id": "ap-calc-bc-practice-1",
+  "title": "AP Calculus BC Practice Exam 1",
+  "category": "AP_CALC",
+  "description": "Full-length AP Calculus BC Practice Exam featuring Section I, Part A (30 Multiple-Choice Questions, 60 Minutes, No Calculator) and Section I, Part B (15 Multiple-Choice Questions, 45 Minutes, Calculator Active).",
+  "isAdaptive": false,
+  "config": {
+    "hasCrossOutMode": true,
+    "allowBacktracking": true,
+    "allowSectionReview": true
+  },
+  "sections": [
+    {
+      "id": "ap-calc-bc-t1-s1a",
+      "file": "ap-calc-bc-t1-s1a.md",
+      "order": 1,
+      "title": "Section I, Part A (No Calculator)",
+      "timeLimit": 3600,
+      "config": {
+        "layout": "single-column",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      },
+      "hasIntermissionAfter": false
+    },
+    {
+      "id": "ap-calc-bc-t1-s1b",
+      "file": "ap-calc-bc-t1-s1b.md",
+      "order": 2,
+      "title": "Section I, Part B (Calculator Active)",
+      "timeLimit": 2700,
+      "config": {
+        "layout": "single-column",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      },
+      "hasIntermissionAfter": false
+    }
+  ]
+}

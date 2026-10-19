@@ -61,7 +61,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
   return (
     <>
       <div
-        className={`prose prose-slate dark:prose-invert max-w-none text-base leading-relaxed ${className}`}
+        className={`prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert max-w-none text-base leading-relaxed ${className}`}
       >
         <ReactMarkdown
           remarkPlugins={[remarkMath, remarkGfm]}
@@ -154,7 +154,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
             // Custom Table styling with inner vertical & horizontal demarcations
             table: ({ children }) => (
               <div className="my-5 overflow-x-auto">
-                <table className="border-collapse border border-border mx-auto text-center font-sans not-prose">
+                <table className="border-collapse border border-border mx-auto text-center font-sans prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert">
                   {children}
                 </table>
               </div>
