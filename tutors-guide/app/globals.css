@@ -225,3 +225,7 @@
 .katex-display .katex {
   white-space: normal;
 }
+
+html {
+  scrollbar-gutter: stable;
+}

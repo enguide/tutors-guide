@@ -71,12 +71,9 @@ export const NavigationTimelineChart: React.FC<NavigationTimelineChartProps> = (
           <CardTitle className="text-base sm:text-lg font-bold">
             Section Navigation Path
           </CardTitle>
-          <CardDescription className="text-xs">
-            Chronological progression, backtracks, and deliberation trace
-          </CardDescription>
         </div>
 
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-row items-end gap-1">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
             Time Remaining
           </span>

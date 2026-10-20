@@ -109,7 +109,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     sectionOrder: frontmatter.sectionOrder,
     timeLimitSeconds: effectiveTimeLimitSeconds,
     questions,
-    isTimerRunning: isSectionStarted,
+    // Stop the background timer decrement while submitting or waiting for route push
+    isTimerRunning: isSectionStarted && !isSubmitting,
     onTimeExpired: () => {
       handleSubmitSection();
     },
@@ -140,7 +141,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const handleSubmitSection = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    setIsSectionStarted(false);
+    // Keep isSectionStarted untouched to avoid falling back to SectionDirectionsModal
 
     try {
       const finalAnswers = getFinalizedAnswers();
@@ -162,7 +163,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
       if (!result.success) {
         alert(result.error || "Failed to submit section.");
         setIsSubmitting(false);
-        setIsSectionStarted(true);
         return;
       }
 
@@ -194,7 +194,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
       console.error("Submission failed:", error);
       alert("An unexpected error occurred while finalizing the section.");
       setIsSubmitting(false);
-      setIsSectionStarted(true);
     }
   }, [
     isSubmitting,
@@ -236,6 +235,18 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
+  // Intercept any transitional state during submission to prevent the directions modal flash
+  if (isSubmitting) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-neutral-900">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white mb-4" />
+        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 font-mono tracking-tight">
+          Finalizing section and loading next module...
+        </p>
+      </div>
+    );
+  }
+
   if (isPreFlightOpen) {
     return (
       <TestPreFlightModal
@@ -269,6 +280,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   return (
     <>
       <TestShellLayout
+        key={activeQuestion?.id ?? currentIndex}
         category={examCat}
         metadata={metadata}
         section={section}

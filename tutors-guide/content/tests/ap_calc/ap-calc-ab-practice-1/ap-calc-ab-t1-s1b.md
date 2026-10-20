@@ -34,17 +34,17 @@ questions:
       - id: "D"
         text: "$[-2, 4]$"
     explanation: |
-      A continuous function $g$ is decreasing on any interval where its derivative satisfies $g'(x) \\le 0$, provided $g'(x) = 0$ occurs only at isolated points.
+      A continuous function $g$ is decreasing on any interval where its derivative satisfies $g'(x) \le 0$, provided $g'(x) = 0$ occurs only at isolated points.
 
-      1. **Analyze the sign of $g'(x)$ from the graph**:
-         - For $x \\in [-3, -2)$, the graph of $g'$ lies strictly above the $x$-axis, so $g'(x) > 0$.
+      - **Analyze the sign of $g'(x)$ from the graph**:
+         - For $x \in [-3, -2)$, the graph of $g'$ lies strictly above the $x$-axis, so $g'(x) > 0$.
          - At $x = -2$, $g'(-2) = 0$.
-         - For $x \\in (-2, 1)$, $g'(x) < 0$.
+         - For $x \in (-2, 1)$, $g'(x) < 0$.
          - At $x = 1$, the graph touches the $x$-axis with a local maximum, meaning $g'(1) = 0$.
-         - For $x \\in (1, 4)$, $g'(x) < 0$.
+         - For $x \in (1, 4)$, $g'(x) < 0$.
          - At $x = 4$, $g'(4) = 0$.
 
-      2. **Evaluate the combined interval**:
+      - **Evaluate the combined interval**:
          Because $g'(x) \\le 0$ on the entire interval $[-2, 4]$ and is zero only at isolated points ($x = 1$, $x = -2$, and $x = 4$), the function $g$ is strictly decreasing on the entire closed interval $[-2, 4]$.
 
       **Distractor Rationale**:
@@ -72,13 +72,13 @@ questions:
       - id: "D"
         text: "The net change in the rate of fuel consumption, in liters per minute, over the first $5$ minutes of the test"
     explanation: |
-      The function $C(t)$ models the rate of fuel consumption with units of $\\text{liters per minute}$, and $t$ is measured in $\\text{minutes}$.
+      The function $C(t)$ models the rate of fuel consumption with units of $\text{liters per minute}$, and $t$ is measured in $\text{minutes}$.
 
-      1. **Determine the derivative's physical meaning and units**:
-         The derivative $C'(t) = \\frac{dC}{dt}$ represents the instantaneous rate of change of $C(t)$ with respect to time $t$.
-         $$\\text{Units of } C'(t) = \\frac{\\text{units of } C}{\\text{units of } t} = \\frac{\\text{liters/min}}{\\text{min}} = \\text{liters per minute per minute}$$
+      - **Determine the derivative's physical meaning and units**:
+         The derivative $C'(t) = \dfrac{dC}{dt}$ represents the instantaneous rate of change of $C(t)$ with respect to time $t$.
+         $$\text{Units of } C'(t) = \dfrac{\text{units of } C}{\text{units of } t} = \dfrac{\text{liters/min}}{\text{min}} = \text{liters per minute per minute}$$
 
-      2. **Interpret at the specific value $t = 5$**:
+      - **Interpret at the specific value $t = 5$**:
          Evaluating at $t = 5$ yields the instantaneous rate of change of the consumption rate specifically at the moment $5$ minutes after the test begins.
 
       **Distractor Rationale**:

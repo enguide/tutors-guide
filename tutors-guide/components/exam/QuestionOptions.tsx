@@ -62,25 +62,16 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
 
   // Handle Option Card Selection
   const handleCardClick = (optionId: string) => {
-    // Unconditionally select - useTestProgress now handles clearing elimination atomically
     onSelectOption(optionId);
   };
 
   // Handle Dedicated Elimination Button Trigger (on the right)
   const handleEliminateTrigger = (e: React.MouseEvent, optionId: string) => {
     e.stopPropagation();
-
-    // If student strikes out the currently selected option, deselect it
-    if (selectedOptionId === optionId) {
-      onSelectOption("");
-    }
-
     onToggleEliminate(optionId);
   };
 
   const isAcademicSerif = variant === "sat" || variant === "ap";
-
-  // Common styling to constrain image dimensions inside option buttons
   const optionImageStyles = "[&_img]:max-h-64 [&_img]:w-auto [&_img]:object-contain [&_img]:my-1";
 
   return (
@@ -91,17 +82,10 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
 
         return (
           <div key={option.id} className="flex items-center gap-3">
-            {/* Main Option Card */}
-            <div
-              role="button"
-              tabIndex={0}
+            {/* Main Option Card as a true Button */}
+            <button
+              type="button"
               onClick={() => handleCardClick(option.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleCardClick(option.id);
-                }
-              }}
               className={`relative flex-1 flex items-center px-4 py-3 rounded-xl border text-left cursor-pointer select-none transition-all ${
                 isSelected
                   ? "border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-900 dark:ring-neutral-100 bg-white dark:bg-neutral-900 opacity-100"
@@ -114,8 +98,9 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-b-2 border-neutral-900 dark:border-neutral-100 z-10 pointer-events-none" />
               )}
 
-              <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                {/* Option Letter Disc: Stays clean sans-serif */}
+              {/* pointer-events-none ensures any click lands on the parent button */}
+              <div className="flex items-center gap-3.5 flex-1 min-w-0 pointer-events-none">
+                {/* Option Letter Disc */}
                 <div
                   className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-sans font-bold transition-colors ${
                     isSelected
@@ -126,14 +111,14 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                   {option.id}
                 </div>
 
-                {/* Option Content: Render with category/testId context */}
+                {/* Option Content */}
                 <div
-  className={`flex-1 min-w-0 text-neutral-900 dark:text-neutral-100 [&:has(.large-op,.op-limits)]:pt-1 ${
-    isAcademicSerif
-      ? "font-serif text-[15.5px] leading-[1.6] font-normal"
-      : "font-sans text-[15px] leading-normal"
-  }`}
->
+                  className={`flex-1 min-w-0 text-neutral-900 dark:text-neutral-100 [&:has(.large-op,.op-limits)]:pt-1 ${
+                    isAcademicSerif
+                      ? "font-serif text-[15.5px] leading-[1.6] font-normal"
+                      : "font-sans text-[15px] leading-normal"
+                  }`}
+                >
                   <MarkdownQuestionRenderer
                     content={option.text}
                     category={category}
@@ -147,7 +132,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                   />
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Right Action: Cross-out trigger */}
             {isCrossOutMode && (

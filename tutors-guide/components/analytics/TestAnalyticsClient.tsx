@@ -129,7 +129,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
 
       {/* Main Container */}
       <div className="max-w-337.5 mx-auto px-4 sm:px-8">
-        {/* Adaptive CAT Trajectory Banner (Task 9.4) */}
+        {/* Adaptive CAT Trajectory Banner */}
         {adaptiveTrajectory && adaptiveTrajectory.stageSummaries.length > 0 && (
           <div className="mb-6">
             <AdaptiveTrajectoryCard
@@ -197,7 +197,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                         className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                           isActive
                             ? "bg-white/20 text-white"
-                            : "bg-rose-500/10 text-rose-500"
+                            : "bg-[#ff9999]/20 text-[#ff9999] border border-[#ff9999]/40"
                         }`}
                       >
                         {incorrectCount}
@@ -302,13 +302,107 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                   </span>
                   <button
                     onClick={handleResetFilters}
-                    className="text-[11px] font-semibold text-rose-500 hover:text-rose-600 flex items-center gap-1"
+                    className="text-[11px] font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                   >
                     <RotateCcw size={12} /> Reset
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* =========================================================================
+                QUESTION INDEX NAVIGATOR (PALETTE)
+               ========================================================================= */}
+            {filteredReviewItems.length > 0 && (
+              <div className="bg-card border border-border rounded-none p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Question Index ({filteredReviewItems.length} filtered)
+                  </span>
+                  
+                  {/* Micro Legend */}
+                  <div className="flex items-center gap-4 text-[10px] text-muted-foreground select-none">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 border-2 border-slate-700 dark:border-slate-300 inline-block" />
+                      Correct
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 border-2 border-[#ff9999] inline-block" />
+                      Incorrect
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-slate-800 text-white ring-1 ring-blue-500 inline-block" />
+                      Selected
+                    </span>
+                  </div>
+                </div>
+
+                {/* Question Boxes Grouped by Section */}
+                <div className="space-y-3 pt-1">
+                  {Array.from(
+                    new Set(filteredReviewItems.map((item) => item.sectionId))
+                  ).map((sectionId) => {
+                    const sectionMeta = sectionResults.find(
+                      (s) => s.sectionId === sectionId
+                    );
+                    const sectionTitle =
+                      sectionMeta?.section.title || "Section";
+
+                    const sectionQuestions = filteredReviewItems
+                      .map((item, originalIndex) => ({
+                        item,
+                        indexInFiltered: originalIndex,
+                      }))
+                      .filter((entry) => entry.item.sectionId === sectionId);
+
+                    return (
+                      <div
+                        key={sectionId}
+                        className="flex items-center gap-3 flex-wrap"
+                      >
+                        {/* Section Identifier Label */}
+                        <span className="text-xs font-semibold text-muted-foreground min-w-20 shrink-0">
+                          {sectionTitle}:
+                        </span>
+
+                        {/* Interactive Question Number Squares */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {sectionQuestions.map(({ item, indexInFiltered }) => {
+                            const isCurrent = reviewIndex === indexInFiltered;
+                            const isCorrect = item.isCorrect;
+
+                            let buttonStyle = "";
+                            if (isCorrect) {
+                              buttonStyle = isCurrent
+                                ? "bg-[#444444] text-white border-2 border-[#444444] ring-2 ring-blue-500 ring-offset-2 ring-offset-background font-extrabold scale-105"
+                                : "border-2 border-slate-700 dark:border-slate-300 text-foreground hover:bg-muted font-bold";
+                            } else {
+                              buttonStyle = isCurrent
+                                ? "bg-[#ff9999] text-white border-2 border-[#ff9999] ring-2 ring-blue-500 ring-offset-2 ring-offset-background font-extrabold scale-105"
+                                : "border-2 border-[#ff9999] text-[#ff9999] bg-[#ff9999]/10 hover:bg-[#ff9999]/20 font-bold";
+                            }
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setReviewIndex(indexInFiltered)}
+                                title={`Q${item.responseOrder} - ${
+                                  isCorrect ? "Correct" : "Incorrect"
+                                } (${item.skill})`}
+                                className={`w-8 h-8 text-xs font-mono flex items-center justify-center transition-all rounded-none select-none ${buttonStyle}`}
+                              >
+                                {item.responseOrder}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Question Inspector Card Display */}
             {currentReviewQuestion ? (
@@ -339,7 +433,12 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                   </div>
                 </div>
 
-                <QuestionResultCard item={currentReviewQuestion} />
+                <QuestionResultCard
+                  key={currentReviewQuestion.id}
+                  item={currentReviewQuestion}
+                  category={metadata.category}
+                  testId={metadata.id}
+                />
               </div>
             ) : (
               <div className="p-12 text-center border border-dashed rounded-none bg-card text-muted-foreground">

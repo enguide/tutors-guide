@@ -162,51 +162,42 @@ export function useTestProgress({
   }, []);
 
   const setCurrentIndex = useCallback(
-    (updater: number | ((prev: number) => number)) => {
-      setCurrentIndexState((prevIdx) => {
-        const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
+  (updater: number | ((prev: number) => number)) => {
+    setCurrentIndexState((prevIdx) => {
+      const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
+      if (nextIdx !== prevIdx) {
+        const leavingQ = questions[prevIdx];
+        if (leavingQ) {
+          const uncommitted = timePerQuestionRef.current[leavingQ.id] || 0;
+          timePerQuestionRef.current[leavingQ.id] = 0;
 
-        if (nextIdx !== prevIdx) {
-          const leavingQ = questions[prevIdx];
-          let updatedAnswers = answers;
-          if (leavingQ) {
-            const uncommitted = timePerQuestionRef.current[leavingQ.id] || 0;
-            timePerQuestionRef.current[leavingQ.id] = 0;
-            const prevAns = answers[leavingQ.id] || {};
-            updatedAnswers = {
-              ...answers,
+          setAnswers((prevAnswers) => {
+            const prevAns = prevAnswers[leavingQ.id] || {};
+            const updated = {
+              ...prevAnswers,
               [leavingQ.id]: {
                 ...prevAns,
                 timeSpent: (prevAns.timeSpent || 0) + uncommitted,
               },
             };
-            setAnswers(updatedAnswers);
-          }
-
-          const elapsed = totalAdjustedSeconds - secondsRemaining;
-          const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
-
-          setNavigationHistory((prevHistory) => {
-            const lastEntry = prevHistory[prevHistory.length - 1];
-            if (lastEntry && lastEntry.qIdx === nextIdx) {
-              return prevHistory;
-            }
-
-            const updatedHistory = [...prevHistory, nextEntry];
-            persistToLocalStorage(
-              updatedAnswers,
-              secondsRemaining,
-              nextIdx,
-              updatedHistory
-            );
-            return updatedHistory;
+            return updated;
           });
         }
-        return nextIdx;
-      });
-    },
-    [questions, answers, totalAdjustedSeconds, secondsRemaining, persistToLocalStorage]
-  );
+
+        const elapsed = totalAdjustedSeconds - secondsRemaining;
+        const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
+
+        setNavigationHistory((prevHistory) => {
+          const lastEntry = prevHistory[prevHistory.length - 1];
+          if (lastEntry && lastEntry.qIdx === nextIdx) return prevHistory;
+          return [...prevHistory, nextEntry];
+        });
+      }
+      return nextIdx;
+    });
+  },
+  [questions, totalAdjustedSeconds, secondsRemaining]
+);
 
   useEffect(() => {
     if (!isTimerRunning) return;
@@ -270,13 +261,16 @@ export function useTestProgress({
     [testId, sectionId, sectionOrder, questions]
   );
 
-  const selectOption = useCallback(
-    (optionId: string) => {
-      const activeQuestion = questions[currentIndex];
-      if (!activeQuestion) return;
+  // Replace selectOption in hooks/useTestProgress.ts
+const selectOption = useCallback(
+  (optionId: string) => {
+    const activeQuestion = questions[currentIndex];
+    if (!activeQuestion) return;
 
-      const qId = activeQuestion.id;
-      const currentAnswer = answers[qId] || {};
+    const qId = activeQuestion.id;
+
+    setAnswers((prevAnswers) => {
+      const currentAnswer = prevAnswers[qId] || {};
 
       let nextEliminated = currentAnswer.eliminatedOptions || [];
       if (nextEliminated.includes(optionId)) {
@@ -292,7 +286,7 @@ export function useTestProgress({
       timePerQuestionRef.current[qId] = 0;
 
       const nextAnswers: StudentAnswers = {
-        ...answers,
+        ...prevAnswers,
         [qId]: {
           ...currentAnswer,
           selectedOptionId:
@@ -303,7 +297,6 @@ export function useTestProgress({
         },
       };
 
-      setAnswers(nextAnswers);
       persistToLocalStorage(
         nextAnswers,
         secondsRemaining,
@@ -311,9 +304,12 @@ export function useTestProgress({
         navigationHistory
       );
       scheduleAutosave(qId, nextAnswers[qId], currentIndex);
-    },
-    [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
-  );
+
+      return nextAnswers;
+    });
+  },
+  [currentIndex, questions, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
+);
 
   const setFrqAnswer = useCallback(
     (val: string) => {

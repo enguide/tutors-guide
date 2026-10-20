@@ -1036,7 +1036,7 @@ questions:
       - id: "C"
         text: "$g'(x) < 0$ for all $x$ in the open interval $(3, 4)$."
       - id: "D"
-        text: "$g'(5) \\neq 0$"
+        text: "$g'(5)$ does not equal $0$"
     explanation: |
       Analyze the extrema of the continuous function $g$ across the subintervals using the Extreme Value Theorem:
 
