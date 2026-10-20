@@ -390,7 +390,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                                 title={`Q${item.responseOrder} - ${
                                   isCorrect ? "Correct" : "Incorrect"
                                 } (${item.skill})`}
-                                className={`w-8 h-8 text-xs font-mono flex items-center justify-center transition-all rounded-none select-none ${buttonStyle}`}
+                                className={`w-8 h-8 text-xs flex items-center justify-center transition-all rounded-none select-none ${buttonStyle}`}
                               >
                                 {item.responseOrder}
                               </button>

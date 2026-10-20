@@ -868,3 +868,117 @@ _Goal: Build the algorithmic routing engine to support multistage computer-adapt
 * Verify 100% of frontmatter fields, answer keys, and options match schema rules.
 * Assert all referenced diagram SVGs, graphs, and WebP stimuli resolve to valid files under `public/content/tests/...`.
 * Validate KaTeX syntax balance across all markdown bodies to eliminate client-side math rendering errors.
+
+```markdown
+## Epic 13: Peer-to-Peer Mentorship Links & Independent Tutor Delegation
+
+*Goal: Decouple diagnostic observability from strictly top-down institutional contracts, enabling independent students and private tutors to establish sovereign, consent-driven observation links without organizational license pools or shared tenant IDs.*
+
+---
+
+### Task 13.1: Mentorship Link Relational Schema & Migration
+
+* Introduce a dedicated peer-to-peer delegation model in Prisma to represent non-institutional tutor-student mentorship:
+  ```prisma
+  enum LinkStatus {
+    PENDING
+    ACTIVE
+    REVOKED
+  }
+
+  model TutorStudentLink {
+    id          String     @id @default(cuid())
+    status      LinkStatus @default(PENDING)
+    
+    // The Tutor receiving observation rights
+    tutorId     String
+    tutor       Profile    @relation("TutorLinks", fields: [tutorId], references: [id], onDelete: Cascade)
+    
+    // The Student granting telemetry access
+    studentId   String
+    student     Profile    @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+    createdAt   DateTime   @default(now())
+    updatedAt   DateTime   @updatedAt
+
+    @@unique([tutorId, studentId])
+    @@index([tutorId])
+    @@index([studentId])
+  }
+
+```
+
+* Extend `model Profile` with corresponding directional relations:
+```prisma
+tutoredStudents TutorStudentLink[] @relation("TutorLinks")
+studentTutors   TutorStudentLink[] @relation("StudentLinks")
+
+```
+
+
+* Generate and apply Prisma migrations to deploy the relation without mutating existing `LicensePool`, `Organization`, or `Enrollment` tables.
+
+---
+
+### Task 13.2: Dual-Initiation Workflow Engine & Server Actions
+
+* Implement bilateral invitation and connection workflows in `actions/mentorship.ts`:
+* **Tutor-Initiated (Invite Link):** Generate persistent or single-use tutor connection tokens (`/link-tutor?tutorCode=TUTOR-XXXXXX`) allowing registered tutors to invite independent students directly.
+* **Student-Initiated (Direct Grant):** Allow students to look up an independent tutor by verified email and trigger a connection request.
+
+
+* Build atomic server actions handling connection state transitions:
+* `createTutorInviteCode()`: Generates a sharable mentor claim link for a tutor profile.
+* `requestMentorConnection(tutorEmail: string)`: Creates a `PENDING` request from student to tutor.
+* `respondToMentorshipRequest(linkId: string, accept: boolean)`: Transitions request status to `ACTIVE` or deletes the pending record.
+* `revokeMentorshipAccess(linkId: string)`: Transitions status to `REVOKED` or severs the relation instantly, ensuring the student retains sovereign data privacy.
+
+
+
+---
+
+### Task 13.3: Tenancy Guard Evolution & Diagnostic Inspection Authorization
+
+* Refactor access checks in `actions/observability.ts`, `app/api/tgadmin/export-csv/route.ts`, and `app/tests/[category]/[testId]/results/page.tsx` to support the expanded compound authorization rule:
+```typescript
+const isSuperAdmin = session.user.role === Role.ADMIN;
+const sharesOrganization =
+  Boolean(session.user.orgId) &&
+  Boolean(studentProfile.orgId) &&
+  session.user.orgId === studentProfile.orgId;
+
+const hasActiveMentorshipLink = await prisma.tutorStudentLink.findFirst({
+  where: {
+    tutorId: session.user.id,
+    studentId: targetProfileId,
+    status: LinkStatus.ACTIVE,
+  },
+});
+
+const isAuthorized = isSuperAdmin || sharesOrganization || Boolean(hasActiveMentorshipLink);
+
+```
+
+
+* Ensure independent tutors (`orgId === null`) can inspect linked students' diagnostic charts, section pacing traces, and question triage reviews while remaining barred from unlinked students.
+
+---
+
+### Task 13.4: Student Sovereignty UI & Tutor Roster Unification
+
+* **Student Privacy & Mentor Settings (`/settings/mentors` or `/dashboard` widget):**
+* Present students with a clear list of instructors currently authorized to view their diagnostic testing history.
+* Provide a modal/prompt for accepting incoming tutor link requests with explicit disclosure: *"Allow [Tutor Name] ([email]) to inspect your diagnostic scores, timing telemetry, and answer revisions?"*
+* Provide an instant "Revoke Access" control allowing students to terminate data sharing at any time.
+
+
+* **Unified Tutor Portal (`/tgadmin`):**
+* Update `getInstitutionalOverview()` and `RosterTable.tsx` for tutors to merge students from institutional license allocations with students connected via `TutorStudentLink`.
+* Display an attribution tag per student row (e.g., `Institutional: Apex Prep` vs. `Direct Mentorship`).
+* Conditionally suppress seat management operations (code refreshing, license reclamation) for peer-linked students who fund their own subscriptions independently.
+
+
+
+```
+
+```

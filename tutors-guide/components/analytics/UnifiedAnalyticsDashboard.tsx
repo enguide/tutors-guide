@@ -12,7 +12,6 @@ import {
   YAxis,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
 } from "recharts";
 import {
@@ -55,19 +54,28 @@ const DIFFICULTY_ORDER: Record<string, number> = {
   Unrated: 99,
 };
 
-const useFontSize = () => {
-  const [fontSize, setFontSize] = React.useState(11);
+const useWindowDimensions = () => {
+  const [state, setState] = React.useState({
+    fontSize: 11,
+    isLg: false,
+    mounted: false,
+  });
+
   React.useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 640) setFontSize(11);
-      else if (window.innerWidth < 1024) setFontSize(12);
-      else setFontSize(13);
+      const width = window.innerWidth;
+      setState({
+        fontSize: width < 640 ? 11 : width < 1024 ? 12 : 13,
+        isLg: width >= 1024,
+        mounted: true,
+      });
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  return fontSize;
+
+  return state;
 };
 
 const topBarConfig = {
@@ -102,7 +110,7 @@ export default function UnifiedAnalyticsDashboard({
   sectionResults,
   responses,
 }: UnifiedAnalyticsDashboardProps) {
-  const fontSize = useFontSize();
+  const { fontSize, isLg, mounted } = useWindowDimensions();
 
   const availableSections = React.useMemo(() => {
     return sectionResults.map((sr) => sr.sectionId);
@@ -270,7 +278,7 @@ export default function UnifiedAnalyticsDashboard({
   };
 
   return (
-    <div className="flex flex-col items-center align-middle mx-1 sm:mx-8 gap-4 w-full">
+    <div className="flex flex-col items-center align-middle mx-1 sm:mx-8 gap-4 w-full min-w-0">
       {/* =========================================================================
           1. TOP RESULTS & PACING BAR CHART
          ========================================================================= */}
@@ -379,15 +387,17 @@ export default function UnifiedAnalyticsDashboard({
           </div>
         </CardHeader>
 
-        <CardContent className="px-2 sm:p-6">
-          {topChartData.length > 0 ? (
-            <>
-              {/* MOBILE VIEW */}
-              <div className="block lg:hidden">
+        <CardContent className="px-2 sm:p-6 min-w-0">
+          {!mounted ? (
+            <div className="h-32 w-full animate-pulse bg-muted/20" />
+          ) : topChartData.length > 0 ? (
+            !isLg ? (
+              /* MOBILE VIEW (Mounted only when screen is < lg) */
+              <div className="w-full min-w-0">
                 <ChartContainer
                   config={topBarConfig}
-                  className="w-full"
-                  style={{ height: `${topChartData.length * 30}px` }}
+                  className="w-full min-w-0"
+                  style={{ height: `${topChartData.length * 30}px`, minHeight: "150px" }}
                 >
                   <BarChart
                     data={topChartData}
@@ -437,12 +447,12 @@ export default function UnifiedAnalyticsDashboard({
                   </BarChart>
                 </ChartContainer>
               </div>
-
-              {/* DESKTOP VIEW */}
-              <div className="hidden lg:block">
+            ) : (
+              /* DESKTOP VIEW (Mounted only when screen is >= lg) */
+              <div className="w-full min-w-0">
                 <ChartContainer
                   config={topBarConfig}
-                  className="aspect-auto h-31.25 pt-2 w-full"
+                  className="aspect-auto h-31.25 pt-2 w-full min-w-0"
                 >
                   <BarChart
                     accessibilityLayer
@@ -493,7 +503,7 @@ export default function UnifiedAnalyticsDashboard({
                   </BarChart>
                 </ChartContainer>
               </div>
-            </>
+            )
           ) : (
             <div className="p-4 text-center text-muted-foreground">
               No response data available for the selected section.
@@ -506,7 +516,7 @@ export default function UnifiedAnalyticsDashboard({
           2. SECTION NAVIGATION CHART
          ========================================================================= */}
       {activeSectionResult && (
-        <Card className="rounded-none w-full xl:w-337.5 xl:min-w-337.5">
+        <Card className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 min-w-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b h-16 px-5 py-3.5">
             <div className="flex flex-col gap-1">
               <CardTitle className="text-base font-bold">
@@ -525,68 +535,68 @@ export default function UnifiedAnalyticsDashboard({
             </div>
           </CardHeader>
 
-          <CardContent className="pt-6">
-            {navData.length > 0 ? (
+          <CardContent className="pt-6 min-w-0">
+            {!mounted ? (
+              <div className="h-56 w-full animate-pulse bg-muted/20" />
+            ) : navData.length > 0 ? (
               <ChartContainer
                 config={navChartConfig}
-                className="aspect-video sm:aspect-2/1 md:aspect-3/1 lg:aspect-4/1 w-full"
+                className="aspect-video sm:aspect-2/1 md:aspect-3/1 lg:aspect-4/1 w-full min-w-0 min-h-[220px]"
               >
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={navData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                  >
-                    <CartesianGrid horizontal={true} vertical={false} />
-                    <XAxis
-                      dataKey="time"
-                      type="number"
-                      domain={[0, "dataMax"]}
-                      tickFormatter={formatNavTime}
-                      stroke="#888888"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={true}
-                      label={{
-                        value: "Test Elapsed Time",
-                        position: "bottom",
-                        offset: 0,
-                        className:
-                          "fill-muted-foreground text-[10px] uppercase font-bold",
-                      }}
-                    />
-                    <YAxis
-                      dataKey="qIdx"
-                      stroke="#888888"
-                      fontSize={12}
-                      allowDecimals={false}
-                      domain={[0, navData[navData.length - 1].qIdx]}
-                      ticks={yAxisTicks}
-                      tickLine={true}
-                      axisLine={true}
-                      tickFormatter={(val) => `Q${val + 1}`}
-                      label={{
-                        value: "Question #",
-                        angle: -90,
-                        position: "insideLeft",
-                        className:
-                          "fill-muted-foreground text-[10px] uppercase font-bold",
-                      }}
-                    />
-                    <Tooltip
-                      content={<ChartTooltipContent hideLabel />}
-                      formatter={(value: any) => [`Question ${Number(value) + 1}`]}
-                      labelFormatter={(label) => `At ${formatNavTime(Number(label))}`}
-                    />
-                    <Line
-                      type="stepAfter"
-                      dataKey="qIdx"
-                      stroke="hsl(220 70% 50%)"
-                      strokeWidth={3}
-                      dot={false}
-                      activeDot={{ r: 6, strokeWidth: 0 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <LineChart
+                  data={navData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid horizontal={true} vertical={false} />
+                  <XAxis
+                    dataKey="time"
+                    type="number"
+                    domain={[0, "dataMax"]}
+                    tickFormatter={formatNavTime}
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={true}
+                    label={{
+                      value: "Test Elapsed Time",
+                      position: "bottom",
+                      offset: 0,
+                      className:
+                        "fill-muted-foreground text-[10px] uppercase font-bold",
+                    }}
+                  />
+                  <YAxis
+                    dataKey="qIdx"
+                    stroke="#888888"
+                    fontSize={12}
+                    allowDecimals={false}
+                    domain={[0, navData[navData.length - 1].qIdx]}
+                    ticks={yAxisTicks}
+                    tickLine={true}
+                    axisLine={true}
+                    tickFormatter={(val) => `Q${val + 1}`}
+                    label={{
+                      value: "Question #",
+                      angle: -90,
+                      position: "insideLeft",
+                      className:
+                        "fill-muted-foreground text-[10px] uppercase font-bold",
+                    }}
+                  />
+                  <Tooltip
+                    content={<ChartTooltipContent hideLabel />}
+                    formatter={(value: any) => [`Question ${Number(value) + 1}`]}
+                    labelFormatter={(label) => `At ${formatNavTime(Number(label))}`}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="qIdx"
+                    stroke="hsl(220 70% 50%)"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                </LineChart>
               </ChartContainer>
             ) : (
               <div className="p-8 text-center text-muted-foreground">
@@ -600,66 +610,71 @@ export default function UnifiedAnalyticsDashboard({
       {/* =========================================================================
           3. ACCURACY CHARTS
          ========================================================================= */}
-      <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-337.5 xl:min-w-337.5">
+      <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-337.5 xl:min-w-337.5 min-w-0">
         {/* Left Column: Topics with Nested Skills Accordion */}
-        <div className="w-full lg:w-2/3">
+        <div className="w-full lg:w-2/3 min-w-0">
           <TopicSkillAccuracyAccordion responses={activeResponses} />
         </div>
 
         {/* Right Column: Difficulty Breakdown */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-4">
-          <Card className="rounded-none w-full h-fit">
+        <div className="w-full lg:w-1/3 flex flex-col gap-4 min-w-0">
+          <Card className="rounded-none w-full h-fit min-w-0">
             <CardHeader className="border-b">
               <CardTitle>By Difficulty</CardTitle>
               <CardDescription>
                 Performance across difficulty levels.
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
-              <ChartContainer
-                config={accuracyChartConfig}
-                className="w-full"
-                style={{
-                  height: calculateChartHeight(accuracyData.difficulties.length),
-                }}
-              >
-                <BarChart
-                  data={accuracyData.difficulties}
-                  layout="vertical"
-                  margin={{ left: 5, right: 5 }}
+            <CardContent className="pt-6 min-w-0">
+              {!mounted ? (
+                <div className="h-40 w-full animate-pulse bg-muted/20" />
+              ) : (
+                <ChartContainer
+                  config={accuracyChartConfig}
+                  className="w-full min-w-0"
+                  style={{
+                    height: calculateChartHeight(accuracyData.difficulties.length),
+                    minHeight: "150px",
+                  }}
                 >
-                  <CartesianGrid horizontal vertical />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    tick={{ fontSize }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={80}
-                  />
-                  <ChartTooltip
-                    content={<ChartTooltipContent indicator="dashed" />}
-                  />
-                  <Bar
-                    dataKey="correct"
-                    fill="#444444"
-                    stackId="a"
-                    radius={0}
-                  />
-                  <Bar
-                    dataKey="incorrect"
-                    fill="#ff9999"
-                    stackId="a"
-                    radius={0}
-                  />
-                </BarChart>
-              </ChartContainer>
+                  <BarChart
+                    data={accuracyData.difficulties}
+                    layout="vertical"
+                    margin={{ left: 5, right: 5 }}
+                  >
+                    <CartesianGrid horizontal vertical />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      tick={{ fontSize }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={80}
+                    />
+                    <ChartTooltip
+                      content={<ChartTooltipContent indicator="dashed" />}
+                    />
+                    <Bar
+                      dataKey="correct"
+                      fill="#444444"
+                      stackId="a"
+                      radius={0}
+                    />
+                    <Bar
+                      dataKey="incorrect"
+                      fill="#ff9999"
+                      stackId="a"
+                      radius={0}
+                    />
+                  </BarChart>
+                </ChartContainer>
+              )}
             </CardContent>
           </Card>
         </div>

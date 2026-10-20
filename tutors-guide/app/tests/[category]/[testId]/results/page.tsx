@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { getTestMetadata, getSectionById } from "@/lib/contentLoader";
 import { synthesizeAdaptiveTestScores } from "@/lib/scoring/adaptiveScorer";
 import { TestAnalyticsClient } from "@/components/analytics/TestAnalyticsClient";
-import { Category, QuestionType } from "@prisma/client";
+import { Category, QuestionType, Role } from "@prisma/client";
 import { QuestionFrontmatter } from "@/types/content";
 import {
   EnrichedResponseItem,
@@ -24,6 +24,9 @@ interface ResultsPageProps {
     category: string;
     testId: string;
   }>;
+  searchParams: Promise<{
+    studentId?: string;
+  }>;
 }
 
 function parseCategorySlug(slug: string): Category | null {
@@ -36,12 +39,17 @@ function parseCategorySlug(slug: string): Category | null {
 
 async function ResultsContent({
   paramsPromise,
+  searchParamsPromise,
 }: {
   paramsPromise: Promise<{ category: string; testId: string }>;
+  searchParamsPromise: Promise<{ studentId?: string }>;
 }) {
   await connection();
 
-  const { category: rawCategory, testId } = await paramsPromise;
+  const [{ category: rawCategory, testId }, { studentId }] = await Promise.all([
+    paramsPromise,
+    searchParamsPromise,
+  ]);
 
   const categoryEnum = parseCategorySlug(rawCategory);
   if (!categoryEnum || categoryEnum === Category.NONE) {
@@ -51,32 +59,70 @@ async function ResultsContent({
   // 1. Authenticate user
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=/tests/${rawCategory}/${testId}/results`);
+    const callbackTarget = studentId
+      ? `/tests/${rawCategory}/${testId}/results?studentId=${studentId}`
+      : `/tests/${rawCategory}/${testId}/results`;
+    redirect(`/login?callbackUrl=${encodeURIComponent(callbackTarget)}`);
   }
 
-  const profileId = session.user.id;
+  // 2. Resolve target profile and enforce multi-tenant isolation
+  let targetProfileId = session.user.id;
+  let isStaffInspection = false;
 
-  // 2. Fetch metadata
+  if (studentId && studentId !== session.user.id) {
+    const userRole = session.user.role as Role;
+    const allowedStaffRoles: Role[] = [Role.ORG_ADMIN, Role.TUTOR, Role.ADMIN];
+
+    if (!allowedStaffRoles.includes(userRole)) {
+      redirect(`/tests/${rawCategory.toLowerCase()}/${testId}/results`);
+    }
+
+    const studentProfile = await prisma.profile.findUnique({
+      where: { id: studentId },
+      select: { id: true, orgId: true, schoolId: true },
+    });
+
+    if (!studentProfile) {
+      notFound();
+    }
+
+    // Strict tenancy verification for non-superadmins
+    if (userRole !== Role.ADMIN) {
+      const sharesOrg =
+        Boolean(session.user.orgId) &&
+        Boolean(studentProfile.orgId) &&
+        session.user.orgId === studentProfile.orgId;
+
+      if (!sharesOrg) {
+        redirect("/tgadmin?error=unauthorized_student_access");
+      }
+    }
+
+    targetProfileId = studentProfile.id;
+    isStaffInspection = true;
+  }
+
+  // 3. Fetch test metadata from filesystem
   const metadata = await getTestMetadata(rawCategory.toLowerCase(), testId);
   if (!metadata) {
     notFound();
   }
 
-  // 3. Fetch user results, responses, and section files concurrently
+  // 4. Fetch target student's results, responses, and section markdown stimuli
   const [testSummaryRecord, sectionResultRecords, userResponseRecords, sectionFiles] =
     await Promise.all([
       prisma.testSummary.findUnique({
         where: {
           testId_profileId: {
             testId,
-            profileId,
+            profileId: targetProfileId,
           },
         },
       }),
       prisma.result.findMany({
         where: {
           testId,
-          profileId,
+          profileId: targetProfileId,
         },
         orderBy: {
           section: {
@@ -90,7 +136,7 @@ async function ResultsContent({
       prisma.response.findMany({
         where: {
           testId,
-          profileId,
+          profileId: targetProfileId,
         },
         orderBy: [
           { sectionOrder: "asc" },
@@ -105,6 +151,9 @@ async function ResultsContent({
     ]);
 
   if (sectionResultRecords.length === 0) {
+    if (isStaffInspection) {
+      notFound();
+    }
     const firstSectionId = metadata.sections[0]?.id;
     if (firstSectionId) {
       redirect(`/tests/${rawCategory.toLowerCase()}/${testId}/${firstSectionId}`);
@@ -112,7 +161,7 @@ async function ResultsContent({
     notFound();
   }
 
-  // 4. Index questions from parsed markdown sections
+  // 5. Index questions and passages from parsed markdown sections
   const questionMap = new Map<string, { question: QuestionFrontmatter; passageText?: string }>();
   for (const secData of sectionFiles) {
     if (secData?.frontmatter?.questions) {
@@ -126,7 +175,7 @@ async function ResultsContent({
     }
   }
 
-  // 5. Enrich database responses with question frontmatter
+  // 6. Enrich database responses with question frontmatter
   const enrichedResponses: EnrichedResponseItem[] = userResponseRecords.map((r) => {
     const entry = questionMap.get(r.questionId);
     const qMeta = entry?.question;
@@ -154,7 +203,7 @@ async function ResultsContent({
     };
   });
 
-  // 6. Shape section results
+  // 7. Shape section results
   const formattedSectionResults: SectionResultData[] = sectionResultRecords.map((sr) => ({
     id: sr.id,
     sectionId: sr.sectionId,
@@ -175,7 +224,7 @@ async function ResultsContent({
     },
   }));
 
-  // 7. Shape test summary
+  // 8. Shape test summary
   const formattedTestSummary: TestSummaryData | null = testSummaryRecord
     ? {
         id: testSummaryRecord.id,
@@ -188,7 +237,7 @@ async function ResultsContent({
       }
     : null;
 
-  // 8. Compute adaptive trajectory data if test is adaptive
+  // 9. Compute adaptive trajectory data if test is adaptive
   let adaptiveTrajectory: AdaptiveTrajectoryData | null = null;
   if (metadata.isAdaptive) {
     const resultsMap = new Map<string, { numCorrect: number; totalQuestions: number }>();
@@ -215,22 +264,25 @@ async function ResultsContent({
 function ResultsLoadingSkeleton() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 space-y-6 animate-pulse">
-      <div className="h-10 w-64 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+      <div className="h-10 w-64 bg-slate-200 dark:bg-slate-800 rounded-none" />
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
-        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
-        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
-        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-none" />
+        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-none" />
+        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-none" />
+        <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-none" />
       </div>
-      <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+      <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-none" />
     </div>
   );
 }
 
-export default function ResultsPage({ params }: ResultsPageProps) {
+export default function ResultsPage({ params, searchParams }: ResultsPageProps) {
   return (
     <Suspense fallback={<ResultsLoadingSkeleton />}>
-      <ResultsContent paramsPromise={params} />
+      <ResultsContent
+        paramsPromise={params}
+        searchParamsPromise={searchParams}
+      />
     </Suspense>
   );
 }

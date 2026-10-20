@@ -38,10 +38,14 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
 
   // Minimal, authentic Bluebook / AP Item Action Bar (Question Number only)[cite: 17, 18]
   const renderExamActionBar = () => (
-    <div className="flex items-stretch bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden rounded-sm border border-neutral-200 dark:border-neutral-700 w-fit">
-      <div className="w-9 h-full flex items-center justify-center bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-base font-sans font-bold">
+    <div className="flex items-stretch bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden rounded-sm  w-full">
+      {/* Left: Stout Question Number Box */}
+      <div className="w-9 h-full flex items-center justify-center bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-base font-sans font-bold shrink-0">
         {item.responseOrder}
       </div>
+
+      {/* Lighter strip filling the rest of the bar */}
+      <div className="flex-1 bg-neutral-100 dark:bg-neutral-800" />
     </div>
   );
 
