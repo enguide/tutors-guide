@@ -19,6 +19,7 @@ import { SectionDirectionsModal } from "./SectionDirectionsModal";
 import { completeTestSection } from "@/actions/completeTestSection";
 import { Category } from "@prisma/client";
 import { TestShellLayout } from "./shells/TestShellLayout";
+import { ExamErrorBoundary } from "./ExamErrorBoundary";
 
 interface ExamClientProps {
   metadata: TestMetadata;
@@ -86,6 +87,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     secondsRemaining,
     answers,
     navigationHistory,
+    syncStatus,
     isCrossOutMode,
     setIsCrossOutMode,
     isCalculatorOpen,
@@ -278,7 +280,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const activeAnswer = activeQuestion ? answers[activeQuestion.id] : undefined;
 
   return (
-    <>
+    <ExamErrorBoundary testId={testId} sectionId={frontmatter.sectionId}>
       <TestShellLayout
         key={activeQuestion?.id ?? currentIndex}
         category={examCat}
@@ -291,6 +293,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
           currentIndex,
           totalQuestions: questions.length,
           secondsRemaining,
+          syncStatus,
           activeQuestion,
           activeAnswer,
           answers,
@@ -337,6 +340,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         answers={answers}
         onJumpToQuestion={(idx) => setCurrentIndex(idx)}
       />
-    </>
+    </ExamErrorBoundary>
   );
 };

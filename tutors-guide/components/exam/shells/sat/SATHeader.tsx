@@ -4,11 +4,14 @@
 import React, { useState } from "react";
 import { Calculator, FileText, Volume2, ChevronDown } from "lucide-react";
 import { SectionExamConfig } from "@/types/examConfig";
+import { NetworkStatusPill } from "@/components/exam/NetworkStatusPill";
+import type { SyncStatus } from "@/hooks/useTestProgress";
 
 interface SATHeaderProps {
   sectionTitle: string;
   config: SectionExamConfig;
   secondsRemaining: number;
+  syncStatus?: SyncStatus;
   isTTSPlaying: boolean;
   isTTSSupported: boolean;
   onToggleCalculator: () => void;
@@ -26,6 +29,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
   sectionTitle,
   config,
   secondsRemaining,
+  syncStatus,
   isTTSPlaying,
   isTTSSupported,
   onToggleCalculator,
@@ -33,7 +37,7 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
   onToggleTTS,
 }) => {
   const [isTimerHidden, setIsTimerHidden] = useState(false);
-  const isTimeCritical = secondsRemaining <= 300; // Under 5 mins
+  const isTimeCritical = secondsRemaining <= 300; // Under 5 mins[cite: 15]
 
   return (
     <header className="relative h-16 border-b border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 grid grid-cols-3 items-center select-none z-30">
@@ -51,15 +55,18 @@ export const SATHeader: React.FC<SATHeaderProps> = ({
         </button>
       </div>
 
-      {/* Center: Bluebook Stacked Timer & Hide Button */}
-      <div className="flex flex-col items-center justify-self-center">
-        <span
-          className={`font-sans text-xl font-bold tracking-tight ${
-            isTimeCritical ? "text-rose-600 animate-pulse" : "text-neutral-900 dark:text-neutral-100"
-          }`}
-        >
-          {isTimerHidden ? "--:--" : formatClock(secondsRemaining)}
-        </span>
+      {/* Center: Bluebook Stacked Timer & Hide Button + Resilience Pill */}
+      <div className="flex flex-col items-center justify-self-center gap-1">
+        <div className="flex items-center gap-2">
+          <span
+            className={`font-sans text-xl font-bold tracking-tight ${
+              isTimeCritical ? "text-rose-600 animate-pulse" : "text-neutral-900 dark:text-neutral-100"
+            }`}
+          >
+            {isTimerHidden ? "--:--" : formatClock(secondsRemaining)}
+          </span>
+          {syncStatus && <NetworkStatusPill status={syncStatus} />}
+        </div>
         <button
           type="button"
           onClick={() => setIsTimerHidden((prev) => !prev)}

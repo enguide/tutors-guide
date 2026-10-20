@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // types/examLayout.ts
 import React from "react";
+import type { SyncStatus } from "@/hooks/useTestProgress";
 import { SupportedExamCategory, SectionExamConfig } from "@/types/examConfig";
 import { QuestionFrontmatter, ParsedSection, TestMetadata } from "@/types/content";
 import { AccommodationSettings } from "@/types/accommodations";
@@ -9,6 +10,7 @@ export interface TestShellExamState {
   currentIndex: number;
   totalQuestions: number;
   secondsRemaining: number;
+  syncStatus?: SyncStatus;
   activeQuestion: QuestionFrontmatter;
   activeAnswer?: {
     selectedOptionId?: string;

@@ -14,7 +14,9 @@ function reportError(file: string, message: string) {
   errorsFound++;
 }
 
-function checkMathDelimiters(content: string, filePath: string) {
+function checkMathDelimiters(content: string, context: string, filePath: string) {
+  if (!content) return;
+
   // Strip code blocks, inline code spans, and escaped dollars (\$);
   const sanitized = content
     .replace(/```[\s\S]*?```/g, "")
@@ -26,7 +28,7 @@ function checkMathDelimiters(content: string, filePath: string) {
   if (displayMatches % 2 !== 0) {
     reportError(
       filePath,
-      `Unbalanced display math delimiters ($$). Count: ${displayMatches}`
+      `Unbalanced display math delimiters ($$) in ${context}. Count: ${displayMatches}`
     );
   }
 
@@ -36,7 +38,7 @@ function checkMathDelimiters(content: string, filePath: string) {
   if (inlineMatches % 2 !== 0) {
     reportError(
       filePath,
-      `Unbalanced inline math delimiters ($). Count: ${inlineMatches}`
+      `Unbalanced inline math delimiters ($) in ${context}. Count: ${inlineMatches}`
     );
   }
 }
@@ -133,18 +135,71 @@ function validateAll() {
         if (!data.sectionId) {
           reportError(sectionFilePath, "Missing 'sectionId' in frontmatter");
         }
+
         if (!data.questions || !Array.isArray(data.questions)) {
           reportError(sectionFilePath, "Frontmatter must contain a 'questions' array");
         } else {
-          for (const q of data.questions) {
-            if (!q.id) reportError(sectionFilePath, "A question is missing an 'id'");
-            if (!q.correctAnswer) {
-              reportError(sectionFilePath, `Question ${q.id} missing 'correctAnswer'`);
+          const seenQuestionIds = new Set<string>();
+
+          data.questions.forEach((q: any, idx: number) => {
+            const qNum = q.questionNumber || idx + 1;
+            const qCtx = `Question #${qNum} (id: ${q.id || "MISSING"})`;
+
+            if (!q.id) {
+              reportError(sectionFilePath, `${qCtx}: Missing question 'id'`);
+            } else if (seenQuestionIds.has(q.id)) {
+              reportError(sectionFilePath, `${qCtx}: Duplicate question ID '${q.id}'`);
+            } else {
+              seenQuestionIds.add(q.id);
             }
-          }
+
+            if (!q.prompt) {
+              reportError(sectionFilePath, `${qCtx}: Missing 'prompt'`);
+            } else {
+              checkMathDelimiters(q.prompt, `${qCtx} prompt`, sectionFilePath);
+            }
+
+            if (q.explanation) {
+              checkMathDelimiters(q.explanation, `${qCtx} explanation`, sectionFilePath);
+            }
+
+            if (!q.correctAnswer) {
+              reportError(sectionFilePath, `${qCtx}: Missing 'correctAnswer'`);
+            }
+
+            // Multiple-Choice Assertions
+            if (q.questionType === "MC") {
+              if (!Array.isArray(q.options) || q.options.length < 2) {
+                reportError(sectionFilePath, `${qCtx}: MC questions must have at least 2 options`);
+              } else {
+                const optionIds = new Set<string>();
+                for (const opt of q.options) {
+                  if (!opt.id) {
+                    reportError(sectionFilePath, `${qCtx}: An option is missing an 'id'`);
+                  } else {
+                    optionIds.add(String(opt.id).toUpperCase());
+                  }
+                  if (opt.text) {
+                    checkMathDelimiters(opt.text, `${qCtx} option ${opt.id}`, sectionFilePath);
+                  }
+                }
+
+                if (
+                  q.correctAnswer &&
+                  !optionIds.has(String(q.correctAnswer).trim().toUpperCase())
+                ) {
+                  reportError(
+                    sectionFilePath,
+                    `${qCtx}: correctAnswer "${q.correctAnswer}" does not match any option IDs: [${Array.from(optionIds).join(", ")}]`
+                  );
+                }
+              }
+            }
+          });
         }
 
-        checkMathDelimiters(content, sectionFilePath);
+        // Validate markdown body (stimulus)
+        checkMathDelimiters(content, "Passage stimulus body", sectionFilePath);
         checkImageReferences(
           content,
           category,

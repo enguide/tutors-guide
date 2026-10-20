@@ -3,8 +3,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { QuestionFrontmatter } from "@/types/content";
-import { autosaveResponse } from "@/actions/autosave";
+import { autosaveResponse, AutosavePayload } from "@/actions/autosave";
 import { QuestionType } from "@prisma/client";
+import { examLogger } from "@/lib/telemetry/examLogger";
+
+export type SyncStatus = "synced" | "saving" | "offline" | "retrying";
 
 export interface StudentAnswers {
   [questionId: string]: {
@@ -28,6 +31,7 @@ interface StoredCache {
   secondsRemaining?: number;
   currentIndex?: number;
   navigationHistory?: NavigationHistoryEntry[];
+  offlineQueue?: AutosavePayload[];
 }
 
 interface UseTestProgressProps {
@@ -89,13 +93,23 @@ export function useTestProgress({
     return [{ time: 0, qIdx: 0 }];
   });
 
+  // Network Resilience State
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {
+    if (typeof window !== "undefined" && !navigator.onLine) return "offline";
+    return "synced";
+  });
+
+  const offlineQueueRef = useRef<AutosavePayload[]>(
+    readStoredSnapshot(storageKey)?.offlineQueue || []
+  );
+
   const [isCrossOutMode, setIsCrossOutMode] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [isFormulaSheetOpen, setIsFormulaSheetOpen] = useState<boolean>(false);
 
-  // Transient Telemetry Refs
   const timePerQuestionRef = useRef<{ [questionId: string]: number }>({});
   const autosaveTimeoutRef = useRef<{ [questionId: string]: NodeJS.Timeout }>({});
+  const isFlushingRef = useRef<boolean>(false);
 
   const persistToLocalStorage = useCallback(
     (
@@ -113,6 +127,7 @@ export function useTestProgress({
             secondsRemaining: remainingTime,
             currentIndex: activeIdx,
             navigationHistory: navHistory,
+            offlineQueue: offlineQueueRef.current,
             lastSavedAt: Date.now(),
           })
         );
@@ -122,6 +137,75 @@ export function useTestProgress({
     },
     [storageKey, isTimerRunning]
   );
+
+  // Flush queued autosaves to Postgres with exponential retry
+  const flushOfflineQueue = useCallback(async () => {
+    if (isFlushingRef.current || offlineQueueRef.current.length === 0) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
+    isFlushingRef.current = true;
+    setSyncStatus("retrying");
+    examLogger.log("network", "Flushing offline autosave queue to server", {
+      pendingCount: offlineQueueRef.current.length,
+    });
+
+    let retryDelay = 1000;
+    while (offlineQueueRef.current.length > 0) {
+      const payload = offlineQueueRef.current[0];
+      try {
+        const res = await autosaveResponse(payload);
+        if (res.success) {
+          offlineQueueRef.current.shift();
+          retryDelay = 1000;
+        } else {
+          throw new Error("Server failed upsert");
+        }
+      } catch (err) {
+        console.warn(`[Autosave Queue] Retry failed. Waiting ${retryDelay}ms...`, err);
+        examLogger.log("network", `Retry queue flush failed. Delay: ${retryDelay}ms`, {
+          queueSize: offlineQueueRef.current.length,
+          error: String(err),
+        });
+        setSyncStatus("offline");
+        await new Promise((res) => setTimeout(res, retryDelay));
+        retryDelay = Math.min(retryDelay * 2, 10000);
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          break;
+        }
+      }
+    }
+
+    isFlushingRef.current = false;
+    const isCleared = offlineQueueRef.current.length === 0;
+    if (isCleared) {
+      examLogger.log("autosave", "Flushed offline response queue successfully to server");
+    }
+    setSyncStatus(isCleared ? "synced" : "offline");
+  }, []);
+
+  // Listen to browser network connectivity events
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => {
+      examLogger.log("network", "Browser connection restored (online event)");
+      setSyncStatus("retrying");
+      flushOfflineQueue();
+    };
+
+    const handleOffline = () => {
+      examLogger.log("network", "Browser connection dropped (offline event)");
+      setSyncStatus("offline");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [flushOfflineQueue]);
 
   const clearLocalBuffer = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -162,42 +246,48 @@ export function useTestProgress({
   }, []);
 
   const setCurrentIndex = useCallback(
-  (updater: number | ((prev: number) => number)) => {
-    setCurrentIndexState((prevIdx) => {
-      const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
-      if (nextIdx !== prevIdx) {
-        const leavingQ = questions[prevIdx];
-        if (leavingQ) {
-          const uncommitted = timePerQuestionRef.current[leavingQ.id] || 0;
-          timePerQuestionRef.current[leavingQ.id] = 0;
+    (updater: number | ((prev: number) => number)) => {
+      setCurrentIndexState((prevIdx) => {
+        const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
+        if (nextIdx !== prevIdx) {
+          const leavingQ = questions[prevIdx];
+          if (leavingQ) {
+            const uncommitted = timePerQuestionRef.current[leavingQ.id] || 0;
+            timePerQuestionRef.current[leavingQ.id] = 0;
 
-          setAnswers((prevAnswers) => {
-            const prevAns = prevAnswers[leavingQ.id] || {};
-            const updated = {
-              ...prevAnswers,
-              [leavingQ.id]: {
-                ...prevAns,
-                timeSpent: (prevAns.timeSpent || 0) + uncommitted,
-              },
-            };
-            return updated;
+            setAnswers((prevAnswers) => {
+              const prevAns = prevAnswers[leavingQ.id] || {};
+              const updated = {
+                ...prevAnswers,
+                [leavingQ.id]: {
+                  ...prevAns,
+                  timeSpent: (prevAns.timeSpent || 0) + uncommitted,
+                },
+              };
+              return updated;
+            });
+          }
+
+          const elapsed = totalAdjustedSeconds - secondsRemaining;
+          const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
+
+          setNavigationHistory((prevHistory) => {
+            const lastEntry = prevHistory[prevHistory.length - 1];
+            if (lastEntry && lastEntry.qIdx === nextIdx) return prevHistory;
+            return [...prevHistory, nextEntry];
+          });
+
+          examLogger.log("navigation", `Navigated to question index ${nextIdx}`, {
+            from: prevIdx,
+            to: nextIdx,
+            questionNumber: questions[nextIdx]?.questionNumber,
           });
         }
-
-        const elapsed = totalAdjustedSeconds - secondsRemaining;
-        const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
-
-        setNavigationHistory((prevHistory) => {
-          const lastEntry = prevHistory[prevHistory.length - 1];
-          if (lastEntry && lastEntry.qIdx === nextIdx) return prevHistory;
-          return [...prevHistory, nextEntry];
-        });
-      }
-      return nextIdx;
-    });
-  },
-  [questions, totalAdjustedSeconds, secondsRemaining]
-);
+        return nextIdx;
+      });
+    },
+    [questions, totalAdjustedSeconds, secondsRemaining]
+  );
 
   useEffect(() => {
     if (!isTimerRunning) return;
@@ -206,6 +296,7 @@ export function useTestProgress({
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          examLogger.log("navigation", "Section timer expired");
           onTimeExpired?.();
           return 0;
         }
@@ -224,12 +315,7 @@ export function useTestProgress({
 
   useEffect(() => {
     if (isTimerRunning && secondsRemaining % 5 === 0) {
-      persistToLocalStorage(
-        answers,
-        secondsRemaining,
-        currentIndex,
-        navigationHistory
-      );
+      persistToLocalStorage(answers, secondsRemaining, currentIndex, navigationHistory);
     }
   }, [isTimerRunning, secondsRemaining, answers, currentIndex, navigationHistory, persistToLocalStorage]);
 
@@ -242,74 +328,100 @@ export function useTestProgress({
       const targetQuestion = questions[index];
       if (!targetQuestion) return;
 
-      autosaveTimeoutRef.current[questionId] = setTimeout(async () => {
-        await autosaveResponse({
-          testId,
-          sectionId,
-          questionId,
-          sectionOrder,
-          responseOrder: targetQuestion.questionNumber,
-          responseType: targetQuestion.questionType as QuestionType,
-          selectedOptionId: updatedAnswer.selectedOptionId,
-          frqUserAnswer: updatedAnswer.frqUserAnswer,
-          correctAnswerKey: targetQuestion.correctAnswer,
-          timeSpentOnResponse: updatedAnswer.timeSpent || 0,
-          usedCalculator: updatedAnswer.usedCalculator || false,
-        });
-      }, 750);
-    },
-    [testId, sectionId, sectionOrder, questions]
-  );
-
-  // Replace selectOption in hooks/useTestProgress.ts
-const selectOption = useCallback(
-  (optionId: string) => {
-    const activeQuestion = questions[currentIndex];
-    if (!activeQuestion) return;
-
-    const qId = activeQuestion.id;
-
-    setAnswers((prevAnswers) => {
-      const currentAnswer = prevAnswers[qId] || {};
-
-      let nextEliminated = currentAnswer.eliminatedOptions || [];
-      if (nextEliminated.includes(optionId)) {
-        nextEliminated = nextEliminated.filter((id) => id !== optionId);
-      }
-
-      const isDivergent =
-        Boolean(currentAnswer.selectedOptionId) &&
-        currentAnswer.selectedOptionId !== optionId;
-
-      const currentSpent =
-        (currentAnswer.timeSpent || 0) + (timePerQuestionRef.current[qId] || 0);
-      timePerQuestionRef.current[qId] = 0;
-
-      const nextAnswers: StudentAnswers = {
-        ...prevAnswers,
-        [qId]: {
-          ...currentAnswer,
-          selectedOptionId:
-            currentAnswer.selectedOptionId === optionId ? undefined : optionId,
-          eliminatedOptions: nextEliminated,
-          changedAnswer: currentAnswer.changedAnswer || isDivergent,
-          timeSpent: currentSpent,
-        },
+      const payload: AutosavePayload = {
+        testId,
+        sectionId,
+        questionId,
+        sectionOrder,
+        responseOrder: targetQuestion.questionNumber,
+        responseType: targetQuestion.questionType as QuestionType,
+        selectedOptionId: updatedAnswer.selectedOptionId,
+        frqUserAnswer: updatedAnswer.frqUserAnswer,
+        correctAnswerKey: targetQuestion.correctAnswer,
+        timeSpentOnResponse: updatedAnswer.timeSpent || 0,
+        usedCalculator: updatedAnswer.usedCalculator || false,
       };
 
-      persistToLocalStorage(
-        nextAnswers,
-        secondsRemaining,
-        currentIndex,
-        navigationHistory
-      );
-      scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+      autosaveTimeoutRef.current[questionId] = setTimeout(async () => {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          offlineQueueRef.current.push(payload);
+          setSyncStatus("offline");
+          examLogger.log("autosave", `Enqueued response while offline for question ${questionId}`);
+          return;
+        }
 
-      return nextAnswers;
-    });
-  },
-  [currentIndex, questions, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
-);
+        setSyncStatus("saving");
+        try {
+          const res = await autosaveResponse(payload);
+          if (!res.success) {
+            offlineQueueRef.current.push(payload);
+            setSyncStatus("retrying");
+            examLogger.log("autosave", `Autosave rejected by server for ${questionId}. Enqueued retry.`);
+            flushOfflineQueue();
+          } else {
+            setSyncStatus(offlineQueueRef.current.length > 0 ? "retrying" : "synced");
+          }
+        } catch (err) {
+          offlineQueueRef.current.push(payload);
+          setSyncStatus("offline");
+          examLogger.log("autosave", `Autosave network error for ${questionId}. Enqueued retry.`, {
+            error: String(err),
+          });
+        }
+      }, 750);
+    },
+    [testId, sectionId, sectionOrder, questions, flushOfflineQueue]
+  );
+
+  const selectOption = useCallback(
+    (optionId: string) => {
+      const activeQuestion = questions[currentIndex];
+      if (!activeQuestion) return;
+
+      const qId = activeQuestion.id;
+
+      setAnswers((prevAnswers) => {
+        const currentAnswer = prevAnswers[qId] || {};
+
+        let nextEliminated = currentAnswer.eliminatedOptions || [];
+        if (nextEliminated.includes(optionId)) {
+          nextEliminated = nextEliminated.filter((id) => id !== optionId);
+        }
+
+        const isDivergent =
+          Boolean(currentAnswer.selectedOptionId) &&
+          currentAnswer.selectedOptionId !== optionId;
+
+        const currentSpent =
+          (currentAnswer.timeSpent || 0) + (timePerQuestionRef.current[qId] || 0);
+        timePerQuestionRef.current[qId] = 0;
+
+        const nextAnswers: StudentAnswers = {
+          ...prevAnswers,
+          [qId]: {
+            ...currentAnswer,
+            selectedOptionId:
+              currentAnswer.selectedOptionId === optionId ? undefined : optionId,
+            eliminatedOptions: nextEliminated,
+            changedAnswer: currentAnswer.changedAnswer || isDivergent,
+            timeSpent: currentSpent,
+          },
+        };
+
+        examLogger.log("interaction", `Selected option on question ${qId}`, {
+          questionId: qId,
+          optionId,
+          changedAnswer: currentAnswer.changedAnswer || isDivergent,
+        });
+
+        persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
+        scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+
+        return nextAnswers;
+      });
+    },
+    [currentIndex, questions, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
+  );
 
   const setFrqAnswer = useCallback(
     (val: string) => {
@@ -319,8 +431,7 @@ const selectOption = useCallback(
       const qId = activeQuestion.id;
       const currentAnswer = answers[qId] || {};
       const isDivergent =
-        Boolean(currentAnswer.frqUserAnswer) &&
-        currentAnswer.frqUserAnswer !== val;
+        Boolean(currentAnswer.frqUserAnswer) && currentAnswer.frqUserAnswer !== val;
 
       const currentSpent =
         (currentAnswer.timeSpent || 0) + (timePerQuestionRef.current[qId] || 0);
@@ -336,13 +447,13 @@ const selectOption = useCallback(
         },
       };
 
+      examLogger.log("interaction", `Set FRQ answer on question ${qId}`, {
+        questionId: qId,
+        length: val.length,
+      });
+
       setAnswers(nextAnswers);
-      persistToLocalStorage(
-        nextAnswers,
-        secondsRemaining,
-        currentIndex,
-        navigationHistory
-      );
+      persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
       scheduleAutosave(qId, nextAnswers[qId], currentIndex);
     },
     [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
@@ -377,13 +488,13 @@ const selectOption = useCallback(
         },
       };
 
+      examLogger.log("tool", `Toggled option strikeout for option ${optionId}`, {
+        questionId: qId,
+        optionId,
+      });
+
       setAnswers(nextAnswers);
-      persistToLocalStorage(
-        nextAnswers,
-        secondsRemaining,
-        currentIndex,
-        navigationHistory
-      );
+      persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
     },
     [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage]
   );
@@ -394,30 +505,33 @@ const selectOption = useCallback(
 
     const qId = activeQuestion.id;
     const currentAnswer = answers[qId] || {};
+    const nextFlagged = !currentAnswer.flagged;
 
     const nextAnswers: StudentAnswers = {
       ...answers,
       [qId]: {
         ...currentAnswer,
-        flagged: !currentAnswer.flagged,
+        flagged: nextFlagged,
       },
     };
 
+    examLogger.log("interaction", `Toggled review flag for question ${qId}`, {
+      questionId: qId,
+      flagged: nextFlagged,
+    });
+
     setAnswers(nextAnswers);
-    persistToLocalStorage(
-      nextAnswers,
-      secondsRemaining,
-      currentIndex,
-      navigationHistory
-    );
+    persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
   }, [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage]);
 
-  // Open/Close toggle: Only toggles visibility, does not mark telemetry
   const toggleCalculator = useCallback(() => {
-    setIsCalculatorOpen((prev) => !prev);
+    setIsCalculatorOpen((prev) => {
+      const next = !prev;
+      examLogger.log("tool", `Toggled calculator visibility: ${next ? "opened" : "closed"}`);
+      return next;
+    });
   }, []);
 
-  // Meaningful Calculator Interaction Event Handler
   const markCalculatorUsed = useCallback(() => {
     const activeQuestion = questions[currentIndex];
     if (!activeQuestion) return;
@@ -425,7 +539,6 @@ const selectOption = useCallback(
     const qId = activeQuestion.id;
     setAnswers((prevAnswers) => {
       const currentAnswer = prevAnswers[qId] || {};
-      // If already recorded for this question, prevent redundant state updates
       if (currentAnswer.usedCalculator) return prevAnswers;
 
       const nextAnswers: StudentAnswers = {
@@ -436,12 +549,9 @@ const selectOption = useCallback(
         },
       };
 
-      persistToLocalStorage(
-        nextAnswers,
-        secondsRemaining,
-        currentIndex,
-        navigationHistory
-      );
+      examLogger.log("tool", `Calculator used on question ${qId}`, { questionId: qId });
+
+      persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
       scheduleAutosave(qId, nextAnswers[qId], currentIndex);
       return nextAnswers;
     });
@@ -474,10 +584,7 @@ const selectOption = useCallback(
       return navigationHistory;
     }
 
-    return [
-      ...navigationHistory,
-      { time: finalElapsed, qIdx: currentIndex },
-    ];
+    return [...navigationHistory, { time: finalElapsed, qIdx: currentIndex }];
   }, [totalAdjustedSeconds, secondsRemaining, navigationHistory, currentIndex]);
 
   return {
@@ -487,6 +594,7 @@ const selectOption = useCallback(
     secondsRemaining,
     answers,
     navigationHistory,
+    syncStatus,
     isCrossOutMode,
     setIsCrossOutMode,
     isCalculatorOpen,

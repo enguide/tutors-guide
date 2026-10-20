@@ -4,11 +4,14 @@
 import React, { useState } from "react";
 import { Calculator, FileText, Volume2, ChevronDown } from "lucide-react";
 import { SectionExamConfig } from "@/types/examConfig";
+import { NetworkStatusPill } from "@/components/exam/NetworkStatusPill";
+import type { SyncStatus } from "@/hooks/useTestProgress";
 
 interface APHeaderProps {
   sectionTitle: string;
   config: SectionExamConfig;
   secondsRemaining: number;
+  syncStatus?: SyncStatus;
   isTTSPlaying?: boolean;
   isTTSSupported?: boolean;
   onToggleCalculator: () => void;
@@ -26,6 +29,7 @@ export const APHeader: React.FC<APHeaderProps> = ({
   sectionTitle,
   config,
   secondsRemaining,
+  syncStatus,
   isTTSPlaying = false,
   isTTSSupported = false,
   onToggleCalculator,
@@ -60,6 +64,7 @@ export const APHeader: React.FC<APHeaderProps> = ({
         >
           {isTimerHidden ? "--:--" : formatClock(secondsRemaining)}
         </span>
+        {syncStatus && <NetworkStatusPill status={syncStatus} />}
         <button
           type="button"
           onClick={() => setIsTimerHidden((prev) => !prev)}
