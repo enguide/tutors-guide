@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 import { Providers } from "../components/providers";
-import { Geist, Merriweather } from "next/font/google";
+import { Geist, Merriweather, Open_Sans } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({
@@ -16,6 +16,13 @@ const merriweather = Merriweather({
   subsets: ["latin"],
   variable: "--font-serif",
 });
+
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  variable: "--font-open-sans",
+  weight: ["400", "600", "700"],
+});
+
 
 export const metadata: Metadata = {
   title: "Tutors Guide",
@@ -31,7 +38,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("font-sans", geist.variable, merriweather.variable)}
+      className={cn("font-sans", geist.variable, merriweather.variable, openSans.variable)}
     >
       <body className="min-h-screen bg-background font-sans antialiased text-foreground">
         <Providers>{children}</Providers>

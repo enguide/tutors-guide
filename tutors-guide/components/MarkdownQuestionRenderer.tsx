@@ -2,11 +2,12 @@
 // components/MarkdownQuestionRenderer.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
 import Image from "next/image";
 import { Maximize2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { resolveTestAssetUrl } from "@/lib/contentPaths";
@@ -18,6 +19,7 @@ interface MarkdownQuestionRendererProps {
   manifestBasePath?: string;
   enableLightbox?: boolean;
   className?: string;
+  activeQuestionNumber?: number; // Active item to highlight and auto-scroll to
 }
 
 interface LightboxState {
@@ -34,7 +36,80 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
   manifestBasePath,
   enableLightbox = false,
   className = "",
+  activeQuestionNumber,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 1. Preprocess placement badges, invisible anchors, and underline targets
+  const processedContent = useMemo(() => {
+    if (!content) return "";
+
+    let text = content;
+
+    // A. Placement markers: {[A]:15} -> <span data-act-placement="A" data-act-target="15">[A]</span>
+    text = text.replace(
+      /\{\[([A-D])\]:(\d+)\}/g,
+      '<span data-act-placement="$1" data-act-target="$2">[$1]</span>'
+    );
+
+    // B. Invisible scroll anchor: {#1}
+    text = text.replace(
+      /\{#(\d+)\}/g,
+      '<span data-act-target="$1" data-act-anchor="true" class="inline-block w-0 h-0 overflow-hidden pointer-events-none"></span>'
+    );
+
+    // C. Question underline target {1|text} or plain underline {text} / {|text}
+    text = text.replace(
+      /\{(?:\s*(\d+)\s*\|)?([^}]+)\}/g,
+      (_, num, body) => {
+        if (num) {
+          return `<span data-act-target="${num}">${body}</span>`;
+        }
+        return `<span data-act-underline="true">${body}</span>`;
+      }
+    );
+
+    return text;
+  }, [content]);
+
+  // 2. Smoothly scroll target into view or reset to top for placement questions
+  useEffect(() => {
+    if (!activeQuestionNumber || !containerRef.current) return;
+
+    const timer = setTimeout(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      // Check if current active question is a placement question ([A], [B], [C], [D])
+      const placementElements = container.querySelectorAll(
+        `[data-act-placement][data-act-target="${activeQuestionNumber}"]`
+      );
+
+      if (placementElements.length > 0) {
+        const scrollableParent = container.closest(".overflow-y-auto") ?? container;
+        scrollableParent.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        return;
+      }
+
+      // Otherwise, scroll target or anchor to the center
+      const activeEl = container.querySelector(
+        `[data-act-target="${activeQuestionNumber}"]`
+      );
+
+      if (activeEl) {
+        activeEl.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 60);
+
+    return () => clearTimeout(timer);
+  }, [activeQuestionNumber, processedContent]);
+
   const [lightbox, setLightbox] = useState<LightboxState>({
     isOpen: false,
     src: "",
@@ -61,11 +136,13 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
   return (
     <>
       <div
+        ref={containerRef}
         className={`prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert max-w-none text-base leading-relaxed ${className}`}
       >
         <ReactMarkdown
           remarkPlugins={[remarkMath, remarkGfm]}
           rehypePlugins={[
+            rehypeRaw,
             [
               rehypeKatex,
               {
@@ -77,7 +154,100 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
             ],
           ]}
           components={{
-            // Prevents <p><figure>...</figure></p> invalid HTML hydration mismatches
+            span: ({ node, children, ...props }: any) => {
+              const targetNum = props["data-act-target"]
+                ? Number(props["data-act-target"])
+                : undefined;
+              const placementLetter = props["data-act-placement"];
+              const isAnchor = props["data-act-anchor"] === "true";
+              const isPlainUnderline = props["data-act-underline"] === "true";
+
+              // Case 1: Placement markers [A], [B], [C], [D]
+              if (placementLetter) {
+                const isActive = activeQuestionNumber === targetNum;
+                return (
+                  <span
+                    data-act-placement={placementLetter}
+                    data-act-target={targetNum}
+                    data-act-active={isActive ? "true" : undefined}
+                    style={
+                      isActive
+                        ? {
+                            backgroundColor: "var(--act-highlight-bg, #FFF59D)",
+                            color: "var(--act-highlight-fg, #000000)",
+                          }
+                        : undefined
+                    }
+                    className={`inline-flex items-center justify-center font-bold text-[12px] px-1 py-0.5 mx-1 rounded-[2px] transition-all duration-150 select-none ${
+                      isActive
+                        ? "ring-1 ring-black/20 shadow-xs"
+                        : "text-[var(--act-text-main)] opacity-75 font-semibold"
+                    }`}
+                    {...props}
+                  >
+                    [{placementLetter}]
+                  </span>
+                );
+              }
+
+              // Case 2: Invisible scroll anchor {#1}
+              if (isAnchor) {
+                return (
+                  <span
+                    data-act-target={targetNum}
+                    aria-hidden="true"
+                    className="inline-block w-0 h-0 -m-px overflow-hidden select-none pointer-events-none"
+                  />
+                );
+              }
+
+              // Case 3: Plain underline {text} or {|text}
+              if (isPlainUnderline) {
+                return (
+                  <span
+                    className="underline underline-offset-4 decoration-1 text-inherit"
+                    {...props}
+                  >
+                    {children}
+                  </span>
+                );
+              }
+
+              // Case 4: Standard Question Underline Target {1|text}
+              if (targetNum !== undefined) {
+                const isActive = activeQuestionNumber === targetNum;
+                return (
+                  <span
+                    data-act-target={targetNum}
+                    data-act-active={isActive ? "true" : undefined}
+                    style={
+                      isActive
+                        ? {
+                            backgroundColor: "var(--act-highlight-bg, #FFF59D)",
+                            color: "var(--act-highlight-fg, #000000)",
+                          }
+                        : undefined
+                    }
+                    className={`underline underline-offset-4 decoration-1 transition-all duration-200 ${
+                      isActive ? "font-normal rounded-[1px] px-0.5 shadow-xs" : "text-inherit"
+                    }`}
+                    {...props}
+                  >
+                    {children}
+                  </span>
+                );
+              }
+
+              return <span {...props}>{children}</span>;
+            },
+
+            // Native <u> support
+            u: ({ children, ...props }: any) => (
+              <span className="underline underline-offset-4 decoration-1" {...props}>
+                {children}
+              </span>
+            ),
+
             p: ({ children }) => {
               const childrenArray = React.Children.toArray(children);
               const hasBlockElement = childrenArray.some((child) => {
@@ -95,55 +265,57 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
                 return <div className="my-3 last:mb-0">{children}</div>;
               }
 
-              return <p className="mb-3 last:mb-0">{children}</p>;
+              return <p className="mb-4 last:mb-0 leading-[28px]">{children}</p>;
             },
+
             h1: ({ children }) => (
-              <h1 className="text-2xl font-bold tracking-tight mb-4">{children}</h1>
+              <h1 className="text-base font-bold tracking-tight mb-3 text-neutral-900 dark:text-neutral-100">
+                {children}
+              </h1>
             ),
             h2: ({ children }) => (
-              <h2 className="text-xl font-semibold tracking-tight mb-3">{children}</h2>
+              <h2 className="text-sm font-bold tracking-tight mb-2 text-neutral-900 dark:text-neutral-100">
+                {children}
+              </h2>
             ),
             h3: ({ children }) => (
-              <h3 className="text-lg font-medium mb-2">{children}</h3>
+              <h3 className="text-sm font-medium mb-2">{children}</h3>
             ),
             ul: ({ children }) => (
               <ul className="list-none my-3 pl-6 sm:pl-8 space-y-2 not-prose">{children}</ul>
             ),
 
             li: ({ children }) => {
-  const childrenArray = React.Children.toArray(children);
-  const firstChild = childrenArray[0];
+              const childrenArray = React.Children.toArray(children);
+              const firstChild = childrenArray[0];
 
-  // Match Roman numerals like "I.", "II.", "III.", "IV.", "V."
-  if (typeof firstChild === "string") {
-    const match = firstChild.match(/^([IVXLCDM]+\.)\s*(.*)/);
-    if (match) {
-      const romanLabel = match[1];
-      const remainingFirstChild = match[2];
+              if (typeof firstChild === "string") {
+                const match = firstChild.match(/^([IVXLCDM]+\.)\s*(.*)/);
+                if (match) {
+                  const romanLabel = match[1];
+                  const remainingFirstChild = match[2];
 
-      return (
-        <li className="flex items-start text-base leading-relaxed">
-          {/* text-right aligns the decimals vertically; pr-3 sets a clean gap to the text */}
-          <span className="w-8 shrink-0 text-right pr-3 font-serif font-normal select-none">
-            {romanLabel}
-          </span>
-          <div className="flex-1 min-w-0">
-            {remainingFirstChild}
-            {childrenArray.slice(1)}
-          </div>
-        </li>
-      );
-    }
-  }
+                  return (
+                    <li className="flex items-start text-base leading-relaxed">
+                      <span className="w-8 shrink-0 text-right pr-3 font-normal select-none">
+                        {romanLabel}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {remainingFirstChild}
+                        {childrenArray.slice(1)}
+                      </div>
+                    </li>
+                  );
+                }
+              }
 
-  // Fallback for standard unordered bullets
-  return (
-    <li className="flex items-start text-base leading-relaxed">
-      <span className="w-8 shrink-0 text-right pr-3 text-neutral-400 select-none">•</span>
-      <div className="flex-1 min-w-0">{children}</div>
-    </li>
-  );
-},
+              return (
+                <li className="flex items-start text-base leading-relaxed">
+                  <span className="w-8 shrink-0 text-right pr-3 text-neutral-400 select-none">•</span>
+                  <div className="flex-1 min-w-0">{children}</div>
+                </li>
+              );
+            },
 
             ol: ({ children }) => (
               <ol className="list-decimal pl-6 space-y-1 my-3">{children}</ol>
@@ -151,7 +323,6 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
             strong: ({ children }) => (
               <strong className="font-semibold text-foreground">{children}</strong>
             ),
-            // Custom Table styling with inner vertical & horizontal demarcations
             table: ({ children }) => (
               <div className="my-5 overflow-x-auto">
                 <table className="border-collapse border border-border mx-auto text-center font-sans prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert">
@@ -160,19 +331,13 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
               </div>
             ),
             thead: ({ children }) => (
-              <thead className="border-b border-border">
-                {children}
-              </thead>
+              <thead className="border-b border-border">{children}</thead>
             ),
             tbody: ({ children }) => (
-              <tbody className="divide-y divide-border">
-                {children}
-              </tbody>
+              <tbody className="divide-y divide-border">{children}</tbody>
             ),
             tr: ({ children }) => (
-              <tr className="border-b border-border last:border-b-0">
-                {children}
-              </tr>
+              <tr className="border-b border-border last:border-b-0">{children}</tr>
             ),
             th: ({ children }) => (
               <th className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
@@ -189,13 +354,11 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
                 return null;
               }
 
-              // 1. Resolve canonical path if context is provided
               let resolvedSrc =
                 category && testId
                   ? resolveTestAssetUrl(category, testId, src, manifestBasePath)
                   : src;
 
-              // 2. Fallback normalization: ensure leading slash for next/image
               if (
                 !resolvedSrc.startsWith("http://") &&
                 !resolvedSrc.startsWith("https://") &&
@@ -208,9 +371,8 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
 
               return (
                 <figure className="my-5 flex flex-col items-center w-full group">
-                  <div className="relative border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-[4px] p-4 shadow-sm transition-all duration-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-700 w-full max-w-xl flex items-center justify-center">
+                  <div className="relative border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-[4px] p-4 shadow-xs transition-all duration-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-700 w-full max-w-xl flex items-center justify-center">
                     {isSvg ? (
-                      // SVG: w-full and max-w prevent 0px intrinsic collapse while remaining scalable
                       <img
                         src={resolvedSrc}
                         alt={alt}
@@ -218,7 +380,6 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
                         loading="eager"
                       />
                     ) : (
-                      // Raster: priority={true} resolves the above-the-fold LCP diagnostic warning
                       <Image
                         src={resolvedSrc}
                         alt={alt}
@@ -241,7 +402,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
                           })
                         }
                         aria-label="Expand image"
-                        className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-neutral-800/90 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-[4px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-sm"
+                        className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-neutral-800/90 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-[4px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-xs"
                       >
                         <Maximize2 className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
                       </button>
@@ -258,7 +419,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
             },
           }}
         >
-          {content}
+          {processedContent}
         </ReactMarkdown>
       </div>
 
@@ -267,7 +428,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-xs p-4 sm:p-8 animate-in fade-in duration-200"
           onClick={closeLightbox}
         >
           <div

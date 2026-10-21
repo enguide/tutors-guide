@@ -282,7 +282,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   return (
     <ExamErrorBoundary testId={testId} sectionId={frontmatter.sectionId}>
       <TestShellLayout
-        key={activeQuestion?.id ?? currentIndex}
         category={examCat}
         metadata={metadata}
         section={section}

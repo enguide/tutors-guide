@@ -11,7 +11,8 @@ questions:
     domain: "Conventions of Standard English"
     skill: "Punctuation & Clause Boundaries"
     difficulty: "Medium"
-    prompt: "Which choice best corrects the underlined portion [1] in the passage?"
+    stimulus: "Temperate rain forests represent some of the most ecologically diverse habitats on the continent. Decades of heavy logging severely fragmented these {1|ecosystems however} coordinated reforestation initiatives have catalyzed a dramatic recovery.\n\n Understory vegetation, which previously struggled beneath aggressive invasive brush, now flourishes beneath a restored secondary canopy. {Ecologists monitoring biodiversity indices note that native avian populations have rebounded to levels unseen since the mid-twentieth century.}"
+    prompt: "Which choice best corrects the underlined portion in the passage?"
     explanation: "Choice C correctly uses a semicolon to separate two independent clauses without creating a comma splice or run-on sentence."
     options:
       - id: "A"
@@ -29,6 +30,7 @@ questions:
     domain: "Production of Writing"
     skill: "Organization, Unity, and Cohesion"
     difficulty: "Easy"
+    stimulus: "Temperate rain forests represent some of the most ecologically diverse habitats on the continent. Decades of heavy logging severely fragmented these {ecosystems however} coordinated reforestation initiatives have catalyzed a dramatic recovery.\n\n Understory vegetation, which previously struggled beneath aggressive invasive brush, now flourishes beneath a restored secondary canopy. {2|Ecologists monitoring biodiversity indices note that native avian populations have rebounded to levels unseen since the mid-twentieth century.}"
     prompt: "Which choice provides the most effective transition into the concluding paragraph?"
     explanation: "Choice A maintains thematic continuity by focusing on forest succession and preservation efforts discussed in earlier paragraphs."
     options:
@@ -41,9 +43,3 @@ questions:
       - id: "D"
         text: "Nevertheless, timber mills operate primarily during seasonal dry periods."
 ---
-
-### Passage I: The Regrowth of Ancient Canopies
-
-Temperate rain forests represent some of the most ecologically diverse habitats on the continent. Decades of heavy logging severely fragmented these **[1] ecosystems however** coordinated reforestation initiatives have catalyzed a dramatic recovery.
-
-Understory vegetation, which previously struggled beneath aggressive invasive brush, now flourishes beneath a restored secondary canopy. Ecologists monitoring biodiversity indices note that native avian populations have rebounded to levels unseen since the mid-twentieth century.

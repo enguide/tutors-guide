@@ -128,7 +128,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             </div>
 
             {/* Right Pane: Question Stem & Choices */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
+            <div key={state.activeQuestion.id}className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
               <div className="max-w-xl mx-auto space-y-4">
                 {renderItemActionBar()}
 
@@ -164,7 +164,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
           </>
         ) : (
           /* Single Column (Math) */
-          <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
+          <div key={state.activeQuestion.id} className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
             <div className="max-w-2xl mx-auto space-y-6">
               {renderItemActionBar()}
 

@@ -226,6 +226,231 @@
   white-space: normal;
 }
 
-html {
-  scrollbar-gutter: stable;
+/* 1. Reserve the scroll track without the default OS background */
+.stable-scroll {
+  overflow-y: scroll;
+}
+
+/* 2. Chrome, Safari, Edge: Make track transparent so background bleeds through */
+.stable-scroll::-webkit-scrollbar {
+  width: 8px;
+  background-color: transparent;
+}
+
+.stable-scroll::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* 3. Invisible thumb by default; fades in when hovered or active */
+.stable-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.stable-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2); /* Soft neutral tint */
+}
+
+/* Dark mode adaptation */
+.dark .stable-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 4. Firefox modern standard: thin profile with transparent track */
+@supports (scrollbar-color: auto) {
+  .stable-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .stable-scroll:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+
+  .dark .stable-scroll:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+}
+
+/* ==========================================================================
+   ACT TestNav Exact Typography Match
+   ========================================================================== */
+
+.act-content-area,
+.act-content-area .prose,
+.act-content-area .prose p,
+.act-content-area .prose span,
+.act-content-area .prose li {
+  font-family: var(--font-open-sans), "Open Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 14px !important;
+  line-height: 30px !important;
+  letter-spacing: 0 !important;
+  color: #222222 !important;
+  font-weight: 400 !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Passage Titles: compact 15px bold, matching the left image */
+.act-content-area h1,
+.act-content-area h2,
+.act-content-area h3,
+.act-content-area strong,
+.act-content-area .prose strong {
+  font-family: var(--font-open-sans), "Open Sans", "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+  line-height: 30px !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Ensure math formulas keep KaTeX fonts */
+.act-content-area .katex,
+.act-content-area .katex-display {
+  font-family: KaTeX_Main, Times New Roman, serif !important;
+}
+
+/* ==========================================================================
+   ACT TestNav Color Themes & Contrast System
+   Strictly scoped to [data-act-theme] — Cannot leak to SAT, AP, or GRE
+   ========================================================================== */
+
+/* 1. Default ACT Theme */
+[data-act-theme="default"] {
+  --act-shell-bg: #ECEFF1;
+  --act-card-bg: #FFFFFF;
+  --act-card-border: #D1D5DB;
+  --act-text-main: #1F2937;
+  --act-text-muted: #4B5563;
+  --act-header-bg: #152B3C;
+  --act-header-fg: #FFFFFF;
+  --act-header-btn-hover-bg: #FFFFFF;
+  --act-header-btn-hover-fg: #152B3C;
+  --act-btn-active-bg: #E5E9EE;
+  --act-btn-active-fg: #152B3C;
+  --act-drawer-bg: #EEF2F5;
+  --act-drawer-item-bg: #FFFFFF;
+  --act-drawer-active-item: #FFF4D4;
+  --act-radio-border: #6B7280;
+  --act-radio-selected: #172B3B;
+  --act-radio-dot: #FFFFFF;
+  --act-highlight-bg: #FFF59D;       /* Classic ACT soft yellow */
+  --act-highlight-fg: #000000;
+}
+
+/* Standard Dark Mode fallback for ACT */
+.dark [data-act-theme="default"] {
+  --act-shell-bg: #0F172A;
+  --act-card-bg: #1E293B;
+  --act-card-border: #334155;
+  --act-text-main: #F1F5F9;
+  --act-text-muted: #94A3B8;
+  --act-header-bg: #0B132B;
+  --act-header-fg: #FFFFFF;
+  --act-header-btn-hover-bg: #334155;
+  --act-header-btn-hover-fg: #FFFFFF;
+  --act-btn-active-bg: #334155;
+  --act-btn-active-fg: #FFFFFF;
+  --act-drawer-bg: #0F172A;
+  --act-drawer-item-bg: #1E293B;
+  --act-drawer-active-item: #2D3748;
+  --act-radio-border: #94A3B8;
+  --act-radio-selected: #38BDF8;
+  --act-radio-dot: #0F172A;
+  --act-highlight-bg: #FDE047;       /* Bright readable yellow */
+  --act-highlight-fg: #000000;
+}
+
+/* 2. Black on Cream (from your reference screenshot) */
+[data-act-theme="black-on-cream"] {
+  --act-shell-bg: #F4EED9;
+  --act-card-bg: #FFFDF0;
+  --act-card-border: #DDD3BA;
+  --act-text-main: #000000;
+  --act-text-muted: #333333;
+  --act-header-bg: #2B261D;
+  --act-header-fg: #FFFDF0;
+  --act-header-btn-hover-bg: #FFFDF0;
+  --act-header-btn-hover-fg: #000000;
+  --act-btn-active-bg: #EADFB8;
+  --act-btn-active-fg: #000000;
+  --act-drawer-bg: #EFE8CE;
+  --act-drawer-item-bg: #FFFDF0;
+  --act-drawer-active-item: #E6DCB0;
+  --act-radio-border: #000000;
+  --act-radio-selected: #000000;
+  --act-radio-dot: #FFFDF0;
+  --act-highlight-bg: #E2D1A0;       /* Rich golden-tan tone */
+  --act-highlight-fg: #000000;
+}
+
+/* 3. White on Black (High Contrast Inverted) */
+[data-act-theme="white-on-black"] {
+  --act-shell-bg: #121212;
+  --act-card-bg: #000000;
+  --act-card-border: #FFFFFF;
+  --act-text-main: #FFFFFF;
+  --act-text-muted: #CCCCCC;
+  --act-header-bg: #000000;
+  --act-header-fg: #FFFFFF;
+  --act-header-btn-hover-bg: #FFFFFF;
+  --act-header-btn-hover-fg: #000000;
+  --act-btn-active-bg: #FFFFFF;
+  --act-btn-active-fg: #000000;
+  --act-drawer-bg: #121212;
+  --act-drawer-item-bg: #000000;
+  --act-drawer-active-item: #333333;
+  --act-radio-border: #5f5f5f;
+  --act-radio-selected: #FFFFFF;
+  --act-radio-dot: #000000;
+  --act-highlight-fg: #FFFFFF;       /* Inverted solid block */
+  --act-highlight-bg: #6d6d6d;
+}
+
+/* 4. Light Yellow on Royal Blue */
+[data-act-theme="yellow-on-blue"] {
+  --act-shell-bg: #00127A;
+  --act-card-bg: #0019A8;
+  --act-card-border: #FFFF66;
+  --act-text-main: #FFFF66;
+  --act-text-muted: #EEEE55;
+  --act-header-bg: #000E5C;
+  --act-header-fg: #FFFF66;
+  --act-header-btn-hover-bg: #FFFF66;
+  --act-header-btn-hover-fg: #00127A;
+  --act-btn-active-bg: #FFFF66;
+  --act-btn-active-fg: #00127A;
+  --act-drawer-bg: #00127A;
+  --act-drawer-item-bg: #0019A8;
+  --act-drawer-active-item: #0022DD;
+  --act-radio-border: #FFFF66;
+  --act-radio-selected: #FFFF66;
+  --act-radio-dot: #0019A8;
+  --act-highlight-bg: #410b01;       /* High-visibility yellow badge */
+  --act-highlight-fg: #00127A;       /* Contrasting royal blue text */
+}
+
+/* Content area font styling with dynamic colors */
+[data-act-theme] .act-content-area,
+[data-act-theme] .act-content-area .prose,
+[data-act-theme] .act-content-area .prose p,
+[data-act-theme] .act-content-area .prose span,
+[data-act-theme] .act-content-area .prose li {
+  font-family: var(--font-open-sans), "Open Sans", "Segoe UI", sans-serif !important;
+  color: var(--act-text-main) !important;
+}
+
+[data-act-theme] .act-content-area h1,
+[data-act-theme] .act-content-area h2,
+[data-act-theme] .act-content-area h3,
+[data-act-theme] .act-content-area strong {
+  font-family: var(--font-open-sans), "Open Sans", "Segoe UI", sans-serif !important;
+  color: var(--act-text-main) !important;
+}
+
+/* Active ACT target and placement highlight */
+[data-act-theme] .act-content-area span[data-act-active="true"] {
+  background-color: var(--act-highlight-bg) !important;
+  color: var(--act-highlight-fg) !important;
 }
