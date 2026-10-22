@@ -2,7 +2,8 @@
 import { ReactNode } from "react";
 import { requireStaffSession } from "@/lib/guards";
 import Link from "next/link";
-import { Building2, Users, BarChart3, LogOut } from "lucide-react";
+import { Building2, LogOut } from "lucide-react";
+import { signOut } from "@/lib/auth";
 
 export default async function TgAdminLayout({ children }: { children: ReactNode }) {
   const staff = await requireStaffSession();
@@ -15,12 +16,12 @@ export default async function TgAdminLayout({ children }: { children: ReactNode 
           <div className="flex items-center gap-6">
             <Link href="/tgadmin" className="flex items-center gap-2 font-black tracking-tight text-base sm:text-lg">
               <Building2 className="text-primary" size={20} />
-              <span>Institutional Portal</span>
+              <span>Institutional & Tutor Portal</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Link href="/tgadmin" className="text-foreground hover:text-primary transition-colors">
-                Roster & Seats
+                Roster & Telemetry
               </Link>
             </nav>
           </div>
@@ -31,12 +32,20 @@ export default async function TgAdminLayout({ children }: { children: ReactNode 
               <span className="text-[10px] font-mono text-muted-foreground uppercase">{staff.role}</span>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="px-3 py-1.5 border border-input hover:bg-muted font-bold transition-colors"
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/login" });
+              }}
             >
-              Exit to Student App
-            </Link>
+              <button
+                type="submit"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-input hover:bg-muted font-bold transition-colors cursor-pointer text-xs"
+              >
+                <LogOut size={13} />
+                <span>Sign Out</span>
+              </button>
+            </form>
           </div>
         </div>
       </header>

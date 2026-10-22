@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
+import { LinkStatus, Role } from "@prisma/client";
 
 export async function GET() {
   const session = await auth();
@@ -16,18 +16,62 @@ export async function GET() {
     return new NextResponse("Forbidden: Staff access required", { status: 403 });
   }
 
-  let orgId = session.user.orgId;
-  if (session.user.role === Role.ADMIN && !orgId) {
+  let profileIds: string[] = [];
+
+  if (session.user.orgId) {
+    // 1. Institutional staff: export students belonging to their organization
+    const orgProfiles = await prisma.profile.findMany({
+      where: { orgId: session.user.orgId, role: Role.STUDENT },
+      select: { id: true },
+    });
+    profileIds = orgProfiles.map((p) => p.id);
+  } else if (session.user.role === Role.ADMIN) {
+    // 2. Super admin without explicit org: fallback to first org or all students
     const firstOrg = await prisma.organization.findFirst({ select: { id: true } });
-    orgId = firstOrg?.id || null;
+    if (firstOrg) {
+      const orgProfiles = await prisma.profile.findMany({
+        where: { orgId: firstOrg.id, role: Role.STUDENT },
+        select: { id: true },
+      });
+      profileIds = orgProfiles.map((p) => p.id);
+    } else {
+      const allStudents = await prisma.profile.findMany({
+        where: { role: Role.STUDENT },
+        select: { id: true },
+      });
+      profileIds = allStudents.map((p) => p.id);
+    }
+  } else {
+    // 3. Independent Tutor: export students connected via active peer-to-peer mentorship links
+    const directLinks = await prisma.tutorStudentLink.findMany({
+      where: {
+        tutorId: session.user.id,
+        status: LinkStatus.ACTIVE,
+      },
+      select: { studentId: true },
+    });
+    profileIds = directLinks.map((l) => l.studentId);
   }
 
-  if (!orgId) {
-    return new NextResponse("No organization found to export", { status: 400 });
+  // Also include any direct peer-linked students for hybrid tutors belonging to an org
+  if (session.user.role === Role.TUTOR && session.user.orgId) {
+    const directLinks = await prisma.tutorStudentLink.findMany({
+      where: {
+        tutorId: session.user.id,
+        status: LinkStatus.ACTIVE,
+      },
+      select: { studentId: true },
+    });
+    const directIds = directLinks.map((l) => l.studentId);
+    profileIds = Array.from(new Set([...profileIds, ...directIds]));
+  }
+
+  if (profileIds.length === 0) {
+    return new NextResponse("No student records found to export", { status: 400 });
   }
 
   const testSummaries = await prisma.testSummary.findMany({
-    where: { profile: { orgId } },
+    where: { profileId: { in: profileIds } },
     include: {
       profile: {
         select: { firstName: true, lastName: true, email: true, classYear: true },

@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireStaffSession } from "@/lib/guards";
-import { Role } from "@prisma/client";
+import { LinkStatus, Role } from "@prisma/client";
 
 export interface StudentCompletedExamItem {
   testId: string;
@@ -36,11 +36,19 @@ export async function getStudentExamsForStaff(targetProfileId: string): Promise<
     throw new Error("Student not found");
   }
 
-  // Tenancy isolation verification
+  // Tenancy verification: superadmin, shared organization, or active direct mentorship
   if (staff.role !== Role.ADMIN) {
     const sharesOrg = staff.orgId && student.orgId && staff.orgId === student.orgId;
-    if (!sharesOrg) {
-      throw new Error("Forbidden: Student belongs to another organization");
+    const hasDirectLink = await prisma.tutorStudentLink.findFirst({
+      where: {
+        tutorId: staff.id,
+        studentId: targetProfileId,
+        status: LinkStatus.ACTIVE,
+      },
+    });
+
+    if (!sharesOrg && !hasDirectLink) {
+      throw new Error("Forbidden: You do not have authorization to view this student's diagnostics.");
     }
   }
 

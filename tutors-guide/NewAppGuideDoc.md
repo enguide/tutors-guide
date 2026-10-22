@@ -870,6 +870,8 @@ _Goal: Build the algorithmic routing engine to support multistage computer-adapt
 * Validate KaTeX syntax balance across all markdown bodies to eliminate client-side math rendering errors.
 
 ```markdown
+
+
 ## Epic 13: Peer-to-Peer Mentorship Links & Independent Tutor Delegation
 
 *Goal: Decouple diagnostic observability from strictly top-down institutional contracts, enabling independent students and private tutors to establish sovereign, consent-driven observation links without organizational license pools or shared tenant IDs.*
@@ -977,8 +979,108 @@ const isAuthorized = isSuperAdmin || sharesOrganization || Boolean(hasActiveMent
 * Display an attribution tag per student row (e.g., `Institutional: Apex Prep` vs. `Direct Mentorship`).
 * Conditionally suppress seat management operations (code refreshing, license reclamation) for peer-linked students who fund their own subscriptions independently.
 
-
-
 ```
 
-```
+## Epic 14: Student Command Center & Modular Preparation Diagnostics
+
+*Goal: Transform the student dashboard from a passive test catalog into an actionable, low-friction preparation command center. Provide modular, client-side and telemetry-driven widgets that foster momentum, prevent diagnostic burnout, pinpoint high-yield skill deficits, and ground student preparation in tangible horizons.*
+
+---
+
+### Task 14.1: Horizon & Target Score Runway Modules
+
+*Build modular widgets that anchor the student's preparation timeline and quantify score improvement goals without inducing testing anxiety.*
+
+- **Component 14.1.1: Official Exam Runway & Horizon Calculator (`ExamCountdownWidget.tsx`)**
+  - **Purpose:** Display a calm, low-stress timeline toward official sittings (SAT/ACT national test dates).
+  - **Mechanics:**
+    - Calculate runway in whole days and study weeks remaining rather than high-anxiety, real-time second tickers.
+    - Contextualize testing horizons by auto-generating milestone phase descriptors: *Foundational Cadence* (>6 weeks), *Targeted Skill Mastery* (4–6 weeks), *Peak Diagnostic Simulation* (2–3 weeks), and *Final Taper* (≤1 week).
+    - Provide rapid selection presets for standard national test windows alongside custom date inputs.
+    - Implement zero-flicker client hydration using `useSyncExternalStore` to persist configuration per category in browser storage.
+  - **Geometry:** Constrained by the golden ratio (`aspect-[1.618/1]`) and styled using sharp border tokens (`rounded-none`).
+
+- **Component 14.1.2: Score Trajectory & Target Delta Gauge (`ScoreTargetGauge.tsx`)**
+  - **Purpose:** Compare a student’s self-declared target score against their actual diagnostic baseline.
+  - **Mechanics:**
+    - Parse latest composite score from `TestSummary` against user-configured target (e.g., Target: 1520 vs. Latest: 1380).
+    - Display an actionable point delta (+140 pts needed) paired with scaled section splits (e.g., Math gap: +90 pts, Reading & Writing gap: +50 pts).
+    - Include target score threshold benchmarks for competitive college admissions tiers (e.g., Ivy/Top 20, Competitive State Honors).
+
+---
+
+### Task 14.2: Diagnostic Cadence & Test Readiness Spacing Engine
+
+*Prevent test fatigue and score plateaus by calculating optimal testing intervals and flagging module stamina drop-offs.*
+
+- **Component 14.2.1: Diagnostic Cadence & Test Spacing Recommender (`DiagnosticCadenceCard.tsx`)**
+  - **Purpose:** Advise the student on *when* to take their next full diagnostic exam.
+  - **Mechanics:**
+    - Read `TestSummary.completedAt` of the most recent evaluation and compare against the official exam target date.
+    - Recommend an optimal spacing cadence: 1 full-length simulation every 10–14 days during peak phase, tapering to 0 tests in the final 5 days before the test date.
+    - Surface status flags: *"Diagnostic Overdue"* (≥18 days since last exam), *"Optimal Window"* (next test due this weekend), or *"Rest & Review Active"* (exam taken <3 days ago; focus on error logs).
+
+- **Component 14.2.2: Section Fatigue & Stamina Degradation Radar (`StaminaAlertWidget.tsx`)**
+  - **Purpose:** Identify if student accuracy degrades significantly across late sections/modules due to mental fatigue.
+  - **Mechanics:**
+    - Analyze `Response.timeSpentOnResponse` and `Response.isCorrect` across chronological section order (e.g., Module 1 vs. Module 2; ACT Science / Math Section 4).
+    - Compute the accuracy and pacing drop-off delta:
+      $$\Delta_{\text{fatigue}} = \text{Accuracy}_{\text{Module 1}} - \text{Accuracy}_{\text{Module 2}}$$
+    - Display a targeted stamina alert when accuracy drops >15% between early and late modules despite consistent difficulty, recommending specific split-session endurance drills.
+
+---
+
+### Task 14.3: Domain Mastery & Error-Pattern Micro-Analytics
+
+*Extract high-granularity diagnostics from database records to drive post-test triage and study focus.*
+
+- **Component 14.3.1: Top-3 High-Yield Priority Focus Radar (`PrioritySkillFocusCard.tsx`)**
+  - **Purpose:** Remove decision paralysis by telling the student the three most impactful skills to review today.
+  - **Mechanics:**
+    - Aggregate recent `Response` rows joined with section YAML frontmatter metadata (`domain`, `skill`, `difficulty`).
+    - Rank skills using an impact-weighting heuristic combining frequency on the exam with student error rate:
+      $$\text{Priority Score} = \text{ErrorRate}_{\text{skill}} \times \text{Weight}_{\text{domain}}$$
+    - Render 3 concise actionable recommendation pills (e.g., *"Heart of Algebra: Linear System Word Problems (25% accuracy across 8 questions)"*).
+    - Include direct deep-links into the Question Triage Review tab (`/tests/[category]/[testId]/results?filterDomain=...`).
+
+- **Component 14.3.2: Second-Guessing & Answer Revision Telemetry (`RevisionAuditWidget.tsx`)**
+  - **Purpose:** Audit the behavioral tendency of changing answers under test conditions.
+  - **Mechanics:**
+    - Inspect `Response.changedAnswer` flags across recent completed sections.
+    - Partition revised answers into two metrics:
+      1. *Beneficial Changes:* Incorrect $\rightarrow$ Correct.
+      2. *Detrimental Changes:* Correct $\rightarrow$ Incorrect.
+    - Surface an actionable confidence index (e.g., *"When you change an answer, you improve your score 68% of the time — your instincts are reliable"*, or *"Warning: 71% of your answer revisions changed correct answers to incorrect"*).
+
+---
+
+### Task 14.4: Consistency & Diagnostic Momentum Tracker
+
+*Reinforce disciplined study habits through non-gamified, architectural progress tracking.*
+
+- **Component 14.4.1: Preparation Momentum Runway (`PrepMomentumTracker.tsx`)**
+  - **Purpose:** Visualize completed diagnostic milestones across the student's study timeline.
+  - **Mechanics:**
+    - Render an architectural linear milestone track displaying completed diagnostics as solid nodal points along the runway leading to the official test sitting.
+    - Display diagnostic volume metrics: Total Questions Answered, Total Timed Hours Logged, and Average Question Pacing vs. Target Benchmark (e.g., SAT Reading: 71s/item avg vs. 75s benchmark).
+    - Include a prompt to export or share the completed preparation telemetry directly with authorized mentors (`/settings/mentors`).
+
+---
+
+### Task 14.5: Modular Dashboard Grid Integration
+
+*Integrate the modular components into `app/dashboard/page.tsx` within an adaptive layout grid.*
+
+- **Sub-task 14.5.1: Adaptive Responsive Grid Composition**
+  - Organize the top tier into two golden-ratio sibling panels:
+    - **Panel A (Left):** `ExamCountdownWidget.tsx` (Official Test Runway & Cadence).
+    - **Panel B (Right):** `ScoreTargetGauge.tsx` (Target Delta & Trajectory).
+  - Organize the middle tier for tactical action:
+    - **Next Recommended Diagnostic Hero Card** (Single prominent CTA to launch next test).
+    - **Diagnostic Cadence / Spacing Card** (`DiagnosticCadenceCard.tsx`).
+  - Organize the lower tier into diagnostic triage & behavioral audits:
+    - `PrioritySkillFocusCard.tsx` (Top 3 Weak Domains).
+    - `RevisionAuditWidget.tsx` (Answer Revision Telemetry).
+- **Sub-task 14.5.2: Independent Modular Skeletons**
+  - Wrap each modular component within self-contained `<Suspense>` boundaries or pure client-side hydration gates (`useSyncExternalStore`) to ensure instant page paint with zero layout shift (CLS).
+

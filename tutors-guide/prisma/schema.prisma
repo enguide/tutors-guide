@@ -67,6 +67,12 @@ model School {
   @@map("School")
 }
 
+enum LinkStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
 model Profile {
   id                     String         @id @default(cuid())
   firstName              String
@@ -80,15 +86,20 @@ model Profile {
   org                    Organization?  @relation("OrgProfiles", fields: [orgId], references: [id])
   orgId                  String?
   
-  // Directly purchased pools (for individual students or self-serve org buyers)
+  // Directly purchased pools
   ownedLicensePools      LicensePool[]  @relation("PurchaserLicensePools")
   
-  // Active entitlements (seats allocated to this student)
+  // Active entitlements
   enrollments            Enrollment[]   @relation("ProfileEnrollments")
 
   responses              Response[]     @relation("ProfileResponses")
   results                Result[]       @relation("ProfileResults")
   summaries              TestSummary[]  @relation("ProfileSummaries")
+
+  // Epic 13: Mentorship delegation relations
+  tutoredStudents        TutorStudentLink[] @relation("TutorLinks")
+  studentTutors          TutorStudentLink[] @relation("StudentLinks")
+
   twoFactorAuthSecret    String?
   twoFactorAuthActivated Boolean?
   createdAt              DateTime       @default(now())
@@ -97,6 +108,27 @@ model Profile {
   @@index([email])
   @@index([orgId])
   @@map("Profile")
+}
+
+model TutorStudentLink {
+  id          String     @id @default(cuid())
+  status      LinkStatus @default(PENDING)
+
+  // The Tutor receiving observation rights
+  tutorId     String
+  tutor       Profile    @relation("TutorLinks", fields: [tutorId], references: [id], onDelete: Cascade)
+
+  // The Student granting telemetry access
+  studentId   String
+  student     Profile    @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([tutorId, studentId])
+  @@index([tutorId])
+  @@index([studentId])
+  @@map("TutorStudentLink")
 }
 
 // -------------------------------------------------------------

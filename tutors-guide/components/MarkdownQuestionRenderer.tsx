@@ -58,16 +58,16 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       '<span data-act-target="$1" data-act-anchor="true" class="inline-block w-0 h-0 overflow-hidden pointer-events-none"></span>'
     );
 
-    // C. Question underline target {1|text} or plain underline {text} / {|text}
-    text = text.replace(
-      /\{(?:\s*(\d+)\s*\|)?([^}]+)\}/g,
-      (_, num, body) => {
-        if (num) {
-          return `<span data-act-target="${num}">${body}</span>`;
-        }
-        return `<span data-act-underline="true">${body}</span>`;
-      }
-    );
+    // Match ONLY {1|text} or {|text}
+text = text.replace(
+  /\{(\d*)\|([^}]+)\}/g,
+  (_, num, body) => {
+    if (num && num.trim().length > 0) {
+      return `<span data-act-target="${num.trim()}">${body}</span>`;
+    }
+    return `<span data-act-underline="true">${body}</span>`;
+  }
+);
 
     return text;
   }, [content]);

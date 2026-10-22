@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireStaffSession, requireOrgAdminSession } from "@/lib/guards";
-import { EnrollmentStatus, Role } from "@prisma/client";
+import { EnrollmentStatus, LinkStatus, Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
@@ -24,16 +24,17 @@ export interface SeatMetrics {
 
 export interface StudentRosterItem {
   profileId: string;
-  enrollmentId: string;
+  enrollmentId: string; // enrollmentId for institutional or linkId for direct students
   name: string;
   email: string;
   classYear: string;
   enrolledAt: Date;
   status: EnrollmentStatus;
-  licensePoolId: string;
+  licensePoolId: string | null;
   licensePoolName: string;
   categories: string[];
   completedExamCount: number;
+  sourceType: "INSTITUTIONAL" | "DIRECT_MENTORSHIP";
 }
 
 export async function getInstitutionalOverview(): Promise<{
@@ -49,14 +50,72 @@ export async function getInstitutionalOverview(): Promise<{
     orgId = firstOrg?.id || null;
   }
 
+  // 1. Fetch direct mentorship links for this staff member (tutor/admin)
+  const directLinks = await prisma.tutorStudentLink.findMany({
+    where: {
+      tutorId: staff.id,
+      status: LinkStatus.ACTIVE,
+    },
+    include: {
+      student: {
+        include: {
+          _count: {
+            select: { summaries: true },
+          },
+          enrollments: {
+            where: { status: EnrollmentStatus.ACTIVE },
+            include: {
+              licensePool: {
+                select: { categories: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Map direct mentorship links into unified roster items
+  const directRoster: StudentRosterItem[] = directLinks.map((link) => {
+    // Derive categories from student's own active license pool entitlements
+    const studentCategories = Array.from(
+      new Set(
+        link.student.enrollments.flatMap((e) => e.licensePool.categories)
+      )
+    );
+
+    return {
+      profileId: link.student.id,
+      enrollmentId: link.id, // Store linkId for identification
+      name: `${link.student.firstName} ${link.student.lastName}`.trim() || link.student.email,
+      email: link.student.email,
+      classYear: link.student.classYear,
+      enrolledAt: link.createdAt,
+      status: EnrollmentStatus.ACTIVE,
+      licensePoolId: null,
+      licensePoolName: "Direct Mentorship",
+      categories: studentCategories.length > 0 ? studentCategories : ["Self-Enrolled"],
+      completedExamCount: link.student._count.summaries,
+      sourceType: "DIRECT_MENTORSHIP",
+    };
+  });
+
+  // 2. If user is independent without an organization, return direct roster immediately
   if (!orgId) {
     return {
-      orgName: "Independent / Unassigned",
-      metrics: { totalPurchasedSeats: 0, activeAllocatedSeats: 0, availableVacancies: 0, licensePools: [] },
-      roster: [],
+      orgName: "Independent / Private Practice",
+      metrics: {
+        totalPurchasedSeats: 0,
+        activeAllocatedSeats: 0,
+        availableVacancies: 0,
+        licensePools: [],
+      },
+      roster: directRoster,
     };
   }
 
+  // 3. Fetch institutional data (organization, license pools, pool enrollments)
   const [org, licensePools, enrollments] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: orgId },
@@ -109,7 +168,7 @@ export async function getInstitutionalOverview(): Promise<{
     categories: p.categories,
   }));
 
-  const roster: StudentRosterItem[] = enrollments.map((e) => ({
+  const institutionalRoster: StudentRosterItem[] = enrollments.map((e) => ({
     profileId: e.profile.id,
     enrollmentId: e.id,
     name: `${e.profile.firstName} ${e.profile.lastName}`.trim() || e.profile.email,
@@ -121,7 +180,18 @@ export async function getInstitutionalOverview(): Promise<{
     licensePoolName: e.licensePool.name,
     categories: e.licensePool.categories,
     completedExamCount: e.profile._count.summaries,
+    sourceType: "INSTITUTIONAL",
   }));
+
+  // 4. Combine rosters, deduplicating by profileId (Institutional takes precedence if both exist)
+  const existingProfileIds = new Set(institutionalRoster.map((item) => item.profileId));
+  const filteredDirectRoster = directRoster.filter(
+    (item) => !existingProfileIds.has(item.profileId)
+  );
+
+  const combinedRoster = [...institutionalRoster, ...filteredDirectRoster].sort(
+    (a, b) => new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime()
+  );
 
   return {
     orgName: org?.name || "Organization",
@@ -131,7 +201,7 @@ export async function getInstitutionalOverview(): Promise<{
       availableVacancies,
       licensePools: formattedPools,
     },
-    roster,
+    roster: combinedRoster,
   };
 }
 

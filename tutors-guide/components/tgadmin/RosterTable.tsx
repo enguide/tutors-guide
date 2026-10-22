@@ -12,10 +12,10 @@ import {
   UserX,
   Download,
   ExternalLink,
-  ShieldAlert,
-  Users,
   CheckCircle2,
   AlertCircle,
+  UserCheck,
+  Building2,
 } from "lucide-react";
 
 interface RosterTableProps {
@@ -28,6 +28,7 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
   const [roster, setRoster] = useState<StudentRosterItem[]>(initialRoster);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [selectedSource, setSelectedSource] = useState<"ALL" | "INSTITUTIONAL" | "DIRECT_MENTORSHIP">("ALL");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -42,7 +43,10 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
     const matchesCategory =
       selectedCategory === "ALL" ||
       student.categories.map((c) => c.toUpperCase()).includes(selectedCategory.toUpperCase());
-    return matchesSearch && matchesCategory;
+    const matchesSource =
+      selectedSource === "ALL" || student.sourceType === selectedSource;
+
+    return matchesSearch && matchesCategory && matchesSource;
   });
 
   const handleCopyCode = (code: string) => {
@@ -81,95 +85,96 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
   };
 
   const handleExportCsv = async () => {
-  setIsExporting(true);
-  try {
-    const res = await fetch("/api/tgadmin/export-csv");
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/tgadmin/export-csv");
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(errorText || `Export failed with status ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `Export failed with status ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `cohort_diagnostic_roster_${new Date().toISOString().slice(0, 10)}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err: any) {
+      alert(err.message || "Failed to generate CSV export.");
+    } finally {
+      setIsExporting(false);
     }
-
-    const blob = await res.blob();
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `cohort_diagnostic_roster_${new Date().toISOString().slice(0, 10)}.csv`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Revoke object URL to free browser memory
-    URL.revokeObjectURL(downloadUrl);
-  } catch (err: any) {
-    alert(err.message || "Failed to generate CSV export.");
-  } finally {
-    setIsExporting(false);
-  }
-};
+  };
 
   return (
     <div className="space-y-6">
-      {/* License Pool Summary & Join Codes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {metrics.licensePools.map((pool) => (
-          <div
-            key={pool.id}
-            className="bg-card border border-slate-200 dark:border-slate-800 rounded-none p-5 shadow-xs space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate max-w-[200px]">
-                {pool.name}
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 border border-border bg-muted/40 font-semibold">
-                {pool.categories.join(", ") || "General"}
-              </span>
-            </div>
-
-            <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-black">
-                {pool.usedSeats}{" "}
-                <span className="text-xs font-normal text-muted-foreground">/ {pool.seatLimit} Seats</span>
+      {/* License Pool Summary & Join Codes (Shown only when pools exist) */}
+      {metrics.licensePools.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {metrics.licensePools.map((pool) => (
+            <div
+              key={pool.id}
+              className="bg-card border border-slate-200 dark:border-slate-800 rounded-none p-5 shadow-xs space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate max-w-[200px]">
+                  {pool.name}
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 border border-border bg-muted/40 font-semibold">
+                  {pool.categories.join(", ") || "General"}
+                </span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                Expires: {new Date(pool.expiresAt).toLocaleDateString()}
-              </span>
-            </div>
 
-            {/* Invite Code Bar */}
-            <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 font-mono text-xs font-bold bg-muted px-2.5 py-1.5 border border-input">
-                <span>{pool.inviteCode || "No Active Code"}</span>
-                {pool.inviteCode && (
+              <div className="flex items-baseline justify-between">
+                <div className="text-2xl font-black">
+                  {pool.usedSeats}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">/ {pool.seatLimit} Seats</span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Expires: {new Date(pool.expiresAt).toLocaleDateString()}
+                </span>
+              </div>
+
+              {/* Invite Code Bar */}
+              <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-mono text-xs font-bold bg-muted px-2.5 py-1.5 border border-input">
+                  <span>{pool.inviteCode || "No Active Code"}</span>
+                  {pool.inviteCode && (
+                    <button
+                      onClick={() => handleCopyCode(pool.inviteCode!)}
+                      className="ml-1 text-muted-foreground hover:text-foreground"
+                      title="Copy Join Code"
+                    >
+                      {copiedCode === pool.inviteCode ? (
+                        <Check size={13} className="text-green-600" />
+                      ) : (
+                        <Copy size={13} />
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {isOrgAdmin && (
                   <button
-                    onClick={() => handleCopyCode(pool.inviteCode!)}
-                    className="ml-1 text-muted-foreground hover:text-foreground"
-                    title="Copy Join Code"
+                    disabled={isPending}
+                    onClick={() => handleRefreshCode(pool.id)}
+                    className="p-1.5 text-xs text-muted-foreground hover:text-foreground border border-input hover:bg-muted transition-colors disabled:opacity-50"
+                    title="Rotate Join Code"
                   >
-                    {copiedCode === pool.inviteCode ? (
-                      <Check size={13} className="text-green-600" />
-                    ) : (
-                      <Copy size={13} />
-                    )}
+                    <RefreshCw size={13} className={isPending ? "animate-spin" : ""} />
                   </button>
                 )}
               </div>
-
-              {isOrgAdmin && (
-                <button
-                  disabled={isPending}
-                  onClick={() => handleRefreshCode(pool.id)}
-                  className="p-1.5 text-xs text-muted-foreground hover:text-foreground border border-input hover:bg-muted transition-colors disabled:opacity-50"
-                  title="Rotate Join Code"
-                >
-                  <RefreshCw size={13} className={isPending ? "animate-spin" : ""} />
-                </button>
-              )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Roster Controls & Search Header */}
       <div className="bg-card border border-slate-200 dark:border-slate-800 rounded-none p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xs">
@@ -195,6 +200,16 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
             <option value="ACT">ACT</option>
             <option value="GRE">GRE</option>
           </select>
+
+          <select
+            value={selectedSource}
+            onChange={(e) => setSelectedSource(e.target.value as any)}
+            className="text-xs font-semibold py-2 px-3 border border-input bg-background rounded-none"
+          >
+            <option value="ALL">All Sources</option>
+            <option value="INSTITUTIONAL">Institutional Pool</option>
+            <option value="DIRECT_MENTORSHIP">Direct Mentorship</option>
+          </select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -216,7 +231,7 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
             <tr className="border-b border-border bg-muted/40 font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
               <th className="py-3.5 px-4">Student</th>
               <th className="py-3.5 px-4">Class Year</th>
-              <th className="py-3.5 px-4">Assigned Pool</th>
+              <th className="py-3.5 px-4">Attribution / Pool</th>
               <th className="py-3.5 px-4">Status</th>
               <th className="py-3.5 px-4 text-center">Exams Completed</th>
               <th className="py-3.5 px-4">Enrolled Date</th>
@@ -227,6 +242,8 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
             {filteredRoster.length > 0 ? (
               filteredRoster.map((student) => {
                 const isActive = student.status === "ACTIVE";
+                const isDirect = student.sourceType === "DIRECT_MENTORSHIP";
+
                 return (
                   <tr key={student.enrollmentId} className="hover:bg-muted/30 transition-colors">
                     <td className="py-3.5 px-4">
@@ -237,10 +254,26 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
                       {student.classYear || "—"}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold">{student.licensePoolName}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {student.categories.join(", ")}
-                      </div>
+                      {isDirect ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 w-fit">
+                            <UserCheck size={11} /> Direct Mentorship
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {student.categories.join(", ")}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                            <Building2 size={11} className="text-muted-foreground" />
+                            {student.licensePoolName}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {student.categories.join(", ")}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3.5 px-4">
                       {isActive ? (
@@ -270,7 +303,8 @@ export function RosterTable({ initialRoster, metrics, userRole }: RosterTablePro
                           <span>Inspect</span>
                         </a>
 
-                        {isOrgAdmin && isActive && (
+                        {/* Revocation is strictly restricted to Institutional Pools */}
+                        {isOrgAdmin && !isDirect && isActive && (
                           <button
                             onClick={() => handleRevoke(student.enrollmentId, student.name)}
                             disabled={isPending}

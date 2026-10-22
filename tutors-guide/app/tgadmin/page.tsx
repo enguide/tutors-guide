@@ -4,9 +4,12 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { getInstitutionalOverview } from "@/actions/institutional";
 import { getCohortAnalytics } from "@/actions/reporting";
+import { getOrCreateTutorInviteLink } from "@/actions/mentorship";
 import { requireStaffSession } from "@/lib/guards";
 import { RosterTable } from "@/components/tgadmin/RosterTable";
-import { Users, UserCheck, UserMinus, Award, Timer } from "lucide-react";
+import { TutorInviteShareBox } from "@/components/tgadmin/TutorInviteShareBox";
+import { Role } from "@prisma/client";
+import { Users, UserCheck, Award, Timer } from "lucide-react";
 
 export const instant = false;
 
@@ -39,9 +42,12 @@ async function AdminPortalContent() {
   await connection();
   const staff = await requireStaffSession();
 
-  const [overview, analytics] = await Promise.all([
+  const [overview, analytics, tutorInvite] = await Promise.all([
     getInstitutionalOverview(),
     getCohortAnalytics(),
+    staff.role === Role.TUTOR || staff.role === Role.ADMIN
+      ? getOrCreateTutorInviteLink().catch(() => null)
+      : null,
   ]);
 
   const formatAvgTime = (seconds: number) => {
@@ -50,6 +56,8 @@ async function AdminPortalContent() {
     return `${mins}m ${secs}s`;
   };
 
+  const isIndependentTutor = !staff.orgId && staff.role === Role.TUTOR;
+
   return (
     <div className="space-y-8">
       {/* Portal Header */}
@@ -57,22 +65,33 @@ async function AdminPortalContent() {
         <div>
           <h1 className="text-2xl font-black tracking-tight">{overview.orgName}</h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Manage license allocations, monitor active cohort test pacing, and audit student diagnostics.
+            {isIndependentTutor
+              ? "Monitor direct student telemetry, test pacing, and individual diagnostic reviews."
+              : "Manage license allocations, monitor active cohort test pacing, and audit student diagnostics."}
           </p>
         </div>
       </div>
 
+      {/* Direct Mentorship Quick-Share Banner (for Tutors/Admins) */}
+      {tutorInvite && (
+        <TutorInviteShareBox inviteUrl={tutorInvite.inviteUrl} />
+      )}
+
       {/* Cohort KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Seats"
-          value={overview.metrics.totalPurchasedSeats}
-          subtitle={`${overview.metrics.availableVacancies} seats available`}
+          title={isIndependentTutor ? "Managed Students" : "Total Seats"}
+          value={isIndependentTutor ? overview.roster.length : overview.metrics.totalPurchasedSeats}
+          subtitle={
+            isIndependentTutor
+              ? "Active direct mentorship links"
+              : `${overview.metrics.availableVacancies} seats available`
+          }
           icon={Users}
         />
         <StatCard
           title="Active Students"
-          value={overview.metrics.activeAllocatedSeats}
+          value={overview.metrics.activeAllocatedSeats || overview.roster.length}
           subtitle={`${overview.roster.length} registered accounts`}
           icon={UserCheck}
         />
@@ -92,7 +111,9 @@ async function AdminPortalContent() {
 
       {/* Roster & Management Workspace */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold tracking-tight">Cohort Roster & Entitlements</h2>
+        <h2 className="text-base font-bold tracking-tight">
+          {isIndependentTutor ? "Mentorship Student Roster" : "Cohort Roster & Entitlements"}
+        </h2>
         <RosterTable
           initialRoster={overview.roster}
           metrics={overview.metrics}

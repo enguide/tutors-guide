@@ -38,9 +38,14 @@ interface CompleteSectionPayload {
 export async function completeTestSection(payload: CompleteSectionPayload) {
   const session = await auth();
   const profileId = session?.user?.id;
+  const userRole = session?.user?.role;
 
   if (!profileId) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  if (userRole !== "STUDENT") {
+  return { success: false, error: "Instructional staff accounts are barred from submitting exam attempts." };
   }
 
   const {
