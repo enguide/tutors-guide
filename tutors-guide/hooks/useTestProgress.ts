@@ -3,7 +3,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { QuestionFrontmatter } from "@/types/content";
-import { autosaveResponse, AutosavePayload } from "@/actions/autosave";
+import {
+  autosaveResponse,
+  saveSectionCheckpoint,
+  AutosavePayload,
+  CheckpointPayload,
+} from "@/actions/autosave";
 import { QuestionType } from "@prisma/client";
 import { examLogger } from "@/lib/telemetry/examLogger";
 
@@ -26,12 +31,29 @@ export interface NavigationHistoryEntry {
   qIdx: number; // Question index (0-based)
 }
 
+export interface ServerCheckpointData {
+  timeRemainingSeconds: number;
+  lastQuestionIndex: number;
+  navigationHistory: NavigationHistoryEntry[] | null;
+  clientUpdatedAt: Date | string;
+}
+
+export interface ServerResponseRecord {
+  questionId: string;
+  selectedOptionId: string | null;
+  frqUserAnswer: string | null;
+  timeSpentOnResponse: number | null;
+  usedCalculator: boolean;
+  changedAnswer: boolean;
+}
+
 interface StoredCache {
   answers?: StudentAnswers;
   secondsRemaining?: number;
   currentIndex?: number;
   navigationHistory?: NavigationHistoryEntry[];
   offlineQueue?: AutosavePayload[];
+  lastSavedAt?: number;
 }
 
 interface UseTestProgressProps {
@@ -43,6 +65,8 @@ interface UseTestProgressProps {
   timeExtensionMultiplier?: number;
   isTimerRunning?: boolean;
   onTimeExpired?: () => void;
+  serverCheckpoint?: ServerCheckpointData | null;
+  serverResponses?: ServerResponseRecord[];
 }
 
 function readStoredSnapshot(key: string): StoredCache | null {
@@ -55,6 +79,113 @@ function readStoredSnapshot(key: string): StoredCache | null {
   }
 }
 
+// Pure helper function for initial state reconciliation
+function resolveInitialProgressState({
+  storageKey,
+  totalAdjustedSeconds,
+  serverCheckpoint,
+  serverResponses,
+  questionsLength,
+}: {
+  storageKey: string;
+  totalAdjustedSeconds: number;
+  serverCheckpoint?: ServerCheckpointData | null;
+  serverResponses: ServerResponseRecord[];
+  questionsLength: number;
+}) {
+  const local = readStoredSnapshot(storageKey);
+  const localTimestamp = local?.lastSavedAt || 0;
+
+  const serverTimestamp = serverCheckpoint?.clientUpdatedAt
+    ? new Date(serverCheckpoint.clientUpdatedAt).getTime()
+    : 0;
+
+  const serverAnswersMap: StudentAnswers = {};
+  for (const r of serverResponses) {
+    serverAnswersMap[r.questionId] = {
+      selectedOptionId: r.selectedOptionId || undefined,
+      frqUserAnswer: r.frqUserAnswer || undefined,
+      usedCalculator: r.usedCalculator,
+      changedAnswer: r.changedAnswer,
+      timeSpent: r.timeSpentOnResponse || 0,
+    };
+  }
+
+  // CASE A: Server Checkpoint exists and is NEWER than local storage, OR local is empty
+  if (serverCheckpoint && (!local || serverTimestamp > localTimestamp)) {
+    const mergedAnswers = {
+      ...serverAnswersMap,
+      ...(local?.answers || {}),
+    };
+
+    const resolved = {
+      answers: mergedAnswers,
+      secondsRemaining:
+        typeof serverCheckpoint.timeRemainingSeconds === "number"
+          ? serverCheckpoint.timeRemainingSeconds
+          : totalAdjustedSeconds,
+      currentIndex:
+        typeof serverCheckpoint.lastQuestionIndex === "number"
+          ? Math.min(serverCheckpoint.lastQuestionIndex, Math.max(0, questionsLength - 1))
+          : 0,
+      navigationHistory:
+        Array.isArray(serverCheckpoint.navigationHistory) &&
+        serverCheckpoint.navigationHistory.length > 0
+          ? serverCheckpoint.navigationHistory
+          : [{ time: 0, qIdx: 0 }],
+      offlineQueue: local?.offlineQueue || [],
+    };
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            ...resolved,
+            lastSavedAt: serverTimestamp,
+          })
+        );
+      } catch {}
+    }
+
+    return resolved;
+  }
+
+  // CASE B: Local storage is newer or only source
+  if (local) {
+    const mergedAnswers = {
+      ...serverAnswersMap,
+      ...(local.answers || {}),
+    };
+
+    return {
+      answers: mergedAnswers,
+      secondsRemaining:
+        typeof local.secondsRemaining === "number"
+          ? local.secondsRemaining
+          : totalAdjustedSeconds,
+      currentIndex:
+        typeof local.currentIndex === "number"
+          ? Math.min(local.currentIndex, Math.max(0, questionsLength - 1))
+          : 0,
+      navigationHistory:
+        Array.isArray(local.navigationHistory) && local.navigationHistory.length > 0
+          ? local.navigationHistory
+          : [{ time: 0, qIdx: 0 }],
+      offlineQueue: local.offlineQueue || [],
+    };
+  }
+
+  // CASE C: Brand-new fresh start
+  return {
+    answers: serverAnswersMap,
+    secondsRemaining: totalAdjustedSeconds,
+    currentIndex: 0,
+    navigationHistory: [{ time: 0, qIdx: 0 }],
+    offlineQueue: [] as AutosavePayload[],
+  };
+}
+
 export function useTestProgress({
   testId,
   sectionId,
@@ -64,34 +195,29 @@ export function useTestProgress({
   timeExtensionMultiplier = 1.0,
   isTimerRunning = true,
   onTimeExpired,
+  serverCheckpoint,
+  serverResponses = [],
 }: UseTestProgressProps) {
   const storageKey = `test_progress_${testId}_${sectionId}`;
   const totalAdjustedSeconds = Math.round(timeLimitSeconds * timeExtensionMultiplier);
 
-  const [currentIndex, setCurrentIndexState] = useState<number>(() => {
-    const cached = readStoredSnapshot(storageKey);
-    return typeof cached?.currentIndex === "number" ? cached.currentIndex : 0;
-  });
+  // Lazy state initializers execute once on mount without touching refs during render
+  const [initialState] = useState(() =>
+    resolveInitialProgressState({
+      storageKey,
+      totalAdjustedSeconds,
+      serverCheckpoint,
+      serverResponses,
+      questionsLength: questions.length,
+    })
+  );
 
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => {
-    const cached = readStoredSnapshot(storageKey);
-    return typeof cached?.secondsRemaining === "number"
-      ? cached.secondsRemaining
-      : totalAdjustedSeconds;
-  });
-
-  const [answers, setAnswers] = useState<StudentAnswers>(() => {
-    const cached = readStoredSnapshot(storageKey);
-    return cached?.answers ?? {};
-  });
-
-  const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryEntry[]>(() => {
-    const cached = readStoredSnapshot(storageKey);
-    if (cached?.navigationHistory && Array.isArray(cached.navigationHistory)) {
-      return cached.navigationHistory;
-    }
-    return [{ time: 0, qIdx: 0 }];
-  });
+  const [currentIndex, setCurrentIndexState] = useState<number>(initialState.currentIndex);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(initialState.secondsRemaining);
+  const [answers, setAnswers] = useState<StudentAnswers>(initialState.answers);
+  const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryEntry[]>(
+    initialState.navigationHistory
+  );
 
   // Network Resilience State
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {
@@ -99,9 +225,7 @@ export function useTestProgress({
     return "synced";
   });
 
-  const offlineQueueRef = useRef<AutosavePayload[]>(
-    readStoredSnapshot(storageKey)?.offlineQueue || []
-  );
+  const offlineQueueRef = useRef<AutosavePayload[]>(initialState.offlineQueue);
 
   const [isCrossOutMode, setIsCrossOutMode] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
@@ -109,6 +233,7 @@ export function useTestProgress({
 
   const timePerQuestionRef = useRef<{ [questionId: string]: number }>({});
   const autosaveTimeoutRef = useRef<{ [questionId: string]: NodeJS.Timeout }>({});
+  const checkpointTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isFlushingRef = useRef<boolean>(false);
 
   const persistToLocalStorage = useCallback(
@@ -138,6 +263,33 @@ export function useTestProgress({
     [storageKey, isTimerRunning]
   );
 
+  // Dispatch background section checkpoint upsert to PostgreSQL
+  const triggerCheckpointSync = useCallback(
+    (remainingTime: number, activeIdx: number, navHistory: NavigationHistoryEntry[]) => {
+      if (checkpointTimeoutRef.current) {
+        clearTimeout(checkpointTimeoutRef.current);
+      }
+
+      checkpointTimeoutRef.current = setTimeout(async () => {
+        if (typeof navigator !== "undefined" && !navigator.onLine) return;
+        const payload: CheckpointPayload = {
+          testId,
+          sectionId,
+          timeRemainingSeconds: remainingTime,
+          lastQuestionIndex: activeIdx,
+          navigationHistory: navHistory,
+          clientUpdatedAt: Date.now(),
+        };
+        try {
+          await saveSectionCheckpoint(payload);
+        } catch (err) {
+          console.warn("[Checkpoint] Background sync deferred:", err);
+        }
+      }, 1200);
+    },
+    [testId, sectionId]
+  );
+
   // Flush queued autosaves to Postgres with exponential retry
   const flushOfflineQueue = useCallback(async () => {
     if (isFlushingRef.current || offlineQueueRef.current.length === 0) return;
@@ -162,10 +314,6 @@ export function useTestProgress({
         }
       } catch (err) {
         console.warn(`[Autosave Queue] Retry failed. Waiting ${retryDelay}ms...`, err);
-        examLogger.log("network", `Retry queue flush failed. Delay: ${retryDelay}ms`, {
-          queueSize: offlineQueueRef.current.length,
-          error: String(err),
-        });
         setSyncStatus("offline");
         await new Promise((res) => setTimeout(res, retryDelay));
         retryDelay = Math.min(retryDelay * 2, 10000);
@@ -177,9 +325,6 @@ export function useTestProgress({
 
     isFlushingRef.current = false;
     const isCleared = offlineQueueRef.current.length === 0;
-    if (isCleared) {
-      examLogger.log("autosave", "Flushed offline response queue successfully to server");
-    }
     setSyncStatus(isCleared ? "synced" : "offline");
   }, []);
 
@@ -191,6 +336,7 @@ export function useTestProgress({
       examLogger.log("network", "Browser connection restored (online event)");
       setSyncStatus("retrying");
       flushOfflineQueue();
+      triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
     };
 
     const handleOffline = () => {
@@ -205,7 +351,7 @@ export function useTestProgress({
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [flushOfflineQueue]);
+  }, [flushOfflineQueue, triggerCheckpointSync, secondsRemaining, currentIndex, navigationHistory]);
 
   const clearLocalBuffer = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -273,20 +419,27 @@ export function useTestProgress({
 
           setNavigationHistory((prevHistory) => {
             const lastEntry = prevHistory[prevHistory.length - 1];
-            if (lastEntry && lastEntry.qIdx === nextIdx) return prevHistory;
-            return [...prevHistory, nextEntry];
-          });
+            const updatedHistory =
+              lastEntry && lastEntry.qIdx === nextIdx
+                ? prevHistory
+                : [...prevHistory, nextEntry];
 
-          examLogger.log("navigation", `Navigated to question index ${nextIdx}`, {
-            from: prevIdx,
-            to: nextIdx,
-            questionNumber: questions[nextIdx]?.questionNumber,
+            persistToLocalStorage(answers, secondsRemaining, nextIdx, updatedHistory);
+            triggerCheckpointSync(secondsRemaining, nextIdx, updatedHistory);
+            return updatedHistory;
           });
         }
         return nextIdx;
       });
     },
-    [questions, totalAdjustedSeconds, secondsRemaining]
+    [
+      questions,
+      totalAdjustedSeconds,
+      secondsRemaining,
+      answers,
+      persistToLocalStorage,
+      triggerCheckpointSync,
+    ]
   );
 
   useEffect(() => {
@@ -313,11 +466,21 @@ export function useTestProgress({
     return () => clearInterval(timer);
   }, [isTimerRunning, currentIndex, questions, onTimeExpired]);
 
+  // Periodic LocalStorage and Checkpoint write (every 10 seconds)
   useEffect(() => {
-    if (isTimerRunning && secondsRemaining % 5 === 0) {
+    if (isTimerRunning && secondsRemaining % 10 === 0) {
       persistToLocalStorage(answers, secondsRemaining, currentIndex, navigationHistory);
+      triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
     }
-  }, [isTimerRunning, secondsRemaining, answers, currentIndex, navigationHistory, persistToLocalStorage]);
+  }, [
+    isTimerRunning,
+    secondsRemaining,
+    answers,
+    currentIndex,
+    navigationHistory,
+    persistToLocalStorage,
+    triggerCheckpointSync,
+  ]);
 
   const scheduleAutosave = useCallback(
     (questionId: string, updatedAnswer: StudentAnswers[string], index: number) => {
@@ -346,7 +509,6 @@ export function useTestProgress({
         if (typeof navigator !== "undefined" && !navigator.onLine) {
           offlineQueueRef.current.push(payload);
           setSyncStatus("offline");
-          examLogger.log("autosave", `Enqueued response while offline for question ${questionId}`);
           return;
         }
 
@@ -356,17 +518,13 @@ export function useTestProgress({
           if (!res.success) {
             offlineQueueRef.current.push(payload);
             setSyncStatus("retrying");
-            examLogger.log("autosave", `Autosave rejected by server for ${questionId}. Enqueued retry.`);
             flushOfflineQueue();
           } else {
             setSyncStatus(offlineQueueRef.current.length > 0 ? "retrying" : "synced");
           }
-        } catch (err) {
+        } catch {
           offlineQueueRef.current.push(payload);
           setSyncStatus("offline");
-          examLogger.log("autosave", `Autosave network error for ${questionId}. Enqueued retry.`, {
-            error: String(err),
-          });
         }
       }, 750);
     },
@@ -408,19 +566,22 @@ export function useTestProgress({
           },
         };
 
-        examLogger.log("interaction", `Selected option on question ${qId}`, {
-          questionId: qId,
-          optionId,
-          changedAnswer: currentAnswer.changedAnswer || isDivergent,
-        });
-
         persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
         scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+        triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
 
         return nextAnswers;
       });
     },
-    [currentIndex, questions, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
+    [
+      currentIndex,
+      questions,
+      secondsRemaining,
+      navigationHistory,
+      persistToLocalStorage,
+      scheduleAutosave,
+      triggerCheckpointSync,
+    ]
   );
 
   const setFrqAnswer = useCallback(
@@ -447,16 +608,21 @@ export function useTestProgress({
         },
       };
 
-      examLogger.log("interaction", `Set FRQ answer on question ${qId}`, {
-        questionId: qId,
-        length: val.length,
-      });
-
       setAnswers(nextAnswers);
       persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
       scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+      triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
     },
-    [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]
+    [
+      currentIndex,
+      questions,
+      answers,
+      secondsRemaining,
+      navigationHistory,
+      persistToLocalStorage,
+      scheduleAutosave,
+      triggerCheckpointSync,
+    ]
   );
 
   const toggleEliminateOption = useCallback(
@@ -488,11 +654,6 @@ export function useTestProgress({
         },
       };
 
-      examLogger.log("tool", `Toggled option strikeout for option ${optionId}`, {
-        questionId: qId,
-        optionId,
-      });
-
       setAnswers(nextAnswers);
       persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
     },
@@ -515,21 +676,12 @@ export function useTestProgress({
       },
     };
 
-    examLogger.log("interaction", `Toggled review flag for question ${qId}`, {
-      questionId: qId,
-      flagged: nextFlagged,
-    });
-
     setAnswers(nextAnswers);
     persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
   }, [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage]);
 
   const toggleCalculator = useCallback(() => {
-    setIsCalculatorOpen((prev) => {
-      const next = !prev;
-      examLogger.log("tool", `Toggled calculator visibility: ${next ? "opened" : "closed"}`);
-      return next;
-    });
+    setIsCalculatorOpen((prev) => !prev);
   }, []);
 
   const markCalculatorUsed = useCallback(() => {
@@ -548,8 +700,6 @@ export function useTestProgress({
           usedCalculator: true,
         },
       };
-
-      examLogger.log("tool", `Calculator used on question ${qId}`, { questionId: qId });
 
       persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
       scheduleAutosave(qId, nextAnswers[qId], currentIndex);

@@ -1,8 +1,9 @@
 // app/dashboard/page.tsx
 import { Suspense } from "react";
 import { connection } from "next/server";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getAllAvailableTests } from "@/lib/contentLoader";
+import { getAllAvailableTests, getTestMetadata } from "@/lib/contentLoader";
 import { prisma } from "@/lib/prisma";
 import { Category } from "@prisma/client";
 import { ExamCountdownWidget } from "@/components/dashboard/ExamCountdownWidget";
@@ -47,10 +48,22 @@ async function DashboardOverviewContent({
   ]);
 
   const userEntitlements = (session?.user?.entitlements || []) as Category[];
+
+  // 1. Enforce default ?program= URL canonicalization
+  if (!rawProgram && userEntitlements.length > 0) {
+    redirect(`/dashboard?program=${userEntitlements[0]}`);
+  }
+
   const activeProgram = resolveActiveCategory(userEntitlements, rawProgram);
 
-  // Fetch only tests and telemetry corresponding to the active program
-  const [availableTestsByCategory, completedSummaries, responseAggregates] = await Promise.all([
+  // 2. Fetch tests, summaries, response totals, submitted section results, AND active draft checkpoints
+  const [
+    availableTestsByCategory,
+    completedSummaries,
+    responseAggregates,
+    userSectionResults,
+    userSectionCheckpoints,
+  ] = await Promise.all([
     getAllAvailableTests(),
     session?.user?.id
       ? prisma.testSummary.findMany({
@@ -79,30 +92,90 @@ async function DashboardOverviewContent({
           _sum: { timeSpentOnResponse: true },
         })
       : Promise.resolve({ _count: { id: 0 }, _sum: { timeSpentOnResponse: 0 } }),
+    session?.user?.id
+      ? prisma.result.findMany({
+          where: { profileId: session.user.id },
+          select: { testId: true, sectionId: true },
+        })
+      : Promise.resolve([]),
+    session?.user?.id
+      ? prisma.sectionCheckpoint.findMany({
+          where: { profileId: session.user.id },
+          select: { testId: true, sectionId: true, updatedAt: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const recentSummary = completedSummaries[0] || null;
   const completedTestIds = new Set(completedSummaries.map((s) => s.testId));
 
-  // Determine next recommended test for THIS active program
+  // Map of finalized sections per test
+  const completedSectionsByTest = new Map<string, Set<string>>();
+  for (const r of userSectionResults) {
+    if (!completedSectionsByTest.has(r.testId)) {
+      completedSectionsByTest.set(r.testId, new Set());
+    }
+    completedSectionsByTest.get(r.testId)!.add(r.sectionId);
+  }
+
+  // Map of active in-flight checkpoints per test
+  const checkpointByTest = new Map<string, string>();
+  for (const cp of userSectionCheckpoints) {
+    checkpointByTest.set(cp.testId, cp.sectionId);
+  }
+
+  // 3. Determine next recommended or in-progress test
   const activeProgramTests = availableTestsByCategory[activeProgram] || [];
   let nextTest: NextTestTarget | null = null;
+  let nextLaunchUrl: string | null = null;
 
+  // First check if any test is IN PROGRESS (has active SectionCheckpoint or submitted sections)
   for (const t of activeProgramTests) {
     if (!completedTestIds.has(t.testId)) {
-      nextTest = {
-        category: activeProgram.toLowerCase(),
-        testId: t.testId,
-        title: t.title,
-        firstSectionId: t.firstSectionId,
-      };
-      break;
+      const finishedSections = completedSectionsByTest.get(t.testId) || new Set();
+      const activeDraftSectionId = checkpointByTest.get(t.testId);
+
+      if (finishedSections.size > 0 || activeDraftSectionId) {
+        const meta = await getTestMetadata(activeProgram.toLowerCase(), t.testId);
+        if (meta && meta.sections) {
+          // Prioritize active draft section; otherwise pick the first unsubmitted section
+          const resumeSection =
+            (activeDraftSectionId && meta.sections.find((s) => s.id === activeDraftSectionId)) ||
+            meta.sections.find((s) => !finishedSections.has(s.id));
+
+          if (resumeSection) {
+            nextTest = {
+              category: activeProgram.toLowerCase(),
+              testId: t.testId,
+              title: t.title,
+              firstSectionId: resumeSection.id,
+              isInProgress: true,
+              completedSectionCount: finishedSections.size,
+            };
+            nextLaunchUrl = `/tests/${activeProgram.toLowerCase()}/${t.testId}/${resumeSection.id}`;
+            break;
+          }
+        }
+      }
     }
   }
 
-  const nextLaunchUrl = nextTest
-    ? `/tests/${nextTest.category}/${nextTest.testId}/${nextTest.firstSectionId}`
-    : null;
+  // If no in-progress tests, find the first completely untouched test
+  if (!nextTest) {
+    for (const t of activeProgramTests) {
+      if (!completedTestIds.has(t.testId)) {
+        nextTest = {
+          category: activeProgram.toLowerCase(),
+          testId: t.testId,
+          title: t.title,
+          firstSectionId: t.firstSectionId,
+          isInProgress: false,
+        };
+        nextLaunchUrl = `/tests/${activeProgram.toLowerCase()}/${t.testId}/${t.firstSectionId}`;
+        break;
+      }
+    }
+  }
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
@@ -124,40 +197,40 @@ async function DashboardOverviewContent({
       </div>
 
       {/* Tier 1: Horizon & Target Score Runway */}
-{userEntitlements.length > 0 && (
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-    <RecentPerformanceCard recentSummary={recentSummary} />
-    <ScoreTargetGauge
-      activeProgram={activeProgram}
-      latestScore={recentSummary?.compositeScore ?? null}
-      latestTestTitle={recentSummary?.testTitle ?? null}
-    />
-    <ExamCountdownWidget activeProgram={activeProgram} />
-  </div>
-)}
+      {userEntitlements.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          <RecentPerformanceCard recentSummary={recentSummary} />
+          <ScoreTargetGauge
+            activeProgram={activeProgram}
+            latestScore={recentSummary?.compositeScore ?? null}
+            latestTestTitle={recentSummary?.testTitle ?? null}
+          />
+          <ExamCountdownWidget activeProgram={activeProgram} />
+        </div>
+      )}
 
-{/* Tier 2: Next Up Hero Action Card */}
-<NextRecommendedHeroCard nextTest={nextTest} launchUrl={nextLaunchUrl} />
+      {/* Tier 2: Next Up Hero Action Card (Shows "Resume Exam" if in-progress) */}
+      <NextRecommendedHeroCard nextTest={nextTest} launchUrl={nextLaunchUrl} />
 
-{/* Tier 3: Diagnostic Cadence & Preparation Time Bank */}
-{userEntitlements.length > 0 && (
-  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-    <div className="md:col-span-8">
-      <StudyInvestmentWidget
-        activeProgram={activeProgram}
-        examTimeSpentSeconds={responseAggregates._sum.timeSpentOnResponse ?? 0}
-      />
-    </div>
-    <div className="md:col-span-4">
-      <DiagnosticCadenceCard
-        latestCompletedAt={recentSummary?.completedAt ?? null}
-        latestCategory={activeProgram}
-        totalCompletedCount={completedSummaries.length}
-        nextTestLaunchUrl={nextLaunchUrl}
-      />
-    </div>
-  </div>
-)}
+      {/* Tier 3: Diagnostic Cadence & Preparation Time Bank */}
+      {userEntitlements.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+          <div className="md:col-span-8">
+            <StudyInvestmentWidget
+              activeProgram={activeProgram}
+              examTimeSpentSeconds={responseAggregates._sum.timeSpentOnResponse ?? 0}
+            />
+          </div>
+          <div className="md:col-span-4">
+            <DiagnosticCadenceCard
+              latestCompletedAt={recentSummary?.completedAt ?? null}
+              latestCategory={activeProgram}
+              totalCompletedCount={completedSummaries.length}
+              nextTestLaunchUrl={nextLaunchUrl}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Tier 4: Quick Navigation Hub */}
       <QuickNavTiles />

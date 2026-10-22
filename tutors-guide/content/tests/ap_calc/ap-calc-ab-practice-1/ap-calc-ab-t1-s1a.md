@@ -16,7 +16,25 @@ questions:
     skill: "Applying the Power Rule and Basic Derivative Rules"
     difficulty: "Easy"
     prompt: "If $f$ is the function given by $f(x) = \\dfrac{9}{x^2} + 4x + 3$, then $f'(3) =$"
-    explanation: "Rewrite f(x) as 9x^(-2) + 4x + 3. Differentiating yields f'(x) = -18x^(-3) + 4 = -18/(x^3) + 4. Evaluating at x = 3 gives f'(3) = -18/27 + 4 = -2/3 + 4 = 10/3."
+    explanation: |
+      **Core Concept:** Before applying the Power Rule, rewrite rational terms with negative exponents: $\dfrac{c}{x^n} = c x^{-n}$. Differentiate term-by-term using $\dfrac{d}{dx}[x^n] = n x^{n-1}$, then substitute the evaluation point.
+
+      **Step-by-Step Solution:**
+      - Rewrite $f(x)$ in power form:
+         $$f(x) = 9x^{-2} + 4x + 3$$
+
+      - Differentiate term-by-term with respect to $x$:
+         $$f'(x) = 9(-2x^{-3}) + 4(1) + 0 = -18x^{-3} + 4 = -\dfrac{18}{x^3} + 4$$
+
+      - Evaluate at $x = 3$:
+         $$f'(3) = -\dfrac{18}{3^3} + 4 = -\dfrac{18}{27} + 4 = -\dfrac{2}{3} + \dfrac{12}{3} = \dfrac{10}{3}$$
+
+      **Distractor Rationale:**
+      * **A** ($\dfrac{8}{3}$): Drops the negative sign on the exponent rule, computing $\dfrac{2}{3} + \dfrac{6}{3} = \dfrac{8}{3}$ or making an arithmetic error when combining $-\dfrac{2}{3} + 4$.
+      * **C** ($\dfrac{14}{3}$): Forgets the negative sign resulting from differentiating $x^{-2}$, evaluating $+\dfrac{2}{3} + 4 = \dfrac{14}{3}$.
+      * **D** ($6$): Differentiates the denominator in place ($\dfrac{d}{dx}[x^2] = 2x$), writing $f'(x) = \dfrac{9}{2x} + 4$ and evaluating $\dfrac{9}{6} + 4 = \dfrac{3}{2} + 4 = \dfrac{11}{2} \approx 6$.
+
+      Therefore, choice **B** is correct.
     options:
       - id: "A"
         text: "$\\dfrac{8}{3}$"
@@ -35,7 +53,27 @@ questions:
     skill: "Antiderivatives and Indefinite Integrals"
     difficulty: "Easy"
     prompt: "$\\displaystyle\\int 8e^{4x} \\, dx =$"
-    explanation: "Using substitution with u = 4x and du = 4 dx, the integral becomes (1/4) * int(8e^u du) = 2e^u + C = 2e^(4x) + C."
+    explanation: |
+      **Core Concept:** The indefinite integral of an exponential composite function of the linear form $e^{kx}$ is $\displaystyle\int e^{kx} \, dx = \dfrac{1}{k}e^{kx} + C$. For standard $u$-substitution, set $u = kx$ so that $dx = \dfrac{1}{k}\, du$.
+
+      **Step-by-Step Solution:**
+      1. Set up $u$-substitution:
+         Let $u = 4x \implies du = 4 \, dx \implies dx = \dfrac{1}{4} \, du$
+
+      2. Transform the integral into terms of $u$:
+         $$\displaystyle\int 8e^{4x} \, dx = \displaystyle\int 8e^u \left(\dfrac{1}{4} \, du\right) = 2 \displaystyle\int e^u \, du$$
+
+      3. Integrate and substitute back $u = 4x$:
+         $$2e^u + C = 2e^{4x} + C$$
+
+      **AP Exam Tip (Mental Check):** Always differentiate your antiderivative to verify: $\dfrac{d}{dx}\left[2e^{4x} + C\right] = 2(4)e^{4x} = 8e^{4x}$.
+
+      **Distractor Rationale:**
+      * **B** ($8e^{4x} + C$): Forgets to divide by the inner derivative $k = 4$ (chain rule factor for integration).
+      * **C** ($32e^{4x} + C$): Multiplies by the internal derivative ($8 \times 4$) rather than dividing by it, confusing integration with differentiation.
+      * **D** ($\dfrac{8e^{4x+1}}{4x+1} + C$): Mistakenly applies the algebraic Power Rule $\dfrac{x^{n+1}}{n+1}$ to an exponential function.
+
+      Therefore, choice **A** is correct.
     options:
       - id: "A"
         text: "$2e^{4x} + C$"

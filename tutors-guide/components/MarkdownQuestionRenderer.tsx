@@ -40,34 +40,49 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 1. Preprocess placement badges, invisible anchors, and underline targets
+  // 1. Preprocess placement badges, invisible anchors, underline targets, and highlights
   const processedContent = useMemo(() => {
     if (!content) return "";
 
-    let text = content;
+    // A. Temporarily mask inline and display LaTeX so math remains untouched
+    const mathTokens: string[] = [];
+    let text = content.replace(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g, (match) => {
+      mathTokens.push(match);
+      return `@@MATH_TOKEN_${mathTokens.length - 1}@@`;
+    });
 
-    // A. Placement markers: {[A]:15} -> <span data-act-placement="A" data-act-target="15">[A]</span>
+    // B. Placement markers: [[[A]:15]] -> <span data-act-placement="A" data-act-target="15">[A]</span>
     text = text.replace(
-      /\{\[([A-D])\]:(\d+)\}/g,
+      /\[\[\[([A-D])\]:(\d+)\]\]/g,
       '<span data-act-placement="$1" data-act-target="$2">[$1]</span>'
     );
 
-    // B. Invisible scroll anchor: {#1}
+    // C. Invisible scroll anchor: [[#1]]
     text = text.replace(
-      /\{#(\d+)\}/g,
+      /\[\[#(\d+)\]\]/g,
       '<span data-act-target="$1" data-act-anchor="true" class="inline-block w-0 h-0 overflow-hidden pointer-events-none"></span>'
     );
 
-    // Match ONLY {1|text} or {|text}
-text = text.replace(
-  /\{(\d*)\|([^}]+)\}/g,
-  (_, num, body) => {
-    if (num && num.trim().length > 0) {
-      return `<span data-act-target="${num.trim()}">${body}</span>`;
-    }
-    return `<span data-act-underline="true">${body}</span>`;
-  }
-);
+    // D. Question Underline Targets: [[u:1]]text[[/u]] -> <span data-act-target="1">text</span>
+    text = text.replace(
+      /\[\[u:(\d+)\]\]([\s\S]*?)\[\[\/u\]\]/g,
+      '<span data-act-target="$1">$2</span>'
+    );
+
+    // E. Plain Underlines: [[u]]text[[/u]] -> <span data-act-underline="true">text</span>
+    text = text.replace(
+      /\[\[u\]\]([\s\S]*?)\[\[\/u\]\]/g,
+      '<span data-act-underline="true">$1</span>'
+    );
+
+    // F. Static Highlights: [[hl]]text[[/hl]] -> <span data-act-highlight="true">text</span>
+    text = text.replace(
+      /\[\[hl\]\]([\s\S]*?)\[\[\/hl\]\]/g,
+      '<span data-act-highlight="true">$1</span>'
+    );
+
+    // G. Restore masked LaTeX tokens
+    text = text.replace(/@@MATH_TOKEN_(\d+)@@/g, (_, index) => mathTokens[Number(index)]);
 
     return text;
   }, [content]);
@@ -161,6 +176,7 @@ text = text.replace(
               const placementLetter = props["data-act-placement"];
               const isAnchor = props["data-act-anchor"] === "true";
               const isPlainUnderline = props["data-act-underline"] === "true";
+              const isHighlight = props["data-act-highlight"] === "true";
 
               // Case 1: Placement markers [A], [B], [C], [D]
               if (placementLetter) {
@@ -170,14 +186,6 @@ text = text.replace(
                     data-act-placement={placementLetter}
                     data-act-target={targetNum}
                     data-act-active={isActive ? "true" : undefined}
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: "var(--act-highlight-bg, #FFF59D)",
-                            color: "var(--act-highlight-fg, #000000)",
-                          }
-                        : undefined
-                    }
                     className={`inline-flex items-center justify-center font-bold text-[12px] px-1 py-0.5 mx-1 rounded-[2px] transition-all duration-150 select-none ${
                       isActive
                         ? "ring-1 ring-black/20 shadow-xs"
@@ -190,7 +198,7 @@ text = text.replace(
                 );
               }
 
-              // Case 2: Invisible scroll anchor {#1}
+              // Case 2: Invisible scroll anchor [[#1]]
               if (isAnchor) {
                 return (
                   <span
@@ -201,7 +209,20 @@ text = text.replace(
                 );
               }
 
-              // Case 3: Plain underline {text} or {|text}
+              // Case 3: Plain Highlight [[hl]]text[[/hl]]
+              if (isHighlight) {
+                return (
+                  <span
+                    data-act-highlight="true"
+                    className="transition-colors duration-150 rounded-[2px] px-0.5"
+                    {...props}
+                  >
+                    {children}
+                  </span>
+                );
+              }
+
+              // Case 4: Plain underline [[u]]text[[/u]]
               if (isPlainUnderline) {
                 return (
                   <span
@@ -213,21 +234,13 @@ text = text.replace(
                 );
               }
 
-              // Case 4: Standard Question Underline Target {1|text}
+              // Case 5: Standard Question Underline Target [[u:1]]text[[/u]]
               if (targetNum !== undefined) {
                 const isActive = activeQuestionNumber === targetNum;
                 return (
                   <span
                     data-act-target={targetNum}
                     data-act-active={isActive ? "true" : undefined}
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: "var(--act-highlight-bg, #FFF59D)",
-                            color: "var(--act-highlight-fg, #000000)",
-                          }
-                        : undefined
-                    }
                     className={`underline underline-offset-4 decoration-1 transition-all duration-200 ${
                       isActive ? "font-normal rounded-[1px] px-0.5 shadow-xs" : "text-inherit"
                     }`}

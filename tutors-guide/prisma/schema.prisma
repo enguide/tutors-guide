@@ -96,6 +96,9 @@ model Profile {
   results                Result[]       @relation("ProfileResults")
   summaries              TestSummary[]  @relation("ProfileSummaries")
 
+  // Live in-flight section checkpoints (draft state before completion)
+  checkpoints            SectionCheckpoint[] @relation("ProfileCheckpoints")
+
   // Epic 13: Mentorship delegation relations
   tutoredStudents        TutorStudentLink[] @relation("TutorLinks")
   studentTutors          TutorStudentLink[] @relation("StudentLinks")
@@ -137,30 +140,20 @@ model TutorStudentLink {
 
 model LicensePool {
   id                   String        @id @default(cuid())
-  name                 String        // e.g. "Individual SAT Prep", "Apex Prep ACT Fall 2026"
+  name                 String
   stripeSessionId      String?       @unique
   stripeSubscriptionId String?
-  
-  // Seat configuration: 1 for direct student purchase, X for Organization
   seatLimit            Int           @default(1)
-  
-  // Array of allowed categories: [SAT], [ACT], or [SAT, ACT] for bundles
   categories           Category[]
-  
-  // Expiration: Set to now() + 365 days at checkout
   startsAt             DateTime      @default(now())
   expiresAt            DateTime
   
-  // Either an individual buyer OR an Organization owns this pool
   purchaserId          String?
   purchaser            Profile?      @relation("PurchaserLicensePools", fields: [purchaserId], references: [id], onDelete: SetNull)
   orgId                String?
   org                  Organization? @relation("OrgLicensePools", fields: [orgId], references: [id], onDelete: Cascade)
 
-  // Students occupying seats
   enrollments          Enrollment[]  @relation("PoolEnrollments")
-
-  // Optional join code for self-serve B2B student registration
   inviteCode           String?       @unique
 
   createdAt            DateTime      @default(now())
@@ -182,7 +175,7 @@ model Enrollment {
   licensePoolId   String
   licensePool     LicensePool      @relation("PoolEnrollments", fields: [licensePoolId], references: [id], onDelete: Cascade)
   
-  firstAccessedAt DateTime?        // Populated on their first test launch
+  firstAccessedAt DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -193,7 +186,7 @@ model Enrollment {
 }
 
 // -------------------------------------------------------------
-// EXAM CORE (Unchanged)
+// EXAM CORE
 // -------------------------------------------------------------
 
 model Test {
@@ -246,6 +239,35 @@ model Response {
   @@index([profileId, testId])
   @@map("Response")
 }
+
+// -------------------------------------------------------------
+// CHECKPOINTS (In-Flight Draft State)
+// -------------------------------------------------------------
+
+model SectionCheckpoint {
+  id                   String   @id @default(cuid())
+  timeRemainingSeconds Int
+  lastQuestionIndex    Int      @default(0)
+  navigationHistory    Json?
+  clientUpdatedAt      DateTime @default(now())
+
+  profileId            String
+  profile              Profile  @relation("ProfileCheckpoints", fields: [profileId], references: [id], onDelete: Cascade)
+
+  testId               String
+  sectionId            String
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([profileId, testId, sectionId])
+  @@index([profileId])
+  @@map("SectionCheckpoint")
+}
+
+// -------------------------------------------------------------
+// RESULTS (Immutable Finalized Scores)
+// -------------------------------------------------------------
 
 model Result {
   id                   String   @id @default(cuid())

@@ -144,7 +144,7 @@ async function ResultsArchiveContent() {
                       className="px-3 py-1.5 border border-input text-xs font-semibold hover:bg-muted inline-flex items-center gap-1 transition-colors rounded-none"
                     >
                       <ExternalLink size={12} />
-                      <span>Inspect Telemetry</span>
+                      <span>See your results</span>
                     </Link>
                   </td>
                 </tr>

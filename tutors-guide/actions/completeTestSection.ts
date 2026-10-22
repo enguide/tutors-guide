@@ -45,7 +45,10 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
   }
 
   if (userRole !== "STUDENT") {
-  return { success: false, error: "Instructional staff accounts are barred from submitting exam attempts." };
+    return {
+      success: false,
+      error: "Instructional staff accounts are barred from submitting exam attempts.",
+    };
   }
 
   const {
@@ -126,7 +129,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       })
     );
 
-    // 3. Persist the immutable Result row
+    // 3a. Persist the immutable Result row
     const totalQuestions = questions.length;
     await prisma.result.create({
       data: {
@@ -142,6 +145,15 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
         accommodations: accommodations
           ? (accommodations as unknown as Prisma.InputJsonValue)
           : Prisma.JsonNull,
+      },
+    });
+
+    // 3b. Clean up in-flight SectionCheckpoint (draft has completed)
+    await prisma.sectionCheckpoint.deleteMany({
+      where: {
+        profileId,
+        testId,
+        sectionId,
       },
     });
 

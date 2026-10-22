@@ -12,6 +12,7 @@ import { resolveSectionConfig } from "@/lib/examConfigRegistry";
 import { SupportedExamCategory } from "@/types/examConfig";
 import { ExamClient } from "@/components/exam/ExamClient";
 import { Category } from "@prisma/client";
+import { NavigationHistoryEntry } from "@/hooks/useTestProgress";
 
 export const instant = false;
 
@@ -94,6 +95,45 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     }
   );
 
+  // 6. Fetch in-flight checkpoint and previous autosaved responses for cross-device resumption
+  const [checkpointRecord, existingResponses] = await Promise.all([
+    prisma.sectionCheckpoint.findUnique({
+      where: {
+        profileId_testId_sectionId: {
+          profileId: session.user.id,
+          testId,
+          sectionId,
+        },
+      },
+    }),
+    prisma.response.findMany({
+      where: {
+        profileId: session.user.id,
+        testId,
+        sectionId,
+      },
+      select: {
+        questionId: true,
+        selectedOptionId: true,
+        frqUserAnswer: true,
+        timeSpentOnResponse: true,
+        usedCalculator: true,
+        changedAnswer: true,
+      },
+    }),
+  ]);
+
+  const formattedCheckpoint = checkpointRecord
+    ? {
+        timeRemainingSeconds: checkpointRecord.timeRemainingSeconds,
+        lastQuestionIndex: checkpointRecord.lastQuestionIndex,
+        navigationHistory: Array.isArray(checkpointRecord.navigationHistory)
+          ? (checkpointRecord.navigationHistory as unknown as NavigationHistoryEntry[])
+          : null,
+        clientUpdatedAt: checkpointRecord.clientUpdatedAt.toISOString(),
+      }
+    : null;
+
   return (
     <ExamClient
       metadata={metadata}
@@ -102,6 +142,8 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
       category={category}
       testId={testId}
       studentName={studentName}
+      serverCheckpoint={formattedCheckpoint}
+      serverResponses={existingResponses}
     />
   );
 }

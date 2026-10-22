@@ -454,3 +454,21 @@
   background-color: var(--act-highlight-bg) !important;
   color: var(--act-highlight-fg) !important;
 }
+
+/* Custom static highlight tag [[hl]] adapting to active ACT themes */
+[data-act-theme] .act-content-area mark[data-act-highlight="true"],
+[data-act-theme] .act-content-area span[data-act-highlight="true"] {
+  background-color: var(--act-highlight-bg) !important;
+  color: var(--act-highlight-fg) !important;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Fallback highlight styling when outside of [data-act-theme] */
+mark[data-act-highlight="true"],
+span[data-act-highlight="true"] {
+  background-color: var(--act-highlight-bg, #FFF59D);
+  color: var(--act-highlight-fg, #000000);
+  padding: 0 2px;
+  border-radius: 2px;
+}

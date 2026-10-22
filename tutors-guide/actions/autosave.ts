@@ -3,7 +3,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { QuestionType } from "@prisma/client";
+import { Prisma, QuestionType } from "@prisma/client";
 
 export interface AutosavePayload {
   testId: string;
@@ -17,6 +17,64 @@ export interface AutosavePayload {
   correctAnswerKey: string;
   timeSpentOnResponse?: number;
   usedCalculator?: boolean;
+}
+
+export interface CheckpointPayload {
+  testId: string;
+  sectionId: string;
+  timeRemainingSeconds: number;
+  lastQuestionIndex: number;
+  navigationHistory?: { time: number; qIdx: number }[];
+  clientUpdatedAt?: number;
+}
+
+export async function saveSectionCheckpoint(payload: CheckpointPayload) {
+  const session = await auth();
+  const profileId = session?.user?.id;
+
+  if (!profileId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const clientDate = payload.clientUpdatedAt
+      ? new Date(payload.clientUpdatedAt)
+      : new Date();
+
+    await prisma.sectionCheckpoint.upsert({
+      where: {
+        profileId_testId_sectionId: {
+          profileId,
+          testId: payload.testId,
+          sectionId: payload.sectionId,
+        },
+      },
+      create: {
+        profileId,
+        testId: payload.testId,
+        sectionId: payload.sectionId,
+        timeRemainingSeconds: Math.max(0, Math.round(payload.timeRemainingSeconds)),
+        lastQuestionIndex: payload.lastQuestionIndex,
+        navigationHistory: payload.navigationHistory
+          ? (payload.navigationHistory as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        clientUpdatedAt: clientDate,
+      },
+      update: {
+        timeRemainingSeconds: Math.max(0, Math.round(payload.timeRemainingSeconds)),
+        lastQuestionIndex: payload.lastQuestionIndex,
+        navigationHistory: payload.navigationHistory
+          ? (payload.navigationHistory as unknown as Prisma.InputJsonValue)
+          : undefined,
+        clientUpdatedAt: clientDate,
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Save section checkpoint error:", error);
+    return { success: false, error: "Checkpoint upsert failed" };
+  }
 }
 
 export async function autosaveResponse(payload: AutosavePayload) {
@@ -81,7 +139,6 @@ export async function autosaveResponse(payload: AutosavePayload) {
         selectedOptionId: payload.selectedOptionId ?? null,
         frqUserAnswer: payload.frqUserAnswer ?? null,
         isCorrect,
-        // Absolute total time — NEVER increment cumulative values
         timeSpentOnResponse: payload.timeSpentOnResponse ?? 0,
         usedCalculator: payload.usedCalculator ?? undefined,
         changedAnswer: hasChangedAnswer ? true : undefined,

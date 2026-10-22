@@ -9,7 +9,11 @@ import {
   AccommodationSettings,
   DEFAULT_ACCOMMODATIONS,
 } from "@/types/accommodations";
-import { useTestProgress } from "@/hooks/useTestProgress";
+import {
+  useTestProgress,
+  ServerCheckpointData,
+  ServerResponseRecord,
+} from "@/hooks/useTestProgress";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { CalculatorToolbar } from "../tools/CalculatorToolbar";
 import { FormulaSheetModal } from "../tools/FormulaSheetModal";
@@ -28,6 +32,8 @@ interface ExamClientProps {
   category?: string;
   testId?: string;
   studentName?: string;
+  serverCheckpoint?: ServerCheckpointData | null;
+  serverResponses?: ServerResponseRecord[];
 }
 
 const emptySubscribe = () => () => {};
@@ -39,6 +45,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   category = metadata.category,
   testId = metadata.id,
   studentName,
+  serverCheckpoint,
+  serverResponses = [],
 }) => {
   const router = useRouter();
 
@@ -111,17 +119,21 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     sectionOrder: frontmatter.sectionOrder,
     timeLimitSeconds: effectiveTimeLimitSeconds,
     questions,
-    // Stop the background timer decrement while submitting or waiting for route push
     isTimerRunning: isSectionStarted && !isSubmitting,
     onTimeExpired: () => {
       handleSubmitSection();
     },
+    serverCheckpoint,
+    serverResponses,
   });
 
+  // Test is resuming if local buffer exists OR if a server checkpoint/prior responses exist
   const isResuming =
     secondsRemaining < effectiveTimeLimitSeconds ||
     Object.keys(answers).length > 0 ||
-    navigationHistory.length > 1;
+    navigationHistory.length > 1 ||
+    Boolean(serverCheckpoint) ||
+    serverResponses.length > 0;
 
   const handleAccommodationsConfirmed = (selected: AccommodationSettings) => {
     setAccommodations(selected);
@@ -143,7 +155,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const handleSubmitSection = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    // Keep isSectionStarted untouched to avoid falling back to SectionDirectionsModal
 
     try {
       const finalAnswers = getFinalizedAnswers();
@@ -237,7 +248,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // Intercept any transitional state during submission to prevent the directions modal flash
   if (isSubmitting) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-neutral-900">

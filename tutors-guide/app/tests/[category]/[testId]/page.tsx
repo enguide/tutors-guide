@@ -45,22 +45,34 @@ export default async function TestEntryPage({ params }: TestEntryPageProps) {
     redirect(`/tests/${category}/${testId}/break`);
   }
 
-  // 2. Fetch submitted results
-  const existingResults = await prisma.result.findMany({
-    where: { testId, profileId },
-    select: { sectionId: true, rawScore: true },
-  });
+  // 2. Fetch submitted results AND any active in-flight draft checkpoint
+  const [existingResults, activeDraftCheckpoint] = await Promise.all([
+    prisma.result.findMany({
+      where: { testId, profileId },
+      select: { sectionId: true, rawScore: true },
+    }),
+    prisma.sectionCheckpoint.findFirst({
+      where: { testId, profileId },
+      select: { sectionId: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
 
   const completedSectionIds = new Set(existingResults.map((r) => r.sectionId));
 
-  // If no sections submitted yet, launch Section 1
+  // 3. Draft Priority Guard: If an in-flight section draft exists on any device, resume it immediately
+  if (activeDraftCheckpoint && !completedSectionIds.has(activeDraftCheckpoint.sectionId)) {
+    redirect(`/tests/${category}/${testId}/${activeDraftCheckpoint.sectionId}`);
+  }
+
+  // 4. If no sections submitted yet and no active draft, launch Section 1
   if (completedSectionIds.size === 0) {
     const firstSection = metadata.sections[0];
     if (!firstSection) notFound();
     redirect(`/tests/${category}/${testId}/${firstSection.id}`);
   }
 
-  // 3. Adaptive (CAT) Multi-Stage Evaluation
+  // 5. Adaptive (CAT) Multi-Stage Evaluation
   if (metadata.isAdaptive && metadata.stages && metadata.stages.length > 0) {
     // Sort stages in order (Stage 1, Stage 2, etc.)
     const sortedStages = [...metadata.stages].sort((a, b) => a.stageIndex - b.stageIndex);
@@ -86,7 +98,7 @@ export default async function TestEntryPage({ params }: TestEntryPageProps) {
     redirect(`/tests/${category}/${testId}/results`);
   }
 
-  // 4. Standard Linear Progression
+  // 6. Standard Linear Progression
   const summary = await prisma.testSummary.findUnique({
     where: { testId_profileId: { testId, profileId } },
   });

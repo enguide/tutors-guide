@@ -10,8 +10,9 @@ import {
   Layers,
   Sparkles,
   CheckCircle2,
+  PlayCircle,
 } from "lucide-react";
-import { getAllAvailableTests, DiscoveredTestItem } from "@/lib/contentLoader";
+import { getAllAvailableTests, getTestMetadata, DiscoveredTestItem } from "@/lib/contentLoader";
 import { prisma } from "@/lib/prisma";
 import { Category } from "@prisma/client";
 
@@ -49,12 +50,19 @@ async function TestsLibraryContent() {
 
   const userEntitlements = (session?.user?.entitlements || []) as Category[];
 
-  const [availableTestsByCategory, completedSummaries] = await Promise.all([
+  // 1. Fetch available tests, completed summaries, AND user section results
+  const [availableTestsByCategory, completedSummaries, userSectionResults] = await Promise.all([
     getAllAvailableTests(),
     session?.user?.id
       ? prisma.testSummary.findMany({
           where: { profileId: session.user.id },
           select: { testId: true, compositeScore: true },
+        })
+      : Promise.resolve([]),
+    session?.user?.id
+      ? prisma.result.findMany({
+          where: { profileId: session.user.id },
+          select: { testId: true, sectionId: true },
         })
       : Promise.resolve([]),
   ]);
@@ -64,6 +72,39 @@ async function TestsLibraryContent() {
   );
 
   const completedMap = new Map(completedSummaries.map((s) => [s.testId, s]));
+
+  // Track finished section counts and set of completed section IDs per test
+  const completedSectionsByTest = new Map<string, Set<string>>();
+  for (const r of userSectionResults) {
+    if (!completedSectionsByTest.has(r.testId)) {
+      completedSectionsByTest.set(r.testId, new Set());
+    }
+    completedSectionsByTest.get(r.testId)!.add(r.sectionId);
+  }
+
+  // Pre-resolve pending section IDs for any in-progress tests
+  const inProgressMap = new Map<
+    string,
+    { resumeSectionId: string; completedCount: number }
+  >();
+
+  for (const [category, tests] of entitledCategories) {
+    for (const test of tests) {
+      if (!completedMap.has(test.testId) && completedSectionsByTest.has(test.testId)) {
+        const finishedSet = completedSectionsByTest.get(test.testId)!;
+        const meta = await getTestMetadata(category.toLowerCase(), test.testId);
+        if (meta && meta.sections) {
+          const nextPending = meta.sections.find((s) => !finishedSet.has(s.id));
+          if (nextPending) {
+            inProgressMap.set(test.testId, {
+              resumeSectionId: nextPending.id,
+              completedCount: finishedSet.size,
+            });
+          }
+        }
+      }
+    }
+  }
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
@@ -113,22 +154,39 @@ async function TestsLibraryContent() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {tests.map((test: DiscoveredTestItem) => {
                     const completed = completedMap.get(test.testId);
+                    const inProgressInfo = inProgressMap.get(test.testId);
+                    const isInProgress = Boolean(inProgressInfo);
+
+                    const targetSectionId = inProgressInfo
+                      ? inProgressInfo.resumeSectionId
+                      : test.firstSectionId;
 
                     return (
                       <div
                         key={test.testId}
-                        className="bg-card border border-border p-5 flex flex-col justify-between rounded-none shadow-xs hover:border-slate-400 dark:hover:border-slate-600 transition-colors"
+                        className={`bg-card p-5 flex flex-col justify-between rounded-none transition-colors ${
+                          isInProgress
+                            ? "border-2 border-blue-500/50 dark:border-blue-400/50"
+                            : "border border-border hover:border-slate-400 dark:hover:border-slate-600"
+                        }`}
                       >
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-2">
                             <h3 className="text-sm font-bold text-foreground line-clamp-1">
                               {test.title}
                             </h3>
-                            {test.isAdaptive && (
-                              <span className="flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 font-mono shrink-0">
-                                <Sparkles className="w-2.5 h-2.5" /> CAT
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isInProgress && (
+                                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 font-mono">
+                                  <PlayCircle size={10} /> In Progress
+                                </span>
+                              )}
+                              {test.isAdaptive && (
+                                <span className="flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 font-mono">
+                                  <Sparkles className="w-2.5 h-2.5" /> CAT
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
@@ -138,7 +196,9 @@ async function TestsLibraryContent() {
                           <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground pt-1">
                             <span className="flex items-center gap-1">
                               <Layers className="w-3.5 h-3.5" />
-                              {test.sectionCount} Module{test.sectionCount > 1 ? "s" : ""}
+                              {isInProgress
+                                ? `${inProgressInfo!.completedCount}/${test.sectionCount} Done`
+                                : `${test.sectionCount} Module${test.sectionCount > 1 ? "s" : ""}`}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5" />
@@ -163,9 +223,17 @@ async function TestsLibraryContent() {
                                 Review Telemetry <ArrowRight size={12} />
                               </Link>
                             </div>
+                          ) : isInProgress ? (
+                            <Link
+                              href={`/tests/${category.toLowerCase()}/${test.testId}/${targetSectionId}`}
+                              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 rounded-none transition-colors"
+                            >
+                              <span>Resume Exam</span>
+                              <ArrowRight size={13} />
+                            </Link>
                           ) : (
                             <Link
-                              href={`/tests/${category.toLowerCase()}/${test.testId}/${test.firstSectionId}`}
+                              href={`/tests/${category.toLowerCase()}/${test.testId}/${targetSectionId}`}
                               className="w-full py-2 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center justify-center gap-1.5 rounded-none transition-colors"
                             >
                               <span>Start Diagnostic</span>
