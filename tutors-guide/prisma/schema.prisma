@@ -36,11 +36,33 @@ enum Category {
 enum QuestionType {
   MC
   FR
+  FRQ_HANDWRITTEN
 }
 
 enum EnrollmentStatus {
   ACTIVE
   REVOKED
+  EXPIRED
+}
+
+enum LinkStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum FrqSubmissionStatus {
+  PENDING_INGESTION
+  UPLOADED
+  CROPPED
+  PENDING_AUDIT
+  EVALUATED
+  FAILED
+}
+
+enum CaptureSessionStatus {
+  ACTIVE
+  CAPTURED
   EXPIRED
 }
 
@@ -65,12 +87,6 @@ model School {
   updatedAt DateTime  @updatedAt
 
   @@map("School")
-}
-
-enum LinkStatus {
-  PENDING
-  ACTIVE
-  REVOKED
 }
 
 model Profile {
@@ -102,6 +118,11 @@ model Profile {
   // Epic 13: Mentorship delegation relations
   tutoredStudents        TutorStudentLink[] @relation("TutorLinks")
   studentTutors          TutorStudentLink[] @relation("StudentLinks")
+
+  // Epic 16: FRQ handwritten submissions, capture sessions, and audit assignments
+  frqSubmissions         FrqSubmission[]    @relation("ProfileFrqSubmissions")
+  captureSessions        CaptureSession[]   @relation("ProfileCaptureSessions")
+  auditedFrqSubCrops     FrqSubCrop[]       @relation("StaffAuditedCrops")
 
   twoFactorAuthSecret    String?
   twoFactorAuthActivated Boolean?
@@ -190,26 +211,28 @@ model Enrollment {
 // -------------------------------------------------------------
 
 model Test {
-  id          String        @id @default(cuid())
-  title       String
-  category    Category      @default(NONE)
-  sections    Section[]     @relation("TestSections")
-  responses   Response[]    @relation("TestResponses")
-  results     Result[]      @relation("ResultTests")
-  summaries   TestSummary[] @relation("TestSummaries")
+  id             String          @id @default(cuid())
+  title          String
+  category       Category        @default(NONE)
+  sections       Section[]       @relation("TestSections")
+  responses      Response[]      @relation("TestResponses")
+  results        Result[]        @relation("ResultTests")
+  summaries      TestSummary[]   @relation("TestSummaries")
+  frqSubmissions FrqSubmission[] @relation("TestFrqSubmissions")
 
   @@map("Test")
 }
 
 model Section {
-  id           String     @id @default(cuid())
-  title        String
-  sectionOrder Int
-  timeLimit    Int
-  testId       String
-  test         Test       @relation("TestSections", fields: [testId], references: [id], onDelete: Cascade)
-  responses    Response[] @relation("SectionResponses")
-  results      Result[]   @relation("ResultSections")
+  id             String          @id @default(cuid())
+  title          String
+  sectionOrder   Int
+  timeLimit      Int
+  testId         String
+  test           Test            @relation("TestSections", fields: [testId], references: [id], onDelete: Cascade)
+  responses      Response[]      @relation("SectionResponses")
+  results        Result[]        @relation("ResultSections")
+  frqSubmissions FrqSubmission[] @relation("SectionFrqSubmissions")
 
   @@index([testId])
   @@map("Section")
@@ -318,4 +341,114 @@ model PasswordResetToken {
 
   @@index([token])
   @@map("PasswordResetToken")
+}
+
+// -------------------------------------------------------------
+// FRQ OPTICAL INGESTION & AUDITING (Epic 16 & 17)
+// -------------------------------------------------------------
+
+model FrqSubmission {
+  id               String              @id @default(cuid())
+  status           FrqSubmissionStatus @default(PENDING_INGESTION)
+
+  // Storage pointer for full uncropped high-res scan
+  fullSheetUrl     String?
+  storageKey       String?
+  mimeType         String?
+  fileSizeBytes    Int?
+
+  // Physical document geometry from APCalculusABFRQPDF.tex
+  // pageNumber: 1 = Parts A & B; 2 = Parts C & D
+  pageNumber       Int                 @default(1)
+  detectedExamCode String?
+  detectedQuestion Int?
+
+  // Scoped student & exam references
+  profileId        String
+  profile          Profile             @relation("ProfileFrqSubmissions", fields: [profileId], references: [id], onDelete: Cascade)
+
+  testId           String
+  test             Test                @relation("TestFrqSubmissions", fields: [testId], references: [id], onDelete: Cascade)
+
+  sectionId        String
+  section          Section             @relation("SectionFrqSubmissions", fields: [sectionId], references: [id], onDelete: Cascade)
+
+  questionId       String
+
+  // Links to the section batch capture session
+  captureSessionId String?
+  captureSession   CaptureSession?     @relation("SessionSubmissions", fields: [captureSessionId], references: [id], onDelete: SetNull)
+
+  crops            FrqSubCrop[]        @relation("SubmissionCrops")
+
+  capturedAt       DateTime            @default(now())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([profileId, testId, sectionId, questionId, pageNumber])
+  @@index([profileId, testId, sectionId])
+  @@index([questionId])
+  @@index([captureSessionId])
+  @@map("FrqSubmission")
+}
+
+model FrqSubCrop {
+  id              String        @id @default(cuid())
+  subPartLabel    String
+  cropUrl         String
+  storageKey      String
+
+  // Bounding rect relative to normalized sheet (0.0 - 1.0)
+  bbox            Json?
+
+  // Transcription & Grading Telemetry
+  transcription   String?
+  pointsAwarded   Float?        @default(0)
+  pointsPossible  Float         @default(1.0)
+  rubricBreakdown Json?
+
+  // Human-in-the-loop audit flag
+  needsHumanAudit Boolean       @default(false)
+  auditReason     String?
+
+  // Teacher/Admin resolution
+  reviewedById    String?
+  reviewedBy      Profile?      @relation("StaffAuditedCrops", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  reviewerNotes   String?
+
+  frqSubmissionId String
+  frqSubmission   FrqSubmission @relation("SubmissionCrops", fields: [frqSubmissionId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([frqSubmissionId])
+  @@index([needsHumanAudit])
+  @@index([reviewedById])
+  @@map("FrqSubCrop")
+}
+
+model CaptureSession {
+  id              String               @id @default(cuid())
+  sessionToken    String               @unique
+  status          CaptureSessionStatus @default(ACTIVE)
+
+  profileId       String
+  profile         Profile              @relation("ProfileCaptureSessions", fields: [profileId], references: [id], onDelete: Cascade)
+
+  testId          String
+  sectionId       String
+  questionId      String?              // Optional: session can cover the entire section
+
+  // Multi-sheet relation: 1 session holds all submitted pages across the section
+  frqSubmissions  FrqSubmission[]      @relation("SessionSubmissions")
+
+  expiresAt       DateTime
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([sessionToken])
+  @@index([profileId, testId, sectionId])
+  @@map("CaptureSession")
 }

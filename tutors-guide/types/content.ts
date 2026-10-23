@@ -1,7 +1,7 @@
 // types/content.ts
 import { SectionExamConfig, SupportedExamCategory } from "./examConfig";
 
-export type QuestionType = "MC" | "FR";
+export type QuestionType = "MC" | "FR" | "FRQ_HANDWRITTEN";
 
 export type QuestionLayoutMode = "split" | "single";
 

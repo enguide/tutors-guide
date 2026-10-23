@@ -2,7 +2,7 @@
   "id": "ap-calc-ab-practice-1",
   "title": "AP Calculus AB Practice Exam 1",
   "category": "AP_CALC",
-  "description": "Full-length AP Calculus AB Practice Exam featuring Section I, Part A (30 Multiple-Choice Questions, 60 Minutes, No Calculator) and Section I, Part B (15 Multiple-Choice Questions, 45 Minutes, Calculator Active).",
+  "description": "Full-length AP Calculus AB Practice Exam featuring Section I (Multiple-Choice) and Section II (Free Response, Parts A & B).",
   "isAdaptive": false,
   "config": {
     "hasCrossOutMode": true,
@@ -34,9 +34,42 @@
       "timeLimit": 3600,
       "config": {
         "layout": "single-column",
-        "calculator": "none",
+        "calculator": "desmos-graphing",
         "hasFormulaSheet": false,
         "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      },
+      "hasIntermissionAfter": true,
+      "intermissionDuration": 600
+    },
+    {
+      "id": "ap-calc-ab-t1-s2a",
+      "file": "ap-calc-ab-t1-s2a.md",
+      "order": 3,
+      "title": "Section II, Part A (Calculator Active FRQ)",
+      "timeLimit": 2700,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": false,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      },
+      "hasIntermissionAfter": false
+    },
+    {
+      "id": "ap-calc-ab-t1-s2b",
+      "file": "ap-calc-ab-t1-s2b.md",
+      "order": 4,
+      "title": "Section II, Part B (No Calculator FRQ)",
+      "timeLimit": 3600,
+      "config": {
+        "layout": "single-column",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": false,
         "allowBacktracking": true,
         "allowSectionReview": true
       },

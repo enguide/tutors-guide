@@ -345,6 +345,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         isSubmitting={isSubmitting}
         category={metadata.category}
         sectionTitle={frontmatter.sectionTitle}
+        testId={testId}
+        sectionId={frontmatter.sectionId}
         questions={questions}
         answers={answers}
         onJumpToQuestion={(idx) => setCurrentIndex(idx)}

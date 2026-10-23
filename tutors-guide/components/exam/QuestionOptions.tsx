@@ -16,6 +16,7 @@ interface QuestionOptionsProps {
   variant?: QuestionOptionVariant;
   category?: string;
   testId?: string;
+  sectionId?: string;
   manifestBasePath?: string;
   onSelectOption: (optionId: string) => void;
   onSetFrqAnswer: (value: string) => void;
@@ -31,13 +32,52 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   variant = "sat",
   category,
   testId,
+  sectionId,
   manifestBasePath,
   onSelectOption,
   onSetFrqAnswer,
   onToggleEliminate,
 }) => {
   // -------------------------------------------------------------
-  // 1. Free Response / Grid-In Handling (Shared across formats)
+  // 1. Handwritten Optical Free Response (Epic 16)
+  // -------------------------------------------------------------
+  if (question.questionType === "FRQ_HANDWRITTEN") {
+    const packetPageStart = (question.questionNumber - 1) * 2 + 4;
+    const packetPageEnd = packetPageStart + 1;
+
+    return (
+      <div className="pt-4 pb-2">
+        <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-5">
+          <div className="flex items-start gap-4">
+            <div className="space-y-2 flex-1">
+              <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                Physical Response Packet Directive
+              </h4>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Complete all handwritten work for Question {question.questionNumber} inside your physical response packet:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-xs">
+                <div className="px-3 py-2 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded flex items-center justify-between">
+                  <span className="text-neutral-700 dark:text-neutral-300">Sheet 1 (Parts A & B)</span>
+                  <span className="text-[11px] text-neutral-400 font-sans">Page {packetPageStart}</span>
+                </div>
+                <div className="px-3 py-2 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded flex items-center justify-between">
+                  <span className="text-neutral-700 dark:text-neutral-300">Sheet 2 (Parts C & D)</span>
+                  <span className="text-[11px] text-neutral-400 font-sans">Page {packetPageEnd}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
+                Do not stop to upload now. You will be prompted to scan and upload all sheets continuously after completing this section.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 2. Standard Typed Free Response / Grid-In Handling
   // -------------------------------------------------------------
   if (question.questionType === "FR") {
     return (
@@ -65,7 +105,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   const optionImageStyles = "[&_img]:max-h-64 [&_img]:w-auto [&_img]:object-contain [&_img]:my-1";
 
   // -------------------------------------------------------------
-  // 2. ACT Presentation: TestNav Native Inline Radio Controls
+  // 3. ACT Presentation: TestNav Native Inline Radio Controls
   // -------------------------------------------------------------
   if (variant === "act") {
     return (
@@ -104,18 +144,18 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                   }`}
                 >
                   <span className="flex flex-row items-center">
-                  <span className="font-normal mr-2.5 opacity-90">
-                    {option.id}.
-                  </span>
-                  <span className="inline">
-                    <MarkdownQuestionRenderer
-                      content={option.text}
-                      category={category}
-                      testId={testId}
-                      manifestBasePath={manifestBasePath}
-                      className={`inline prose-p:inline prose-p:m-0 ${optionImageStyles}`}
-                    />
-                  </span>
+                    <span className="font-normal mr-2.5 opacity-90">
+                      {option.id}.
+                    </span>
+                    <span className="inline">
+                      <MarkdownQuestionRenderer
+                        content={option.text}
+                        category={category}
+                        testId={testId}
+                        manifestBasePath={manifestBasePath}
+                        className={`inline prose-p:inline prose-p:m-0 ${optionImageStyles}`}
+                      />
+                    </span>
                   </span>
                 </div>
               </div>
@@ -156,7 +196,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   }
 
   // -------------------------------------------------------------
-  // 3. SAT & AP Presentation: Card Enclosures with Letter Badges
+  // 4. SAT & AP Presentation: Card Enclosures with Letter Badges
   // -------------------------------------------------------------
   const isAcademicSerif = variant === "sat" || variant === "ap";
   const isApTheme = variant === "ap";
@@ -183,13 +223,11 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                   : "border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600"
               }`}
             >
-              {/* Crossed-out Horizontal Strike Line */}
               {isEliminated && (
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-b-2 border-neutral-900 dark:border-neutral-100 z-10 pointer-events-none" />
               )}
 
               <div className="flex items-center gap-3.5 flex-1 min-w-0 pointer-events-none">
-                {/* Option Letter Disc Badge */}
                 <div
                   className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-sans font-bold transition-colors ${
                     isSelected
@@ -200,7 +238,6 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                   {option.id}
                 </div>
 
-                {/* Rendered Text */}
                 <div
                   className={`flex-1 min-w-0 text-neutral-900 dark:text-neutral-100 [&:has(.large-op,.op-limits)]:pt-1 ${
                     isAcademicSerif
@@ -223,7 +260,6 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
               </div>
             </button>
 
-            {/* Bluebook-style Right Action: Crossed Circle Elimination Trigger */}
             {isCrossOutMode && (
               <div className="shrink-0 w-12 flex items-center justify-center">
                 {isEliminated ? (
@@ -248,7 +284,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                     title={`Eliminate option ${option.id}`}
                   >
                     <span>{option.id}</span>
-                    <span className="absolute -left-1 -right-1 top-1/2 -translate-y-1/2 h-[1.5px] bg-neutral-700 dark:bg-neutral-300 pointer-events-none group-hover:bg-black dark:group-hover:bg-white" />
+                    <span className="absolute -left-1 -right-1 top-1/2 -translate-y-1/2 h-[1.5px] bg-neutral-700 dark:border-neutral-300 pointer-events-none group-hover:bg-black dark:group-hover:bg-white" />
                   </button>
                 )}
               </div>
