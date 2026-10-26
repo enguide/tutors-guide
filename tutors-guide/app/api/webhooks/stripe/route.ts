@@ -35,13 +35,15 @@ export const POST = async (req: NextRequest) => {
     const metadata = session.metadata || {};
     const isB2B = metadata.isB2B === "true";
     const seatLimit = Math.max(1, parseInt(metadata.seatLimit || "1", 10));
-    const categories: Category[] = metadata.categories ? JSON.parse(metadata.categories) : [Category.SAT];
+    const categories: Category[] = metadata.categories
+      ? JSON.parse(metadata.categories)
+      : [Category.SAT];
     const orgName = metadata.orgName || "Purchased Organization";
     const buyerEmail = (
-  session.customer_details?.email ||
-  session.customer_email ||
-  ""
-).toLowerCase().trim();
+      session.customer_details?.email ||
+      session.customer_email ||
+      ""
+    ).toLowerCase().trim();
 
     if (!buyerEmail) {
       console.error("No customer email found in Stripe Checkout session:", session.id);
@@ -63,19 +65,24 @@ export const POST = async (req: NextRequest) => {
           where: { email: buyerEmail },
         });
 
-        const customerName = session.customer_details?.name || "Customer Member";
-        const [firstName, ...rest] = customerName.split(" ");
-        const lastName = rest.join(" ") || "Student";
+        // Resolve names: metadata input > Stripe customer_details > fallbacks
+        const customerName = session.customer_details?.name || "";
+        const [parsedFirst, ...parsedRest] = customerName.split(" ");
+        const firstName = metadata.firstName || parsedFirst || "Student";
+        const lastName = metadata.lastName || parsedRest.join(" ") || "Account";
 
         if (!profile) {
-          const tempPassword = crypto.randomBytes(16).toString("hex");
-          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          // Use chosen pre-hashed password if present; otherwise generate a random secure hash
+          const hashedPassword =
+            metadata.hashedPassword && metadata.hashedPassword.length > 0
+              ? metadata.hashedPassword
+              : await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10);
 
           profile = await tx.profile.create({
             data: {
               email: buyerEmail,
-              firstName: firstName || "Student",
-              lastName: lastName || "Account",
+              firstName,
+              lastName,
               password: hashedPassword,
               classYear: ClassYear.OTHER,
               role: isB2B ? Role.ORG_ADMIN : Role.STUDENT,
@@ -93,7 +100,8 @@ export const POST = async (req: NextRequest) => {
           const org = await tx.organization.create({
             data: {
               name: orgName,
-              stripeCustomerId: typeof session.customer === "string" ? session.customer : undefined,
+              stripeCustomerId:
+                typeof session.customer === "string" ? session.customer : undefined,
               members: { connect: { id: profile.id } },
             },
           });
@@ -105,7 +113,7 @@ export const POST = async (req: NextRequest) => {
 
           await tx.licensePool.create({
             data: {
-              name: `${orgName} - ${categories.join("/")} Pool`,
+              name: `${orgName} ${categories.join("/")} Pool`,
               stripeSessionId: session.id,
               seatLimit,
               categories,

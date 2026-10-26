@@ -1084,3 +1084,111 @@ const isAuthorized = isSuperAdmin || sharesOrganization || Boolean(hasActiveMent
 - **Sub-task 14.5.2: Independent Modular Skeletons**
   - Wrap each modular component within self-contained `<Suspense>` boundaries or pure client-side hydration gates (`useSyncExternalStore`) to ensure instant page paint with zero layout shift (CLS).
 
+## Epic 15: Low-Friction Candidate Acquisition, Embedded Checkout & Zero-Downtime Provisioning
+
+*Goal: Replace high-friction post-checkout password recovery loops and static placeholders with a unified, high-conversion acquisition architecture. Unify the platform under a single, authoritative OKLCH design system, embed zero-redirect Stripe checkout with upfront credential establishment, automate background NextAuth authentication, and deliver dynamic, category-driven pricing infrastructure.*
+
+---
+
+### Task 15.1: Unified Pricing Source of Truth & Dynamic Storefront Engine
+
+*Decouple product tier definitions and Stripe billing amounts from hardcoded component markup into a centralized, typesafe configuration layer.*
+
+- **Component 15.1.1: Shared Program & Pricing Matrix (`config/pricing.ts`)**
+  - **Purpose:** Serve as the immutable, bidirectional single source of truth for UI presentation, category filtering, and backend Stripe checkout instantiation.
+  - **Mechanics:**
+    - Define typesafe schemas: `PricingTier`, `PricingCategoryConfig`, and `ExamCategory` (`college-admissions`, `academic`, `graduate`).
+    - Map product metadata directly to Prisma `Category` enums (`SAT`, `ACT`, `GRE`, `AP_CALC`), pricing in whole USD cents (`priceCents`), feature breakdowns, and editorial descriptions.
+    - Enable zero-downtime additions: appending a new record to `PRICING_TIERS` automatically provisions new catalog cards on the storefront and validates tier selection during server-side checkout initialization.
+
+- **Component 15.1.2: Dynamic Category Storefront Grid (`TierPricingGrid.tsx`)**
+  - **Purpose:** Display academic testing suites organized by curriculum track rather than generic software tiers.
+  - **Mechanics:**
+    - Filter packages dynamically across three academic tracks: *SAT & ACT Examinations*, *Academic Exams (AP)*, and *Graduate Entrance (GRE)*.
+    - Implement adaptive CSS Grid geometry: automatically transitions between 1-column centered, 2-column balanced, and 3-column layouts based on active category length.
+    - Emphasize test-day fidelity, timing analysis, and diagnostic depth over raw software technicalities (highlighting pacing traces, answer revision audits, and sub-skill triage).
+    - Provide a dedicated institutional partnership contact tier (`partnerships@thetutorsguide.com`) for schools, districts, and tutoring cohorts requiring custom seat pools and negotiated agreements.
+
+---
+
+### Task 15.2: Editorial Hero & Dynamic Baseline Header Alignment
+
+*Establish an understated, academically authoritative storefront entry point compliant with Next.js 16 dynamic streaming guidelines.*
+
+- **Component 15.2.1: Horizontal Sliding Curriculum Marquee (`RotatingExamHeroText.tsx`)**
+  - **Purpose:** Present continuous, unhurried examination coverage without vertical layout displacement or baseline shifts.
+  - **Mechanics:**
+    - Implement an intrinsic CSS Grid cell-stacking architecture (`inline-grid grid-cols-1 grid-rows-1`) to lock rotating text directly onto the uppercase headline baseline.
+    - Execute horizontal, right-to-left translations (`translate-x-full` $\rightarrow$ `translate-x-0` $\rightarrow$ `-translate-x-full`) on a 3000ms loop using an unhurried cubic-bezier deceleration curve (`cubic-bezier(0.16, 1, 0.3, 1)`).
+    - Rotate smoothly through primary programs: *Digital SAT*, *ACT*, *GRE*, and *AP Exams*.
+  - **Geometry & Alignment:** Wrap within a centered intrinsic width container (`w-fit mx-auto text-left`) on `app/page.tsx`, ensuring flush left alignment of the category tag, headline, and subtext while maintaining optical balance across wide viewports.
+
+---
+
+### Task 15.3: Upfront Credential Establishment & Embedded Checkout Modal
+
+*Eliminate the multi-step post-purchase password obstacle course by establishing candidate credentials directly at checkout initiation.*
+
+- **Component 15.3.1: In-App Embedded Checkout Coordinator (`EmbeddedCheckoutModal.tsx`)**
+  - **Purpose:** Keep prospective students and parents entirely within the platform domain during payment, bypassing remote Stripe hosted redirects.
+  - **Mechanics:**
+    - Integrate `@stripe/react-stripe-js` and `@stripe/stripe-js` with Next.js App Router client boundaries.
+    - **Step 1 (Candidate Registration):** Capture student first name, last name, email, and password upfront for unauthenticated users.
+    - **Step 2 (Payment Integration):** Mount `<EmbeddedCheckout />` using the generated `clientSecret` within a constrained modal drawer.
+    - Automatically detect active NextAuth sessions: authenticated users skip registration and proceed directly to payment initialization.
+
+- **Component 15.3.2: Secure Pre-Hashed Credential Forwarding (`app/api/checkout/route.ts`)**
+  - **Purpose:** Validate package keys and securely pass candidate registration credentials through Stripe metadata.
+  - **Mechanics:**
+    - Dynamically match the requested `tier` against `PRICING_TIERS[tierKey]` to pull immutable prices and category arrays.
+    - Enforce server-side password length policies ($\ge 8$ characters) and hash credentials immediately using `bcryptjs` (salt rounds: 10) before sending them off-system.
+    - Embed pre-hashed passwords, buyer names, and category arrays directly into Stripe Checkout session `metadata`.
+
+---
+
+### Task 15.4: Atomic Post-Payment Provisioning & Seamless Auto-Login
+
+*Transition paying students immediately into their active diagnostic workstation with zero manual authentication barriers.*
+
+- **Component 15.4.1: Password-Preserving Webhook Fulfillment (`app/api/webhooks/stripe/route.ts`)**
+  - **Purpose:** Atomically provision student profiles, license pools, and active enrollments with user-selected credentials.
+  - **Mechanics:**
+    - Verify Stripe cryptographic webhook signatures (`constructEvent`).
+    - Check session idempotency against `LicensePool.stripeSessionId` to block duplicate provisioning.
+    - Ingest `metadata.hashedPassword` during `Profile` creation, ensuring candidate-defined passwords are saved directly without generating throwaway strings.
+    - Execute atomic Prisma transaction creating `Profile`, 1-seat `LicensePool`, and active `Enrollment` with a 365-day validity window.
+
+- **Component 15.4.2: Client-Side Auto-Authentication Pipeline**
+  - **Purpose:** Log new students in automatically upon completion of the Stripe embedded checkout form.
+  - **Mechanics:**
+    - Wire `EmbeddedCheckoutProvider.options.onComplete` to invoke NextAuth's `signIn("credentials", { email, password, redirect: false })`.
+    - Upon successful token resolution, execute a background router cache refresh (`router.refresh()`) and redirect the user immediately to `/dashboard`.
+    - Provide a robust fallback: if the modal is dismissed or refreshed during payment, redirect to `/checkout/success` where session verification and dashboard launch controls await.
+
+---
+
+### Task 15.5: Architectural Design System & Secondary Auth Alignment
+
+*Harmonize authentication, password recovery, and institutional seat redemption views with the system's OKLCH slate palette, monospace telemetry tokens, and micro-interactions.*
+
+- **Component 15.5.1: Morphing Action CTA Micro-Interactions**
+  - **Purpose:** Deliver an interactive visual affordance on primary program launch buttons.
+  - **Mechanics:**
+    - Implement a composite translation and rotational morph inside `TierPricingGrid.tsx`.
+    - On button hover, apply an understated 4px horizontal glide (`group-hover:translate-x-1`) while simultaneously executing an opposing 180° rotational scale swap between an `ArrowRight` icon and a `Check` icon.
+
+- **Component 15.5.2: Authentication & Institutional Access Views**
+  - **`app/login/page.tsx`:** Standardize under the core `bg-card` and `border-border` theme tokens, replacing dark glassmorphism and robotic jargon with clear, parent- and student-facing labels.
+  - **`app/join/page.tsx`:** Align institutional claim views with standard layout styling, allowing students with `ORG-` codes to claim licenses and automatically log in.
+  - **`app/checkout/success/page.tsx`:** Modernize post-purchase confirmation for both B2C students (diagnostic workspace launch) and B2B administrators (seat utilization counters and shareable claim URLs).
+  - **`app/forgot-password/page.tsx` & `app/reset-password/page.tsx`:** Standardize tokenized recovery views under shared typography and layout geometry.
+
+---
+
+### Task 15.6: Next.js 16 Dynamic Streaming & Concurrency Hardening
+
+*Eliminate prerendering errors and server component crashes under Next.js 16 Dynamic IO and Cache Components.*
+
+- **Mechanics:**
+  - Enforce `export const instant = false;` across dynamic root routes (`app/page.tsx`, `app/checkout/success/page.tsx`).
+  - Isolate header session inspection (`auth()`) within `<Suspense>` boundaries paired with `await connection()` calls to prevent uncached data prerendering bailouts.

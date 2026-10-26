@@ -40,7 +40,8 @@ export function StudentNavbar({ user, onSignOut }: StudentNavbarProps) {
             <div className="p-1.5 bg-primary text-primary-foreground">
               <GraduationCap size={18} />
             </div>
-            <span className="hidden md:inline">Tutors Guide</span>
+            <div className="flex flex-row"><span className="hidden md:inline">TheTutors</span>
+            <span className="hidden md:inline text-foreground/75">Guide</span></div>
           </Link>
 
           {/* Student Navigation Links */}

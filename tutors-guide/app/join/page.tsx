@@ -1,3 +1,4 @@
+// app/join/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -5,7 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useState, Suspense } from "react";
 import { redeemInviteCode } from "@/actions/joinOrg";
 import { signIn } from "next-auth/react";
-import { ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Loader2, AlertCircle, GraduationCap } from "lucide-react";
 
 function JoinForm() {
   const searchParams = useSearchParams();
@@ -27,15 +29,15 @@ function JoinForm() {
 
     try {
       await redeemInviteCode({
-        inviteCode: code,
-        email,
-        firstName,
-        lastName,
+        inviteCode: code.trim(),
+        email: email.trim().toLowerCase(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         password,
       });
 
       const res = await signIn("credentials", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
       });
@@ -44,110 +46,156 @@ function JoinForm() {
         router.push(`/login?email=${encodeURIComponent(email)}`);
       } else {
         router.push("/dashboard");
+        router.refresh();
       }
     } catch (err: any) {
-      setError(err.message || "Failed to redeem code.");
+      setError(err.message || "Failed to redeem institutional access code.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[4px] p-6 shadow-2xl backdrop-blur-md">
+    <div className="w-full max-w-sm bg-card border border-border p-8 shadow-sm rounded-none font-sans">
       <div className="flex items-center gap-2 mb-6">
-        <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-[4px]">
-          <ShieldCheck className="w-5 h-5 text-indigo-400" />
+        <div className="p-1.5 bg-primary text-primary-foreground">
+          <GraduationCap size={16} />
         </div>
-        <div>
-          <h1 className="text-lg font-semibold text-white tracking-wide">Claim Test Seat</h1>
-          <p className="text-xs text-slate-400">Institutional diagnostic entitlement</p>
-        </div>
+        <span className="text-xs font-bold tracking-tight uppercase">
+          The Tutors Guide
+        </span>
+      </div>
+
+      <div className="mb-6">
+        <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+          Student Enrollment
+        </span>
+        <h1 className="text-xl font-bold tracking-tight text-foreground uppercase mt-0.5">
+          Activate Access
+        </h1>
+        <p className="text-xs text-muted-foreground mt-1">
+          Enter the access code provided by your school or instructor to activate your diagnostic program.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[4px] text-xs text-red-400">
-          {error}
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">Access Invite Code</label>
+          <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+            Access Code
+          </label>
           <input
             type="text"
             required
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="ORG-XXXX"
-            className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+            className="w-full bg-background border border-input px-3 py-2 text-xs font-mono font-bold tracking-widest text-foreground focus:outline-none focus:border-primary uppercase"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">First Name</label>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+              First Name
+            </label>
             <input
               type="text"
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              placeholder="Jane"
+              className="w-full bg-background border border-input px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Last Name</label>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+              Last Name
+            </label>
             <input
               type="text"
               required
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              placeholder="Doe"
+              className="w-full bg-background border border-input px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+          <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+            Email Address
+          </label>
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+            placeholder="jane@school.edu"
+            className="w-full bg-background border border-input px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">Create Password</label>
+          <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+            Create Password
+          </label>
           <input
             type="password"
             required
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+            placeholder="••••••••••••"
+            className="w-full bg-background border border-input px-3 py-2 text-xs font-mono tracking-widest text-foreground focus:outline-none focus:border-primary"
           />
+          <span className="text-[10px] text-muted-foreground mt-1 block">
+            Minimum 8 characters.
+          </span>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 px-4 rounded-[4px] transition-colors disabled:opacity-50 cursor-pointer"
+          className="w-full flex items-center justify-between bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold py-2.5 px-3.5 transition-colors disabled:opacity-50 cursor-pointer"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Activate License & Launch"}
-          {!loading && <ArrowRight className="w-4 h-4" />}
+          {loading ? (
+            <span className="flex items-center gap-2 mx-auto">
+              <Loader2 size={14} className="animate-spin" /> Verifying Code...
+            </span>
+          ) : (
+            <>
+              <span className="tracking-wider uppercase">Activate Access</span>
+              <ArrowRight size={14} />
+            </>
+          )}
         </button>
       </form>
+
+      <div className="mt-6 pt-4 border-t border-border flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+        <span>Already have an account?</span>
+        <Link href="/login" className="text-foreground font-bold hover:underline">
+          Sign In →
+        </Link>
+      </div>
     </div>
   );
 }
 
 export default function JoinPage() {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/20 text-foreground flex items-center justify-center p-4">
       <Suspense
         fallback={
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[4px] p-6 shadow-2xl flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+          <div className="w-full max-w-sm bg-card border border-border p-8 flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         }
       >

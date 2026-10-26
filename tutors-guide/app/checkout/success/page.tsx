@@ -1,13 +1,21 @@
+// app/checkout/success/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Users, BookOpen, ArrowRight, KeyRound, Loader2 } from "lucide-react";
+import {
+  Users,
+  BookOpen,
+  ArrowRight,
+  Loader2,
+  GraduationCap,
+  Calendar,
+  Layers,
+} from "lucide-react";
 import Stripe from "stripe";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// Explicitly mark this route as blocking dynamic runtime navigation for Next.js 16
 export const instant = false;
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -31,7 +39,7 @@ async function SuccessContent({
     redirect("/dashboard?status=unpaid");
   }
 
-  // Lookup provisioned LicensePool (B2B)
+  // Lookup provisioned LicensePool
   const pool = await prisma.licensePool.findUnique({
     where: { stripeSessionId: session_id },
     include: {
@@ -40,106 +48,173 @@ async function SuccessContent({
     },
   });
 
-  const customerEmail = session.customer_details?.email || "";
+  const customerEmail =
+    session.customer_details?.email || session.customer_email || "";
   const origin = process.env.NEXTAUTH_URL || "http://localhost:3000";
-  const shareableJoinLink = pool?.inviteCode ? `${origin}/join?code=${pool.inviteCode}` : "";
-  const formattedExpiry = pool ? new Date(pool.expiresAt).toLocaleDateString() : "";
+  const shareableJoinLink = pool?.inviteCode
+    ? `${origin}/join?code=${pool.inviteCode}`
+    : "";
+  const formattedExpiry = pool
+    ? new Date(pool.expiresAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const isB2B = Boolean(pool?.orgId);
 
   return (
-    <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-[4px] p-8 shadow-2xl">
-      <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-800">
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-[4px]">
-          <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+    <div className="w-full max-w-2xl bg-card border border-border shadow-sm p-6 sm:p-8 rounded-none font-sans">
+      {/* Brand Header */}
+      <div className="flex items-center justify-between border-b border-border pb-6 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary text-primary-foreground">
+            <GraduationCap size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+                {isB2B ? "Institutional Account" : "Student Registration"}
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                ACTIVE
+              </span>
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-foreground uppercase mt-0.5">
+              Access Confirmed
+            </h1>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-semibold text-white">Entitlement Provisioned</h1>
-          <p className="text-xs text-slate-400 font-mono">Order Ref: {session.id}</p>
+        <div className="hidden sm:block text-right">
+          <span className="text-[10px] font-mono text-muted-foreground block">
+            Reference
+          </span>
+          <span className="text-[10px] font-mono text-foreground font-bold">
+            {session.id.slice(-12)}
+          </span>
         </div>
       </div>
 
-      {pool ? (
+      {isB2B && pool ? (
+        /* B2B Institutional Cohort View */
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-950 border border-slate-800 rounded-[4px] p-4">
-              <span className="text-xs text-slate-400">Entitled Categories</span>
-              <p className="text-sm font-semibold text-white mt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-muted/30 border border-border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Layers size={14} />
+                <span className="font-mono uppercase text-[10px]">
+                  Curriculum Programs
+                </span>
+              </div>
+              <p className="text-sm font-bold text-foreground">
                 {pool.categories.join(", ")}
               </p>
             </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-[4px] p-4">
-              <span className="text-xs text-slate-400">Access Validity</span>
-              <p className="text-sm font-semibold text-white mt-1">
-                1 Year (Through {formattedExpiry})
+            <div className="bg-muted/30 border border-border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                <Calendar size={14} />
+                <span className="font-mono uppercase text-[10px]">
+                  Access Term
+                </span>
+              </div>
+              <p className="text-sm font-bold text-foreground">
+                Active through {formattedExpiry}
               </p>
             </div>
           </div>
 
-          <div className="bg-slate-950 border border-indigo-500/20 rounded-[4px] p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-indigo-400 text-sm font-medium">
-                <Users className="w-4 h-4" />
-                <span>Organization Seat Allocation ({pool.seatLimit} Total Seats)</span>
+          <div className="bg-muted/30 border border-border p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2 text-foreground text-xs font-bold uppercase tracking-wider">
+                <Users size={15} />
+                <span>Student Licenses: {pool.seatLimit} Available</span>
               </div>
-              <span className="text-xs font-mono text-slate-400">
-                {pool.enrollments.length} / {pool.seatLimit} claimed
+              <span className="text-xs font-mono text-muted-foreground">
+                {pool.enrollments.length} of {pool.seatLimit} enrolled
               </span>
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Student Invite Code</label>
-              <div className="text-sm font-mono bg-slate-900 border border-slate-800 px-3 py-2 rounded-[4px] text-white">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                Access Code
+              </label>
+              <div className="text-sm font-mono font-bold bg-background border border-border px-3 py-2 text-foreground tracking-widest">
                 {pool.inviteCode}
               </div>
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Shareable Student Claim URL</label>
-              <div className="text-xs font-mono bg-slate-900 border border-slate-800 px-3 py-2 rounded-[4px] text-slate-300 break-all select-all">
-                {shareableJoinLink}
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                Direct Enrollment Link
+              </label>
+              <div className="flex items-center gap-2 bg-background border border-border p-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareableJoinLink}
+                  className="w-full bg-transparent text-xs font-mono text-muted-foreground focus:outline-none select-all"
+                />
               </div>
+              <span className="text-[10px] text-muted-foreground mt-1 block">
+                Share this link with your students to allow direct enrollment.
+              </span>
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4 border-t border-slate-800">
+          <div className="pt-2">
             <Link
               href="/dashboard"
-              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 px-4 rounded-[4px] transition-colors"
+              className="w-full flex items-center justify-between bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold py-3 px-4 transition-colors"
             >
-              Go to Dashboard
-              <ArrowRight className="w-4 h-4" />
+              <span className="tracking-widest uppercase">Open Workspace</span>
+              <ArrowRight size={14} />
             </Link>
           </div>
         </div>
       ) : (
+        /* B2C Individual Candidate View */
         <div className="space-y-6">
-          <div className="bg-slate-950 border border-slate-800 rounded-[4px] p-5 flex items-center justify-between">
+          <div className="bg-muted/30 border border-border p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <BookOpen className="w-5 h-5 text-indigo-400" />
+              <div className="p-2 bg-background border border-border">
+                <BookOpen size={18} className="text-foreground" />
+              </div>
               <div>
-                <h3 className="text-sm font-medium text-white">Diagnostic Suite Ready</h3>
-                <p className="text-xs text-slate-400">
-                  Account provisioned for <span className="text-slate-200">{customerEmail}</span>
+                <h3 className="text-sm font-bold text-foreground">
+                  Account Ready
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Registration confirmed for{" "}
+                  <span className="text-foreground font-medium">
+                    {customerEmail}
+                  </span>
                 </p>
               </div>
             </div>
+            <div className="text-right">
+              <span className="text-[10px] font-mono text-muted-foreground block">
+                Access Period
+              </span>
+              <span className="text-xs font-mono font-bold text-foreground">
+                365 Days
+              </span>
+            </div>
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-slate-800">
-            {customerEmail && (
-              <Link
-                href={`/forgot-password?email=${encodeURIComponent(customerEmail)}`}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-2.5 px-4 rounded-[4px] border border-slate-700 transition-colors"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                Set Password
-              </Link>
-            )}
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Your workspace has been established. You have immediate access to full diagnostic examinations, adaptive module transitions, and complete performance analytics.
+          </p>
+
+          <div className="pt-2">
             <Link
-              href="/login"
-              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2.5 px-4 rounded-[4px] transition-colors"
+              href="/dashboard"
+              className="w-full flex items-center justify-between bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold py-3 px-4 transition-colors"
             >
-              Sign In
-              <ArrowRight className="w-4 h-4" />
+              <span className="tracking-widest uppercase">
+                Enter Diagnostic Workspace
+              </span>
+              <ArrowRight size={14} />
             </Link>
           </div>
         </div>
@@ -154,11 +229,11 @@ export default function CheckoutSuccessPage({
   searchParams: Promise<{ session_id?: string }>;
 }) {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-muted/20 text-foreground flex items-center justify-center p-4">
       <Suspense
         fallback={
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-[4px] p-8 shadow-2xl flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+          <div className="w-full max-w-2xl bg-card border border-border p-8 flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         }
       >

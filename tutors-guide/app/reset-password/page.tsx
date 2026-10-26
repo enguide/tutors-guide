@@ -1,10 +1,11 @@
+// app/reset-password/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, Suspense } from "react";
 import { resetPasswordWithToken } from "@/actions/passwordReset";
-import { Lock, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle, CheckCircle2, GraduationCap } from "lucide-react";
 import Link from "next/link";
 
 function ResetPasswordForm() {
@@ -20,12 +21,19 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[4px] p-6 shadow-2xl text-center">
-        <AlertCircle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-        <h2 className="text-sm font-semibold text-white mb-1">Missing Reset Token</h2>
-        <p className="text-xs text-slate-400 mb-4">This password reset link is invalid or incomplete.</p>
-        <Link href="/forgot-password" className="text-xs text-indigo-400 hover:underline">
-          Request a new link
+      <div className="w-full max-w-sm bg-card border border-border p-8 shadow-sm text-center">
+        <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+        <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">
+          Invalid or Expired Link
+        </h2>
+        <p className="text-xs text-muted-foreground mt-1 mb-4">
+          This security recovery token is missing or has expired.
+        </p>
+        <Link
+          href="/forgot-password"
+          className="text-xs font-mono font-bold text-primary hover:underline"
+        >
+          Request new reset link →
         </Link>
       </div>
     );
@@ -45,72 +53,94 @@ function ResetPasswordForm() {
       setSuccess(true);
       setTimeout(() => {
         router.push(`/login?email=${encodeURIComponent(res.email)}`);
-      }, 2000);
+      }, 1500);
     } catch (err: any) {
-      setError(err.message || "Failed to reset password.");
+      setError(err.message || "Failed to update password.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[4px] p-6 shadow-2xl backdrop-blur-md">
+    <div className="w-full max-w-sm bg-card border border-border p-8 shadow-sm rounded-none">
       <div className="flex items-center gap-2 mb-6">
-        <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-[4px]">
-          <Lock className="w-5 h-5 text-indigo-400" />
+        <div className="p-1.5 bg-primary text-primary-foreground">
+          <GraduationCap size={16} />
         </div>
-        <div>
-          <h1 className="text-lg font-semibold text-white tracking-wide">Set New Password</h1>
-          <p className="text-xs text-slate-400">Establish your permanent account password</p>
-        </div>
+        <span className="text-xs font-black tracking-tight uppercase">Tutors Guide</span>
+      </div>
+
+      <div className="mb-6">
+        <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+          Credential Management
+        </span>
+        <h1 className="text-xl font-bold tracking-tight text-foreground uppercase mt-0.5">
+          New Password
+        </h1>
+        <p className="text-xs text-muted-foreground mt-1">
+          Establish a secure password for your candidate account.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[4px] text-xs text-red-400 flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {success ? (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-[4px] text-xs text-emerald-400 flex items-start gap-2">
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-start gap-2">
           <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>Password updated successfully. Redirecting to sign in...</span>
+          <span>Password established successfully. Routing to workstation sign in...</span>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">New Password</label>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+              New Password
+            </label>
             <input
               type="password"
               required
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              placeholder="••••••••••••"
+              className="w-full bg-background border border-input px-3 py-2 text-xs font-mono tracking-widest text-foreground focus:outline-none focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Confirm Password</label>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+              Confirm Password
+            </label>
             <input
               type="password"
               required
               minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-[4px] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              placeholder="••••••••••••"
+              className="w-full bg-background border border-input px-3 py-2 text-xs font-mono tracking-widest text-foreground focus:outline-none focus:border-primary"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 px-4 rounded-[4px] transition-colors disabled:opacity-50 cursor-pointer"
+            className="w-full flex items-center justify-between bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold py-2.5 px-3.5 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update Password"}
-            {!loading && <ArrowRight className="w-4 h-4" />}
+            {loading ? (
+              <span className="flex items-center gap-2 mx-auto">
+                <Loader2 size={14} className="animate-spin" /> Saving Password...
+              </span>
+            ) : (
+              <>
+                <span className="tracking-wider uppercase">Update Credentials</span>
+                <ArrowRight size={14} />
+              </>
+            )}
           </button>
         </form>
       )}
@@ -120,11 +150,11 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/20 text-foreground flex items-center justify-center p-4">
       <Suspense
         fallback={
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[4px] p-6 shadow-2xl flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+          <div className="w-full max-w-sm bg-card border border-border p-8 flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         }
       >
