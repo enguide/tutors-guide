@@ -2,6 +2,22 @@
   "id": "ap-calc-bc-practice-1",
   "title": "AP Calculus BC Practice Exam 1",
   "category": "AP_CALC",
+  "scoring": {
+    "scaleType": "AP_WEIGHTED",
+    "apWeights": {
+      "mcSectionIds": ["ap-calc-bc-t1-s1a", "ap-calc-bc-t1-s1b"],
+      "mcMultiplier": 1.2,
+      "frqSectionIds": ["ap-calc-bc-t1-s2a", "ap-calc-bc-t1-s2b"],
+      "frqMultiplier": 1.0,
+      "gradeCutoffs": {
+        "5": 68,
+        "4": 54,
+        "3": 41,
+        "2": 30,
+        "1": 0
+      }
+    }
+  },
   "description": "Full-length AP Calculus BC Practice Exam featuring Section I, Part A (30 Multiple-Choice Questions, 60 Minutes, No Calculator) and Section I, Part B (15 Multiple-Choice Questions, 45 Minutes, Calculator Active).",
   "isAdaptive": false,
   "config": {

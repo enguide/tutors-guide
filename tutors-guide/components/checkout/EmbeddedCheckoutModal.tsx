@@ -317,7 +317,7 @@ export function EmbeddedCheckoutModal({
 
           {/* STEP 2: Stripe Embedded Frame */}
           {step === "checkout" && clientSecret && (
-            <div className="min-h-[380px]">
+            <div className="min-h-95">
               <EmbeddedCheckoutProvider
                 stripe={stripePromise}
                 options={{ clientSecret, onComplete: handleComplete }}

@@ -106,7 +106,7 @@ export function StudentNavbar({ user, onSignOut }: StudentNavbarProps) {
 
         {/* User Identity & Sign Out */}
         <div className="flex items-center gap-2 sm:gap-4 text-xs shrink-0">
-          <div className="hidden md:flex flex-col text-right max-w-[160px] truncate">
+          <div className="hidden md:flex flex-col text-right max-w-40 truncate">
             <span className="font-bold text-foreground truncate">{user.name || "Student"}</span>
             <span className="text-[10px] text-muted-foreground font-mono truncate">{user.email}</span>
           </div>

@@ -176,43 +176,70 @@ export default function UnifiedAnalyticsDashboard({
     return stats;
   }, [sectionResults, responses]);
 
-  // Scaled Score partitions
-  const partitionScores = React.useMemo(() => {
-    const isSAT = metadata.category.toUpperCase() === "SAT";
-    if (!isSAT) {
+  // Unified Total / Composite Score definition
+  const scoreCard = React.useMemo(() => {
+    const category = metadata.category.toUpperCase();
+
+    if (category === "SAT") {
+      const erSections = sectionResults.filter((sr) =>
+        sr.section.title.toLowerCase().includes("reading") ||
+        sr.section.title.toLowerCase().includes("writing") ||
+        sr.sectionId.includes("rw") ||
+        sr.sectionId.includes("s1") ||
+        sr.sectionId.includes("s2")
+      );
+      const mathSections = sectionResults.filter((sr) =>
+        sr.section.title.toLowerCase().includes("math") ||
+        sr.sectionId.includes("math") ||
+        sr.sectionId.includes("s3") ||
+        sr.sectionId.includes("s4")
+      );
+
+      const erScore = erSections.reduce((sum, s) => sum + (s.scaledScore || 0), 0);
+      const mathScore = mathSections.reduce((sum, s) => sum + (s.scaledScore || 0), 0);
+      const totalScore = testSummary?.compositeScore ?? (erScore + mathScore || null);
+
       return {
-        hasPartitions: false,
-        sections: sectionResults.map((sr) => ({
-          title: sr.section.title,
-          score: sr.scaledScore ?? sr.rawScore,
-        })),
-        totalScore: testSummary?.compositeScore ?? null,
+        label: "Total Score",
+        score: totalScore,
+        maxScore: 1600,
+        subtext: null,
       };
     }
 
-    const erSections = sectionResults.filter((sr) =>
-      sr.section.title.toLowerCase().includes("reading") ||
-      sr.section.title.toLowerCase().includes("writing") ||
-      sr.sectionId.includes("rw") ||
-      sr.sectionId.includes("s1") ||
-      sr.sectionId.includes("s2")
-    );
-    const mathSections = sectionResults.filter((sr) =>
-      sr.section.title.toLowerCase().includes("math") ||
-      sr.sectionId.includes("math") ||
-      sr.sectionId.includes("s3") ||
-      sr.sectionId.includes("s4")
-    );
+    if (category === "ACT") {
+      return {
+        label: "Composite",
+        score: testSummary?.compositeScore ?? null,
+        maxScore: 36,
+        subtext: null,
+      };
+    }
 
-    const erScore = erSections.reduce((sum, s) => sum + (s.scaledScore || 0), 0);
-    const mathScore = mathSections.reduce((sum, s) => sum + (s.scaledScore || 0), 0);
-    const totalScore = testSummary?.compositeScore ?? (erScore + mathScore || null);
+    if (category === "AP_CALC") {
+      const compositeRaw = sectionResults.reduce((acc, sr) => acc + (sr.rawScore || 0), 0);
+      return {
+        label: "AP Grade",
+        score: testSummary?.compositeScore ?? null,
+        maxScore: 5,
+        subtext: `${compositeRaw}/108 pts`,
+      };
+    }
+
+    if (category === "GRE") {
+      return {
+        label: "Total (V+Q)",
+        score: testSummary?.compositeScore ?? null,
+        maxScore: 340,
+        subtext: null,
+      };
+    }
 
     return {
-      hasPartitions: true,
-      erScore: erScore || null,
-      mathScore: mathScore || null,
-      totalScore: totalScore || null,
+      label: "Raw Score",
+      score: testSummary?.compositeScore ?? null,
+      maxScore: null,
+      subtext: null,
     };
   }, [metadata, sectionResults, testSummary]);
 
@@ -287,6 +314,7 @@ export default function UnifiedAnalyticsDashboard({
         className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 border border-slate-200 dark:border-slate-800 shadow-sm"
       >
         <CardHeader className="flex flex-col items-stretch justify-between space-y-0 border-b border-slate-200 dark:border-slate-800 p-0 md:flex-row">
+          {/* Title & Legend */}
           <div className="flex md:flex-col flex-row justify-between md:justify-center items-center md:items-start gap-1 px-4 py-3">
             <CardTitle>{metadata.title || "Exam Results"}</CardTitle>
             <CardDescription className="hidden md:block">
@@ -311,71 +339,37 @@ export default function UnifiedAnalyticsDashboard({
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row">
-            <div className="hidden xl:flex border-t border-b md:border-t-0 md:border-b-0 divide-x bg-muted/5 md:bg-transparent md:order-last">
-              {partitionScores.hasPartitions ? (
-                <>
-                  {partitionScores.erScore !== null && (
-                    <div className="flex flex-1 flex-col justify-center px-4 py-2 text-center md:px-8">
-                      <span className="text-[10px] text-muted-foreground uppercase">
-                        English
-                      </span>
-                      <span className="text-xl md:text-4xl font-bold leading-none">
-                        {partitionScores.erScore}
-                      </span>
-                    </div>
-                  )}
-                  {partitionScores.mathScore !== null && (
-                    <div className="flex flex-1 flex-col justify-center px-4 py-2 text-center md:px-8">
-                      <span className="text-[10px] text-muted-foreground uppercase">
-                        Math
-                      </span>
-                      <span className="text-xl md:text-4xl font-bold leading-none">
-                        {partitionScores.mathScore}
-                      </span>
-                    </div>
-                  )}
-                  {partitionScores.totalScore !== null && (
-                    <div className="flex flex-1 flex-col justify-center px-4 py-2 text-center md:border-l md:px-8 bg-primary/5 md:bg-transparent">
-                      <span className="text-[10px] font-bold md:font-normal text-primary md:text-muted-foreground uppercase">
-                        Total
-                      </span>
-                      <span className="text-xl md:text-4xl font-black md:font-bold leading-none text-primary md:text-foreground">
-                        {partitionScores.totalScore}
-                      </span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="flex flex-1 flex-col justify-center px-4 py-2 text-center md:px-8">
-                  <span className="text-[10px] text-muted-foreground uppercase">
-                    Composite
-                  </span>
-                  <span className="text-xl md:text-4xl font-bold leading-none">
-                    {partitionScores.totalScore ?? "—"}
-                  </span>
-                </div>
-              )}
-            </div>
-
+          {/* Section Buttons & Master Score Anchor */}
+          <div className="flex flex-col md:flex-row items-stretch">
+            {/* Clickable Section Navigation Tabs */}
             <div className="flex flex-row overflow-x-auto md:overflow-visible no-scrollbar">
               {sectionResults.map((sr) => {
                 const stats = sectionStats[sr.sectionId];
+                const isCurrent = activeSectionId === sr.sectionId;
+
+                // Priority: Scaled score (e.g. 7 for ACT) -> AP points -> percentage
+                const displayScore =
+                  sr.scaledScore !== null && sr.scaledScore !== undefined
+                    ? sr.scaledScore
+                    : stats
+                    ? `${stats.percentage.toFixed(0)}%`
+                    : "0%";
+
                 return (
                   <button
                     key={sr.sectionId}
-                    data-active={activeSectionId === sr.sectionId ? "true" : "false"}
-                    className="flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 px-4 py-2 text-center transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l md:min-w-25 lg:px-8 lg:py-2"
+                    data-active={isCurrent ? "true" : "false"}
+                    className="flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 px-4 py-2.5 text-center transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l md:min-w-28 lg:px-6 lg:py-2.5"
                     onClick={() => setSelectedSectionId(sr.sectionId)}
                   >
-                    <span className="text-[10px] text-muted-foreground uppercase">
-                      {sr.section.title}
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight line-clamp-1">
+                      {sr.section.title.replace(/ - Section \d+/i, "")}
                     </span>
-                    <span className="text-lg md:text-2xl font-bold leading-none">
-                      {stats ? stats.percentage.toFixed(0) : 0}%
+                    <span className="text-xl md:text-2xl font-bold leading-none">
+                      {displayScore}
                     </span>
                     {stats?.formattedTime && (
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-semibold">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
                         <Clock className="w-2.5 h-2.5" />
                         {stats.formattedTime}
                       </span>
@@ -384,6 +378,28 @@ export default function UnifiedAnalyticsDashboard({
                 );
               })}
             </div>
+
+            {/* Master Composite Score Pillar (Rightmost Anchor) */}
+            {scoreCard.score !== null && (
+              <div className="flex flex-col justify-center items-center px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 shrink-0">
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                  {scoreCard.label}
+                </span>
+                <span className="text-2xl md:text-3xl font-black leading-none text-primary md:text-foreground">
+                  {scoreCard.score}
+                  {scoreCard.maxScore && (
+                    <span className="text-xs text-muted-foreground font-normal ml-0.5">
+                      /{scoreCard.maxScore}
+                    </span>
+                  )}
+                </span>
+                {scoreCard.subtext && (
+                  <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">
+                    {scoreCard.subtext}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </CardHeader>
 

@@ -69,6 +69,7 @@ export interface TestMetadata {
   isAdaptive?: boolean;
   stages?: AdaptiveStage[];
   sections: SectionManifest[];
+  scoring?: ExamScoringConfig;
 }
 
 export interface ParsedSection {
@@ -76,4 +77,37 @@ export interface ParsedSection {
   content: string;
   category?: string;
   testId?: string;
+}
+
+export interface LinearCurveMapping {
+  // Raw score -> Scaled score
+  [rawScore: number]: number;
+}
+
+export interface APGradeCutoffs {
+  // Minimum composite raw score required for each grade (1-5)
+  5: number;
+  4: number;
+  3: number;
+  2: number;
+  1: number;
+}
+
+export interface ExamScoringConfig {
+  scaleType: "SAT_ADAPTIVE" | "ACT_CONCORDANCE" | "AP_WEIGHTED" | "GRE_SECTION";
+  // For ACT & standard linear sections: maps sectionId or subject domain to raw->scaled curve
+  curves?: Record<string, LinearCurveMapping>;
+  // For AP exams: custom section multipliers and composite grade boundaries
+  apWeights?: {
+    mcSectionIds: string[];
+    mcMultiplier: number;     // e.g. 1.2
+    frqSectionIds: string[];
+    frqMultiplier: number;    // e.g. 1.0
+    gradeCutoffs: APGradeCutoffs;
+  };
+  // For GRE: section-specific scaling tables
+  greConfig?: {
+    verbalCurves?: Record<string, LinearCurveMapping>;
+    quantCurves?: Record<string, LinearCurveMapping>;
+  };
 }

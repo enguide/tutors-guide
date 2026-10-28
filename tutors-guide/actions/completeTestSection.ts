@@ -1,4 +1,3 @@
-// actions/completeTestSection.ts
 "use server";
 
 import { cookies } from "next/headers";
@@ -6,10 +5,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { evaluateAnswer } from "@/lib/scoring/mathEvaluator";
 import { QuestionFrontmatter } from "@/types/content";
-import { DEFAULT_SAT_CURVE, lookupScaledScore } from "@/lib/scoring/curveEngine";
 import { getTestMetadata } from "@/lib/contentLoader";
 import { evaluateNextExamRoute } from "@/lib/adaptive/branchingController";
-import { synthesizeAdaptiveTestScores } from "@/lib/scoring/adaptiveScorer";
+import {
+  calculateSectionScaledScore,
+  synthesizeExamComposite,
+} from "@/lib/scoring/scoringEngine";
 import { Category, Prisma, QuestionType } from "@prisma/client";
 import { AccommodationSettings } from "@/types/accommodations";
 
@@ -80,7 +81,13 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       return { success: false, error: "Section already submitted." };
     }
 
-    // 2. Fetch all optical FRQ submissions & crops for this student in this section
+    // 2. Fetch test metadata upfront for scoring and routing
+    const metadata = await getTestMetadata(category.toLowerCase(), testId);
+    if (!metadata) {
+      throw new Error("Unable to resolve test metadata for scoring and routing.");
+    }
+
+    // 3. Fetch optical FRQ submissions & crops for this student in this section
     const frqSubmissions = await prisma.frqSubmission.findMany({
       where: {
         profileId,
@@ -93,7 +100,6 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
     });
 
     // Map questionId -> { pointsEarned, pointsPossible, transcriptions[] }
-    // Aggregate points ACROSS all physical sheets (Sheet 1: A/B, Sheet 2: C/D)
     const frqScoreMap = new Map<
       string,
       { earned: number; possible: number; transcriptions: string[] }
@@ -120,7 +126,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       }
     }
 
-    // 3. Finalize all response records
+    // 4. Finalize all response records
     let numCorrect = 0;
     let totalEarnedRawScore = 0;
 
@@ -134,7 +140,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
 
         if (isHandwrittenFrq && frqScoreMap.has(q.id)) {
           const frqData = frqScoreMap.get(q.id)!;
-          // Award full question credit if student earns maximum possible points across all parts
+          // Full question credit if student earns maximum possible points across all parts
           isCorrect = frqData.earned >= frqData.possible && frqData.possible > 0;
           totalEarnedRawScore += frqData.earned;
           if (isCorrect) numCorrect++;
@@ -200,7 +206,11 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       })
     );
 
-    // 4a. Persist the immutable Result row
+    // 5. Calculate section-level scaled score via the Scoring Engine
+    const roundedRawScore = Math.round(totalEarnedRawScore);
+    const scaledScore = calculateSectionScaledScore(sectionId, roundedRawScore, metadata);
+
+    // 6a. Persist the immutable Result row with scaledScore
     const totalQuestions = questions.length;
     await prisma.result.create({
       data: {
@@ -210,7 +220,8 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
         testTitle,
         numCorrect,
         totalQuestions,
-        rawScore: Math.round(totalEarnedRawScore),
+        rawScore: roundedRawScore,
+        scaledScore,
         timeRemainingSeconds,
         navigationHistory: navigationHistory as unknown as Prisma.InputJsonValue,
         accommodations: accommodations
@@ -219,7 +230,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       },
     });
 
-    // 4b. Clean up in-flight SectionCheckpoint (draft has completed)
+    // 6b. Clean up in-flight SectionCheckpoint (draft has completed)
     await prisma.sectionCheckpoint.deleteMany({
       where: {
         profileId,
@@ -228,15 +239,15 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       },
     });
 
-    // 5. Resolve next exam route (linear or adaptive branching)
-    const metadata = await getTestMetadata(category.toLowerCase(), testId);
-    if (!metadata) {
-      throw new Error("Unable to resolve test metadata for routing.");
-    }
-
+    // 7. Resolve next exam route (linear or adaptive branching)
     const submittedResults = await prisma.result.findMany({
       where: { testId, profileId },
-      select: { sectionId: true, numCorrect: true, totalQuestions: true, rawScore: true },
+      select: {
+        sectionId: true,
+        numCorrect: true,
+        totalQuestions: true,
+        rawScore: true,
+      },
     });
 
     const submittedSectionIds = submittedResults.map((r) => r.sectionId);
@@ -248,7 +259,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       submittedSectionIds
     );
 
-    // 6. If an intermission follows this section, set the HTTP-only server cookie
+    // 8. If an intermission follows this section, set the HTTP-only server cookie
     if (routingDecision.isIntermission) {
       const duration = routingDecision.intermissionDuration || 600;
       const breakEndsAt = Date.now() + duration * 1000;
@@ -262,28 +273,9 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       });
     }
 
-    // 7. Check whether the full exam is completed across all stages
+    // 9. Synthesize full exam composite score if complete across all stages
     if (routingDecision.isTestComplete) {
-      let compositeScore: number | null = null;
-
-      const resultsMap = new Map<string, { numCorrect: number; totalQuestions: number }>();
-      submittedResults.forEach((r) => {
-        resultsMap.set(r.sectionId, {
-          numCorrect: r.numCorrect,
-          totalQuestions: r.totalQuestions,
-        });
-      });
-
-      if (metadata.isAdaptive) {
-        const adaptiveSynthesis = synthesizeAdaptiveTestScores(metadata, resultsMap);
-        compositeScore = adaptiveSynthesis.compositeScore;
-      } else if (category === "SAT") {
-        const totalCorrect = submittedResults.reduce((acc, r) => acc + r.numCorrect, 0);
-        compositeScore = lookupScaledScore(DEFAULT_SAT_CURVE.sectionCurves.English, totalCorrect);
-      } else if (category === "AP_CALC") {
-        // Aggregate raw scores across all sections (e.g., Section I MC + Section II FRQ)
-        compositeScore = submittedResults.reduce((acc, r) => acc + r.rawScore, 0);
-      }
+      const synthesis = synthesizeExamComposite(metadata, submittedResults);
 
       await prisma.testSummary.upsert({
         where: {
@@ -297,10 +289,10 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
           testId,
           testTitle,
           category,
-          compositeScore,
+          compositeScore: synthesis.compositeScore,
         },
         update: {
-          compositeScore,
+          compositeScore: synthesis.compositeScore,
         },
       });
     }
@@ -315,7 +307,8 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       stats: {
         numCorrect,
         totalQuestions,
-        rawScore: Math.round(totalEarnedRawScore),
+        rawScore: roundedRawScore,
+        scaledScore,
       },
     };
   } catch (error) {

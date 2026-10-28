@@ -86,8 +86,147 @@ function checkImageReferences(
   }
 }
 
+function validateScoringConfig(metadata: any, metadataFile: string, sectionIds: Set<string>) {
+  const scoring = metadata.scoring;
+  if (!scoring) return;
+
+  const validScaleTypes = [
+    "SAT_ADAPTIVE",
+    "ACT_CONCORDANCE",
+    "AP_WEIGHTED",
+    "GRE_SECTION",
+  ];
+
+  if (!scoring.scaleType || !validScaleTypes.includes(scoring.scaleType)) {
+    reportError(
+      metadataFile,
+      `Invalid 'scoring.scaleType' "${scoring.scaleType}". Must be one of: ${validScaleTypes.join(", ")}`
+    );
+  }
+
+  // 1. Validate AP_WEIGHTED rules
+  if (scoring.scaleType === "AP_WEIGHTED") {
+    const ap = scoring.apWeights;
+    if (!ap) {
+      reportError(
+        metadataFile,
+        `scoring.scaleType is 'AP_WEIGHTED' but 'scoring.apWeights' is missing.`
+      );
+    } else {
+      // Validate section IDs
+      for (const id of ap.mcSectionIds || []) {
+        if (!sectionIds.has(id)) {
+          reportError(
+            metadataFile,
+            `apWeights.mcSectionIds references unknown sectionId "${id}"`
+          );
+        }
+      }
+      for (const id of ap.frqSectionIds || []) {
+        if (!sectionIds.has(id)) {
+          reportError(
+            metadataFile,
+            `apWeights.frqSectionIds references unknown sectionId "${id}"`
+          );
+        }
+      }
+
+      // Validate multipliers
+      if (typeof ap.mcMultiplier !== "number" || ap.mcMultiplier <= 0) {
+        reportError(metadataFile, `apWeights.mcMultiplier must be a positive number.`);
+      }
+      if (typeof ap.frqMultiplier !== "number" || ap.frqMultiplier <= 0) {
+        reportError(metadataFile, `apWeights.frqMultiplier must be a positive number.`);
+      }
+
+      // Validate cutoffs: 5 > 4 > 3 > 2 > 1
+      const cutoffs = ap.gradeCutoffs;
+      if (!cutoffs || typeof cutoffs !== "object") {
+        reportError(metadataFile, `apWeights.gradeCutoffs object is required.`);
+      } else {
+        const c5 = Number(cutoffs["5"]);
+        const c4 = Number(cutoffs["4"]);
+        const c3 = Number(cutoffs["3"]);
+        const c2 = Number(cutoffs["2"]);
+        const c1 = Number(cutoffs["1"] ?? 0);
+
+        if ([c5, c4, c3, c2].some(isNaN)) {
+          reportError(metadataFile, `gradeCutoffs must define numeric thresholds for 5, 4, 3, and 2.`);
+        } else if (!(c5 > c4 && c4 > c3 && c3 > c2 && c2 >= c1)) {
+          reportError(
+            metadataFile,
+            `gradeCutoffs must be strictly descending: 5 (${c5}) > 4 (${c4}) > 3 (${c3}) > 2 (${c2}) >= 1 (${c1})`
+          );
+        }
+      }
+    }
+  }
+
+  // 2. Validate custom curves monotonicity (raw -> scaled)
+  if (scoring.curves) {
+    for (const [secId, curve] of Object.entries(scoring.curves as Record<string, Record<string, number>>)) {
+      if (!sectionIds.has(secId)) {
+        reportError(
+          metadataFile,
+          `scoring.curves references unknown sectionId "${secId}"`
+        );
+      }
+
+      const rawKeys = Object.keys(curve)
+        .map(Number)
+        .filter((n) => !isNaN(n))
+        .sort((a, b) => a - b);
+
+      if (rawKeys.length === 0) {
+        reportError(metadataFile, `scoring.curves["${secId}"] has no valid numeric entries.`);
+      }
+
+      for (let i = 0; i < rawKeys.length - 1; i++) {
+        const lowerRaw = rawKeys[i];
+        const higherRaw = rawKeys[i + 1];
+        if (curve[higherRaw] < curve[lowerRaw]) {
+          reportError(
+            metadataFile,
+            `scoring.curves["${secId}"] has non-monotonic curve: raw ${higherRaw} (${curve[higherRaw]}) < raw ${lowerRaw} (${curve[lowerRaw]})`
+          );
+        }
+      }
+    }
+  }
+}
+
+function validateAdaptiveStages(metadata: any, metadataFile: string, sectionIds: Set<string>) {
+  if (!metadata.isAdaptive) return;
+
+  if (!Array.isArray(metadata.stages) || metadata.stages.length === 0) {
+    reportError(metadataFile, `isAdaptive is true but 'stages' array is missing or empty.`);
+    return;
+  }
+
+  metadata.stages.forEach((stage: any, idx: number) => {
+    const prefix = `stages[${idx}] (stageIndex: ${stage.stageIndex})`;
+    if (!stage.sectionId || !sectionIds.has(stage.sectionId)) {
+      reportError(metadataFile, `${prefix}: base sectionId "${stage.sectionId}" not found in sections manifest.`);
+    }
+
+    if (!stage.routing) {
+      reportError(metadataFile, `${prefix}: missing 'routing' object.`);
+    } else {
+      if (typeof stage.routing.threshold !== "number" || stage.routing.threshold < 0) {
+        reportError(metadataFile, `${prefix}: routing.threshold must be a non-negative number.`);
+      }
+      if (!stage.routing.onPass || !sectionIds.has(stage.routing.onPass)) {
+        reportError(metadataFile, `${prefix}: routing.onPass "${stage.routing.onPass}" not found in sections.`);
+      }
+      if (!stage.routing.onFail || !sectionIds.has(stage.routing.onFail)) {
+        reportError(metadataFile, `${prefix}: routing.onFail "${stage.routing.onFail}" not found in sections.`);
+      }
+    }
+  });
+}
+
 function validateAll() {
-  console.log("Validating markdown content, frontmatter, and assets...\n");
+  console.log("Validating markdown content, frontmatter, assets, scoring, and adaptive routing...\n");
 
   if (!fs.existsSync(CONTENT_DIR)) {
     console.error(`Content directory not found at: ${CONTENT_DIR}`);
@@ -119,6 +258,15 @@ function validateAll() {
         continue;
       }
 
+      const sectionIds = new Set<string>(
+        (metadata.sections || []).map((s: any) => s.id).filter(Boolean)
+      );
+
+      // Validate scoring configurations & adaptive routing graph
+      validateScoringConfig(metadata, metadataFile, sectionIds);
+      validateAdaptiveStages(metadata, metadataFile, sectionIds);
+
+      // Validate individual sections
       for (const section of metadata.sections || []) {
         const sectionFilePath = path.join(testPath, section.file);
         if (!fs.existsSync(sectionFilePath)) {
@@ -216,7 +364,7 @@ function validateAll() {
     process.exit(1);
   } else {
     console.log(
-      `\x1b[32m[PASS]\x1b[0m All test manifests, frontmatter, LaTeX, and assets validated successfully.\n`
+      `\x1b[32m[PASS]\x1b[0m All test manifests, frontmatter, LaTeX, assets, scoring, and adaptive routes validated successfully.\n`
     );
   }
 }
