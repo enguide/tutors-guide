@@ -1,13 +1,12 @@
 // app/tgadmin/frq-audit/page.tsx
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getPendingAuditCrops } from "@/actions/frqAudit";
 import { AuditQueueClient } from "./AuditQueueClient";
 
-
-export const dynamic = "force-dynamic";
-
 export default async function FrqAuditPage() {
+  await connection();
   const session = await auth();
   const userRole = session?.user?.role;
 
