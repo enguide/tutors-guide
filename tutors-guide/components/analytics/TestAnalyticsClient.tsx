@@ -129,15 +129,6 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
 
       {/* Main Container */}
       <div className="max-w-337.5 mx-auto px-4 sm:px-8">
-        {/* Adaptive CAT Trajectory Banner */}
-        {adaptiveTrajectory && adaptiveTrajectory.stageSummaries.length > 0 && (
-          <div className="mb-6">
-            <AdaptiveTrajectoryCard
-              stageSummaries={adaptiveTrajectory.stageSummaries}
-              category={metadata.category}
-            />
-          </div>
-        )}
 
         {/* TAB 1: Unified Analytics Dashboard */}
         {activeTab === "analytics" && (
@@ -147,6 +138,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
               testSummary={testSummary}
               sectionResults={sectionResults}
               responses={responses}
+              adaptiveTrajectory={adaptiveTrajectory}
             />
           </div>
         )}

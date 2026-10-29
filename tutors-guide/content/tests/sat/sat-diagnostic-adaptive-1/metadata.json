@@ -33,7 +33,7 @@
       "id": "sat-t1-rw1",
       "file": "rw-m1.md",
       "order": 1,
-      "title": "Reading and Writing - Module 1 (Baseline)",
+      "title": "Reading & Writing - M1",
       "timeLimit": 1920,
       "config": {
         "layout": "split-passage",
@@ -48,7 +48,7 @@
       "id": "sat-t1-rw2h",
       "file": "rw-m2-hard.md",
       "order": 2,
-      "title": "Reading and Writing - Module 2 (Hard Tier)",
+      "title": "Reading & Writing - M2H",
       "timeLimit": 1920,
       "hasIntermissionAfter": true,
       "intermissionDuration": 600,
@@ -65,7 +65,7 @@
       "id": "sat-t1-rw2e",
       "file": "rw-m2-easy.md",
       "order": 2,
-      "title": "Reading and Writing - Module 2 (Standard Tier)",
+      "title": "Reading & Writing - M2S",
       "timeLimit": 1920,
       "hasIntermissionAfter": true,
       "intermissionDuration": 600,
@@ -82,7 +82,7 @@
       "id": "sat-t1-m1",
       "file": "math-m1.md",
       "order": 3,
-      "title": "Math - Module 1 (Baseline)",
+      "title": "Mathematics - M1",
       "timeLimit": 2100,
       "config": {
         "layout": "single-column",
@@ -95,10 +95,10 @@
       }
     },
     {
-      "id": "sat-t1-rw2h",
+      "id": "sat-t1-m2h",
       "file": "math-m2-hard.md",
       "order": 4,
-      "title": "Math - Module 2 (Hard Tier)",
+      "title": "Mathematics - M2H",
       "timeLimit": 2100,
       "config": {
         "layout": "single-column",
@@ -111,10 +111,10 @@
       }
     },
     {
-      "id": "sat-t1-rw2e",
+      "id": "sat-t1-m2e",
       "file": "math-m2-easy.md",
       "order": 4,
-      "title": "Math - Module 2 (Standard Tier)",
+      "title": "Mathematics - M2S",
       "timeLimit": 2100,
       "config": {
         "layout": "single-column",

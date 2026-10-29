@@ -1,6 +1,6 @@
 ---
 sectionId: "sat-t1-rw1"
-sectionTitle: "Reading and Writing - Module 1"
+sectionTitle: "Reading and Writing - M1"
 sectionOrder: 1
 timeLimit: 1920
 questions:

@@ -29,7 +29,12 @@ import {
 } from "@/components/ui/chart";
 import { Clock } from "lucide-react";
 
-import { EnrichedResponseItem, SectionResultData, TestSummaryData } from "@/types/analytics";
+import {
+  EnrichedResponseItem,
+  SectionResultData,
+  TestSummaryData,
+  AdaptiveTrajectoryData,
+} from "@/types/analytics";
 import { TestMetadata } from "@/types/content";
 import { TopicSkillAccuracyAccordion } from "@/components/analytics/TopicSkillAccuracyAccordion";
 
@@ -102,6 +107,7 @@ interface UnifiedAnalyticsDashboardProps {
   testSummary: TestSummaryData | null;
   sectionResults: SectionResultData[];
   responses: EnrichedResponseItem[];
+  adaptiveTrajectory?: AdaptiveTrajectoryData | null;
 }
 
 export default function UnifiedAnalyticsDashboard({
@@ -109,6 +115,7 @@ export default function UnifiedAnalyticsDashboard({
   testSummary,
   sectionResults,
   responses,
+  adaptiveTrajectory,
 }: UnifiedAnalyticsDashboardProps) {
   const { fontSize, isLg, mounted } = useWindowDimensions();
 
@@ -181,6 +188,15 @@ export default function UnifiedAnalyticsDashboard({
     const category = metadata.category.toUpperCase();
 
     if (category === "SAT") {
+      if (adaptiveTrajectory?.compositeScore) {
+        return {
+          label: "Total Score",
+          score: adaptiveTrajectory.compositeScore,
+          maxScore: 1600,
+          subtext: null,
+        };
+      }
+
       const erSections = sectionResults.filter((sr) =>
         sr.section.title.toLowerCase().includes("reading") ||
         sr.section.title.toLowerCase().includes("writing") ||
@@ -241,7 +257,7 @@ export default function UnifiedAnalyticsDashboard({
       maxScore: null,
       subtext: null,
     };
-  }, [metadata, sectionResults, testSummary]);
+  }, [metadata, sectionResults, testSummary, adaptiveTrajectory]);
 
   const formatNavTime = (seconds: number | string) => {
     const totalSeconds =
@@ -304,6 +320,50 @@ export default function UnifiedAnalyticsDashboard({
     return Math.max(minHeight, itemCount * step);
   };
 
+  const isSatCategory = metadata.category.toUpperCase() === "SAT";
+  const hasAdaptiveScores =
+    isSatCategory &&
+    Boolean(adaptiveTrajectory?.stageSummaries && adaptiveTrajectory.stageSummaries.length > 0);
+
+  const getSatModuleAbbreviation = (sr: SectionResultData, index: number) => {
+  const id = (sr.sectionId || "").toLowerCase();
+  const title = (sr.section?.title || "").toLowerCase();
+  
+  // Use sectionOrder if present on section, otherwise array index
+  const orderIndex = sr.section?.sectionOrder !== undefined 
+    ? sr.section.sectionOrder - 1 
+    : index;
+
+  // 1. Direct Module 2 checks
+  const isModule2 =
+    title.includes("module 2") ||
+    title.includes("module-2") ||
+    title.includes("section 2") ||
+    title.includes("stage 2") ||
+    title.includes("routed") ||
+    title.includes("tier") ||
+    id.includes("m2") ||
+    id.includes("s2") ||
+    id.includes("sec2") ||
+    id.includes("hard") ||
+    id.includes("easy") ||
+    id.includes("standard") ||
+    orderIndex === 1 ||
+    orderIndex === 3;
+
+  const isMath =
+    title.includes("math") ||
+    id.includes("math") ||
+    orderIndex >= 2;
+
+  if (isMath) {
+    return isModule2 ? "M2" : "M1";
+  }
+
+  // Reading & Writing
+  return isModule2 ? "RW2" : "RW1";
+};
+
   return (
     <div className="flex flex-col items-center align-middle mx-1 sm:mx-8 gap-4 w-full min-w-0">
       {/* =========================================================================
@@ -339,15 +399,14 @@ export default function UnifiedAnalyticsDashboard({
             </div>
           </div>
 
-          {/* Section Buttons & Master Score Anchor */}
+          {/* Section Buttons, Domain Scores, & Master Score Anchor */}
           <div className="flex flex-col md:flex-row items-stretch">
             {/* Clickable Section Navigation Tabs */}
             <div className="flex flex-row overflow-x-auto md:overflow-visible no-scrollbar">
-              {sectionResults.map((sr) => {
+              {sectionResults.map((sr, idx) => {
                 const stats = sectionStats[sr.sectionId];
                 const isCurrent = activeSectionId === sr.sectionId;
 
-                // Priority: Scaled score (e.g. 7 for ACT) -> AP points -> percentage
                 const displayScore =
                   sr.scaledScore !== null && sr.scaledScore !== undefined
                     ? sr.scaledScore
@@ -355,15 +414,23 @@ export default function UnifiedAnalyticsDashboard({
                     ? `${stats.percentage.toFixed(0)}%`
                     : "0%";
 
+                const sectionTitle = isSatCategory
+                  ? getSatModuleAbbreviation(sr, idx)
+                  : sr.section.title.replace(/ - Section \d+/i, "");
+
                 return (
                   <button
                     key={sr.sectionId}
                     data-active={isCurrent ? "true" : "false"}
-                    className="flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 px-4 py-2.5 text-center transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l md:min-w-28 lg:px-6 lg:py-2.5"
+                    className={`flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l ${
+                      isSatCategory
+                        ? "px-3 py-2.5 md:min-w-16 lg:min-w-20 lg:px-6"
+                        : "px-4 py-2.5 md:min-w-28 lg:px-6"
+                    }`}
                     onClick={() => setSelectedSectionId(sr.sectionId)}
                   >
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight line-clamp-1">
-                      {sr.section.title.replace(/ - Section \d+/i, "")}
+                      {sectionTitle}
                     </span>
                     <span className="text-xl md:text-2xl font-bold leading-none">
                       {displayScore}
@@ -379,9 +446,41 @@ export default function UnifiedAnalyticsDashboard({
               })}
             </div>
 
+            {/* Adaptive SAT Domain Scores (Reading & Writing / Math 200–800) */}
+            {hasAdaptiveScores && (
+              <div className="flex flex-row border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-muted/20">
+                {adaptiveTrajectory!.stageSummaries.map((summary) => {
+                  const domainTitle =
+                    summary.stageIndex === 1 ? "Reading & Writing" : "Mathematics";
+                  const tierLabel =
+                    summary.routedTier === "easy" ? "Standard Tier" : "Hard Tier";
+
+                  return (
+                    <div
+                      key={summary.stageIndex}
+                      className="flex flex-1 flex-col gap-1 justify-center items-center px-6 py-2.5 text-center border-r md:border-r border-slate-200 dark:border-slate-800 md:min-w-32 lg:min-w-34 shrink-0"
+                    >
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight line-clamp-1">
+                        {domainTitle}
+                      </span>
+                      <span className="text-xl md:text-2xl font-black leading-none text-foreground">
+                        {summary.domainScore}
+                        <span className="text-[10px] text-muted-foreground font-normal ml-0.5">
+                          /800
+                        </span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {tierLabel}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Master Composite Score Pillar (Rightmost Anchor) */}
             {scoreCard.score !== null && (
-              <div className="flex flex-col justify-center items-center px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 shrink-0">
+              <div className="flex flex-col gap-1 justify-center items-center px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 lg:min-w-36 shrink-0">
                 <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
                   {scoreCard.label}
                 </span>
@@ -429,7 +528,6 @@ export default function UnifiedAnalyticsDashboard({
                         value: "Time (s)",
                         fontSize: 10,
                         fontWeight: "bold",
-                        fill: "hsl(var(--primary))",
                         position: "insideTop",
                         offset: 5,
                       }}
@@ -494,8 +592,7 @@ export default function UnifiedAnalyticsDashboard({
                         angle: -90,
                         position: "insideLeft",
                         fontSize: 10,
-                        fontWeight: "bold",
-                        fill: "hsl(var(--primary))",
+                        fontWeight: "bold",                 
                         dy: 15,
                       }}
                     />

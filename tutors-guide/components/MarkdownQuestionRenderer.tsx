@@ -46,9 +46,12 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
 
     // A. Temporarily mask inline and display LaTeX so math remains untouched
     const mathTokens: string[] = [];
-    let text = content.replace(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g, (match) => {
+    
+    // Match display math ($$...$$) first across lines, then inline math ($...$)
+    let text = content.replace(/(\$\$[\s\S]*?\$\$|\$(?!\$)[^$\n]+?\$)/g, (match) => {
       mathTokens.push(match);
-      return `@@MATH_TOKEN_${mathTokens.length - 1}@@`;
+      // Use an alphanumeric placeholder without '$' symbols to prevent regex replacement collision
+      return `XKMATHBLOCKTOKEN${mathTokens.length - 1}ENDX`;
     });
 
     // B. Placement markers: [[[A]:15]] -> <span data-act-placement="A" data-act-target="15">[A]</span>
@@ -81,8 +84,10 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       '<span data-act-highlight="true">$1</span>'
     );
 
-    // G. Restore masked LaTeX tokens
-    text = text.replace(/@@MATH_TOKEN_(\d+)@@/g, (_, index) => mathTokens[Number(index)]);
+    // G. Safely restore masked LaTeX tokens using a callback function
+    text = text.replace(/XKMATHBLOCKTOKEN(\d+)ENDX/g, (_, index) => {
+      return mathTokens[Number(index)] ?? "";
+    });
 
     return text;
   }, [content]);

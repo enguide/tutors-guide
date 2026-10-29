@@ -1,6 +1,6 @@
 ---
 sectionId: "sat-t1-rw2h"
-sectionTitle: "Reading and Writing - Module 2 (Hard)"
+sectionTitle: "Reading and Writing - M2H"
 sectionOrder: 2
 timeLimit: 1920
 questions:
@@ -99,7 +99,7 @@ questions:
   - id: "sat-t1-rwh2-q5"
     questionNumber: 5
     questionType: "MC"
-    correctAnswer: "B"
+    correctAnswer: "C"
     domain: "Craft and Structure"
     skill: "Words in Context"
     difficulty: "Hard"
@@ -107,18 +107,24 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      While contemporary analysis has nuanced earlier assertions that the architectural innovations of Frank Lloyd Wright were entirely ______ prevailing European modernist movements, it is nevertheless clear that his integration of natural landscapes into design represented a distinctive departure from common practice.
+      When professor Magne Nylenna and his colleagues submitted manuscripts containing deliberately introduced methodological flaws to medical journals, they discovered that most reviewers failed to detect the errors. Subsequent evaluations revealed that these findings were hardly ______: when Dr. Fiona Godlee and her team later administered a similar test across hundreds of reviewers, the vast majority again overlooked the planted defects.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The text contrasts early assertions that Wright's work was closely copied from European movements with his later recognized distinctiveness, making 'derivative of' the precise phrase indicating copying or stemming from European trends."
+    explanation: |
+      The sentence structure uses a colon to link an initial claim about Nylenna’s findings with an illustrative follow-up study. The text explains that Nylenna's results were "hardly [BLANK]" because a subsequent experiment conducted by Godlee yielded nearly identical outcomes ("the vast majority again overlooked the planted defects"). Therefore, the blank must describe something that is unusual, isolated, or exceptional, which the phrase "hardly" will negate to show that Nylenna's results were reproducible and not an isolated fluke.
+
+      * **C** ("anomalous") means deviating from what is standard, normal, or expected (i.e., an irregular fluke or outlier). Stating that the results were "hardly anomalous" directly aligns with Godlee obtaining the same widespread reviewer oversights.
+      * **A** ("credible") means believable or plausible. Saying the results were "hardly credible" would mean they were dubious or untrustworthy, which directly contradicts the fact that another independent study confirmed and replicated them.
+      * **B** ("consequential") means significant or having important outcomes. The text emphasizes reproducibility and consistency across trials, not whether the findings lacked impact or importance.
+      * **D** ("quantifiable") means able to be measured or expressed as a numerical value. The study clearly measured defect detection rates, and Godlee's replication does not address whether the initial findings could be counted or measured.
     options:
       - id: "A"
-        text: "congruent with"
+        text: "credible"
       - id: "B"
-        text: "derivative of"
+        text: "consequential"
       - id: "C"
-        text: "independent from"
+        text: "anomalous"
       - id: "D"
-        text: "superfluous to"
+        text: "quantifiable"
   - id: "sat-t1-rwh2-q6"
     questionNumber: 6
     questionType: "MC"
@@ -258,7 +264,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      ![Commuter Impact Chart](./assets/commuter-impact-chart.svg)
+      ![](./assets/dSAT-T1-RW2H-Q11.svg)
 
       A research team investigated the potential impact of daily commute time on employee productivity, as measured by average time required to complete a standard task. One hundred full-time employees from a large technology firm participated in a four-week study. Participants were divided into three groups: those with commute times under 30 minutes, those with commute times between 30 and 60 minutes, and those with commute times over 60 minutes. Task completion times were recorded weekly for each employee, and averages were calculated for each group. The researchers concluded that longer commute times were correlated with lower average productivity.
     prompt: "Which choice best describes data from the table that supports the researchers' conclusion?"
@@ -344,7 +350,7 @@ questions:
   - id: "sat-t1-rwh2-q15"
     questionNumber: 15
     questionType: "MC"
-    correctAnswer: "B"
+    correctAnswer: "A"
     domain: "Information and Ideas"
     skill: "Command of Evidence"
     difficulty: "Hard"
@@ -352,7 +358,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      ![Training Regimens Performance Chart](./assets/training-regimens-chart.svg)
+      ![](./assets/dSAT-T1-RW2H-Q15.svg)
 
       A group of sports scientists at the Norwegian University of Science and Technology (NTNU) investigated the relative effectiveness of two distinct six-week training regimens on Recovery Heart Rate (RHR—each participant's heart rate 1 minute after peak exercise), a key physiological indicator of cardiovascular fitness. Group X incorporated high-intensity interval training, while Group Y undertook on a steady-state aerobic protocol. The data suggests that while ______
     prompt: "Which choice most effectively uses data from the graph to complete the text?"
@@ -438,7 +444,7 @@ questions:
   - id: "sat-t1-rwh2-q19"
     questionNumber: 19
     questionType: "MC"
-    correctAnswer: "C"
+    correctAnswer: "B"
     domain: "Standard English Conventions"
     skill: "Boundaries"
     difficulty: "Hard"
@@ -461,7 +467,7 @@ questions:
   - id: "sat-t1-rwh2-q20"
     questionNumber: 20
     questionType: "MC"
-    correctAnswer: "B"
+    correctAnswer: "C"
     domain: "Standard English Conventions"
     skill: "Boundaries"
     difficulty: "Hard"
@@ -530,7 +536,7 @@ questions:
   - id: "sat-t1-rwh2-q23"
     questionNumber: 23
     questionType: "MC"
-    correctAnswer: "B"
+    correctAnswer: "C"
     domain: "Information and Ideas"
     skill: "Transitions"
     difficulty: "Hard"

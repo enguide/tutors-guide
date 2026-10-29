@@ -170,6 +170,8 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
           ? QuestionType.FRQ_HANDWRITTEN
           : (q.questionType as unknown as QuestionType);
 
+        const normalizedCorrectAnswerKey = String(q.correctAnswer ?? "").trim();
+
         return prisma.response.upsert({
           where: {
             profileId_questionId: {
@@ -187,7 +189,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
             responseType: resolvedResponseType,
             selectedOptionId: student?.selectedOptionId ?? null,
             frqUserAnswer: resolvedFrqAnswer,
-            correctAnswerKey: q.correctAnswer,
+            correctAnswerKey: normalizedCorrectAnswerKey,
             isCorrect,
             timeSpentOnResponse: student?.timeSpent ?? 0,
             usedCalculator: student?.usedCalculator ?? false,
@@ -197,6 +199,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
             responseType: resolvedResponseType,
             selectedOptionId: student?.selectedOptionId ?? null,
             frqUserAnswer: resolvedFrqAnswer,
+            correctAnswerKey: normalizedCorrectAnswerKey,
             isCorrect,
             timeSpentOnResponse: student?.timeSpent ?? 0,
             usedCalculator: student?.usedCalculator ?? undefined,

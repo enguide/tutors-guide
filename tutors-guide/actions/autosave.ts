@@ -14,7 +14,7 @@ export interface AutosavePayload {
   responseType: QuestionType;
   selectedOptionId?: string | null;
   frqUserAnswer?: string | null;
-  correctAnswerKey: string;
+  correctAnswerKey: string | number;
   timeSpentOnResponse?: number;
   usedCalculator?: boolean;
 }
@@ -86,12 +86,14 @@ export async function autosaveResponse(payload: AutosavePayload) {
   }
 
   try {
+    const normalizedCorrectKey = String(payload.correctAnswerKey ?? "").trim();
+    const normalizedSelectedOption = (payload.selectedOptionId ?? "").trim();
+    const normalizedFrqAnswer = (payload.frqUserAnswer ?? "").trim();
+
     const isCorrect =
       payload.responseType === "MC"
-        ? (payload.selectedOptionId ?? "").trim().toUpperCase() ===
-          payload.correctAnswerKey.trim().toUpperCase()
-        : (payload.frqUserAnswer ?? "").trim().toLowerCase() ===
-          payload.correctAnswerKey.trim().toLowerCase();
+        ? normalizedSelectedOption.toUpperCase() === normalizedCorrectKey.toUpperCase()
+        : normalizedFrqAnswer.toLowerCase() === normalizedCorrectKey.toLowerCase();
 
     const existing = await prisma.response.findUnique({
       where: {
@@ -129,7 +131,7 @@ export async function autosaveResponse(payload: AutosavePayload) {
         responseType: payload.responseType,
         selectedOptionId: payload.selectedOptionId ?? null,
         frqUserAnswer: payload.frqUserAnswer ?? null,
-        correctAnswerKey: payload.correctAnswerKey,
+        correctAnswerKey: normalizedCorrectKey,
         isCorrect,
         timeSpentOnResponse: payload.timeSpentOnResponse ?? 0,
         usedCalculator: payload.usedCalculator ?? false,
@@ -138,6 +140,7 @@ export async function autosaveResponse(payload: AutosavePayload) {
       update: {
         selectedOptionId: payload.selectedOptionId ?? null,
         frqUserAnswer: payload.frqUserAnswer ?? null,
+        correctAnswerKey: normalizedCorrectKey,
         isCorrect,
         timeSpentOnResponse: payload.timeSpentOnResponse ?? 0,
         usedCalculator: payload.usedCalculator ?? undefined,

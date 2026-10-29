@@ -1,6 +1,6 @@
 ---
 sectionId: "sat-t1-m2h"
-sectionTitle: "Math - Module 2 (Hard)"
+sectionTitle: "Mathematics - M2H"
 sectionOrder: 4
 timeLimit: 2100
 questions:
@@ -125,7 +125,7 @@ questions:
     containsChart: false
     containsDiagram: false
     prompt: |
-      A school drama club is selling tickets for a performance of their latest production. The theater for the performance has $300$ seats available. Adult tickets, $a$, cost $\$15$ each, and student tickets, $s$, cost $\$10$ each. The club's goal is to raise at least $\$4{,}000$. Which system of inequalities represents this situation?
+      A school drama club is selling tickets for a performance of their latest production. The theater for the performance has $300$ seats available. Adult tickets, $a$, cost &dollar;$15$ each, and student tickets, $s$, cost &dollar;$10$ each. The club's goal is to raise at least &dollar;$4{,}000$. Which system of inequalities represents this situation?
     explanation: |
       The total revenue from selling $a$ adult tickets and $s$ student tickets must be at least $\$4{,}000$:
       $$15a + 10s \ge 4000$$
@@ -134,13 +134,13 @@ questions:
       $$a + s \le 300$$
     options:
       - id: "A"
-        text: "$10a + 15s \\ge 4000 \\quad \\text{and} \\quad a + s \\le 300$"
+        text: "$\\begin{aligned} &10a + 15s \\ge 4000 \\\\ &a + s \\le 300 \\end{aligned}$"
       - id: "B"
-        text: "$15a + 10s \\le 4000 \\quad \\text{and} \\quad a + s \\ge 300$"
+        text: "$\\begin{aligned} &15a + 10s \\le 4000 \\\\ &a + s \\ge 300 \\end{aligned}$"
       - id: "C"
-        text: "$15a + 10s \\ge 4000 \\quad \\text{and} \\quad a + s \\le 300$"
+        text: "$\\begin{aligned} &15a + 10s \\ge 4000 \\\\ &a + s \\le 300 \\end{aligned}$"
       - id: "D"
-        text: "$10a + 15s \\le 4000 \\quad \\text{and} \\quad a + s \\ge 300$"
+        text: "$\\begin{aligned} &10a + 15s \\le 4000 \\\\ &a + s \\ge 300 \\end{aligned}$"
 
   - id: "sat-t1-m2h-q6"
     questionNumber: 6
@@ -296,7 +296,7 @@ questions:
   - id: "sat-t1-mh2-q11"
     questionNumber: 11
     questionType: "FR"
-    correctAnswer: "3"
+    correctAnswer: "6"
     domain: "Geometry and Trigonometry"
     skill: "Area and Perimeter"
     difficulty: "Hard"
@@ -487,13 +487,13 @@ questions:
       $$\text{Mean } (7.39) < \text{Range } (9) < \text{Median } (10)$$
     options:
       - id: "A"
-        text: "$\text{mean} < \text{range} < \text{median}$"
+        text: "$\\text{mean} < \\text{range} < \\text{median}$"
       - id: "B"
-        text: "$\text{range} < \text{mean} < \text{median}$"
+        text: "$\\text{range} < \\text{mean} < \\text{median}$"
       - id: "C"
-        text: "$\text{mean} < \text{median} < \text{range}$"
+        text: "$\\text{mean} < \\text{median} < \\text{range}$"
       - id: "D"
-        text: "$\text{median} < \text{mean} < \text{range}$"
+        text: "$\\text{median} < \\text{mean} < \\text{range}$"
 
   - id: "sat-t1-mh2-q18"
     questionNumber: 18
@@ -506,7 +506,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      ![Graph of transformed function](./assets/transformed-function-graph.svg)
+      ![](./assets/dSAT-T1-M2H-Q18.svg)
 
       The graph of $y = 3f(x) - 2$ is shown above.
     prompt: |
@@ -540,9 +540,13 @@ questions:
     prompt: |
       Let $S$ be the set of all integers that can be written in the form $n^2 + 2$, where $n$ is a nonzero integer. If $x$ and $y$ are two distinct integers in $S$, which of the following must be the square of an integer?
 
-      I. $(x - 2)(y - 2)$
-      II. $4(x - 2)$
-      III. $(x - y)^2$
+      $$
+      \begin{aligned}
+      \text{I.}& \quad (x - 2)(y - 2) \\
+      \text{II.}& \quad 4(x - 2) \\
+      \text{III.}& \quad (x - y)^2
+      \end{aligned}
+      $$
     explanation: |
       Because $x, y \in S$, we can write $x = n_1^2 + 2$ and $y = n_2^2 + 2$ for distinct nonzero integers $n_1$ and $n_2$. Therefore, $x - 2 = n_1^2$ and $y - 2 = n_2^2$.
 
@@ -649,9 +653,9 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      ![Circle Segment Diagram](./assets/circle-segment-diagram.svg)
+      ![](./assets/dSAT-T1-M2H-Q22.svg)
     prompt: |
-      If diameter $AC$ measures $8$ feet and $m\overparen{AB} = \dfrac{1}{2} m\overparen{BC}$, what is the area, in square feet, of the shaded region?
+      If diameter $AC$ measures $8$ feet and the measure of arc $AB$ is $\dfrac{1}{2}$ the measure of arc $BC$, what is the area, in square feet, of the shaded region?
     explanation: |
       Since $AC$ is a diameter, the arc measure of semicircle $ABC$ is $180^\circ$:
       $$\dfrac{1}{2} m\overparen{BC} + m\overparen{BC} = 180^\circ \implies \dfrac{3}{2} m\overparen{BC} = 180^\circ \implies m\overparen{BC} = 120^\circ$$
