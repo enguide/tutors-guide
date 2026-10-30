@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { CaptureSessionStatus } from "@prisma/client";
 import { MobileCameraContainer } from "./MobileCameraContainer";
 
+export const instant = false;
+
 export default async function MobileScanPage({
   params,
 }: {
