@@ -5,6 +5,8 @@ import { connection } from "next/server";
 import { getPendingAuditCrops } from "@/actions/frqAudit";
 import { AuditQueueClient } from "./AuditQueueClient";
 
+export const instant = false;
+
 export default async function FrqAuditPage() {
   await connection();
   const session = await auth();
