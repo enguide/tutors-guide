@@ -3,6 +3,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { evaluateAnswer } from "@/lib/scoring/mathEvaluator";
 import { Prisma, QuestionType } from "@prisma/client";
 
 export interface AutosavePayload {
@@ -87,13 +88,20 @@ export async function autosaveResponse(payload: AutosavePayload) {
 
   try {
     const normalizedCorrectKey = String(payload.correctAnswerKey ?? "").trim();
-    const normalizedSelectedOption = (payload.selectedOptionId ?? "").trim();
-    const normalizedFrqAnswer = (payload.frqUserAnswer ?? "").trim();
-
-    const isCorrect =
+    const studentAnswer =
       payload.responseType === "MC"
-        ? normalizedSelectedOption.toUpperCase() === normalizedCorrectKey.toUpperCase()
-        : normalizedFrqAnswer.toLowerCase() === normalizedCorrectKey.toLowerCase();
+        ? payload.selectedOptionId
+        : payload.frqUserAnswer;
+
+    // Only run math evaluation for MC and typed FR questions
+    let isCorrect = false;
+    if (payload.responseType === "MC" || payload.responseType === "FR") {
+      isCorrect = evaluateAnswer(
+        payload.responseType,
+        studentAnswer,
+        payload.correctAnswerKey
+      );
+    }
 
     const existing = await prisma.response.findUnique({
       where: {
@@ -105,6 +113,7 @@ export async function autosaveResponse(payload: AutosavePayload) {
       select: {
         selectedOptionId: true,
         frqUserAnswer: true,
+        timeSpentOnResponse: true,
       },
     });
 
@@ -113,6 +122,12 @@ export async function autosaveResponse(payload: AutosavePayload) {
         ? existing.selectedOptionId !== payload.selectedOptionId
         : existing.frqUserAnswer !== payload.frqUserAnswer
       : false;
+
+    // Preserve monotonic time increments across queued or out-of-order network calls
+    const incomingTimeSpent = payload.timeSpentOnResponse ?? 0;
+    const resolvedTimeSpent = existing
+      ? Math.max(existing.timeSpentOnResponse ?? 0, incomingTimeSpent)
+      : incomingTimeSpent;
 
     await prisma.response.upsert({
       where: {
@@ -133,7 +148,7 @@ export async function autosaveResponse(payload: AutosavePayload) {
         frqUserAnswer: payload.frqUserAnswer ?? null,
         correctAnswerKey: normalizedCorrectKey,
         isCorrect,
-        timeSpentOnResponse: payload.timeSpentOnResponse ?? 0,
+        timeSpentOnResponse: resolvedTimeSpent,
         usedCalculator: payload.usedCalculator ?? false,
         changedAnswer: hasChangedAnswer,
       },
@@ -142,7 +157,7 @@ export async function autosaveResponse(payload: AutosavePayload) {
         frqUserAnswer: payload.frqUserAnswer ?? null,
         correctAnswerKey: normalizedCorrectKey,
         isCorrect,
-        timeSpentOnResponse: payload.timeSpentOnResponse ?? 0,
+        timeSpentOnResponse: resolvedTimeSpent,
         usedCalculator: payload.usedCalculator ?? undefined,
         changedAnswer: hasChangedAnswer ? true : undefined,
       },

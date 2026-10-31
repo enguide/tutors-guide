@@ -11,9 +11,11 @@ const geist = Geist({
   variable: "--font-sans",
 });
 
+// Single-weight instantiation avoids Turbopack's multi-entry font query crash
 const merriweather = Merriweather({
-  weight: ["300", "400", "700"],
+  weight: "400",
   subsets: ["latin"],
+  display: "swap",
   variable: "--font-serif",
 });
 
@@ -22,7 +24,6 @@ const openSans = Open_Sans({
   variable: "--font-open-sans",
   weight: ["400", "600", "700"],
 });
-
 
 export const metadata: Metadata = {
   title: "Tutors Guide",

@@ -1,3 +1,4 @@
+// actions/completeTestSection.ts
 "use server";
 
 import { cookies } from "next/headers";
@@ -34,6 +35,32 @@ interface CompleteSectionPayload {
     }
   >;
   accommodations?: AccommodationSettings;
+}
+
+/**
+ * Derives the total dwell time spent per question by computing the duration 
+ * of each interval in navigationHistory up to the final elapsed section time.
+ */
+function deriveTimeSpentFromNavigationHistory(
+  navHistory: { time: number; qIdx: number }[],
+  totalElapsedSeconds: number,
+  totalQuestions: number
+): number[] {
+  const result = new Array(totalQuestions).fill(0);
+  if (!navHistory || navHistory.length === 0) return result;
+
+  for (let i = 0; i < navHistory.length; i++) {
+    const current = navHistory[i];
+    const nextTime =
+      i + 1 < navHistory.length ? navHistory[i + 1].time : totalElapsedSeconds;
+
+    const dwell = Math.max(0, nextTime - current.time);
+    if (current.qIdx >= 0 && current.qIdx < totalQuestions) {
+      result[current.qIdx] += dwell;
+    }
+  }
+
+  return result;
 }
 
 export async function completeTestSection(payload: CompleteSectionPayload) {
@@ -126,12 +153,25 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       }
     }
 
-    // 4. Finalize all response records
+    // 4. Derive question dwell times strictly from navigationHistory timeline
+    const matchedSectionMeta = metadata.sections.find((s) => s.id === sectionId);
+    const baseTimeLimit = matchedSectionMeta?.timeLimit ?? 0;
+    const timeMultiplier = accommodations?.timeMultiplier ?? 1.0;
+    const effectiveTotalLimit = Math.round(baseTimeLimit * timeMultiplier);
+    const totalElapsedSeconds = Math.max(0, effectiveTotalLimit - timeRemainingSeconds);
+
+    const computedDwellTimes = deriveTimeSpentFromNavigationHistory(
+      navigationHistory,
+      totalElapsedSeconds,
+      questions.length
+    );
+
+    // 5. Finalize all response records
     let numCorrect = 0;
     let totalEarnedRawScore = 0;
 
     await Promise.all(
-      questions.map(async (q) => {
+      questions.map(async (q, idx) => {
         const student = clientAnswers[q.id];
         let isCorrect = false;
 
@@ -171,6 +211,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
           : (q.questionType as unknown as QuestionType);
 
         const normalizedCorrectAnswerKey = String(q.correctAnswer ?? "").trim();
+        const finalTimeSpent = computedDwellTimes[idx] ?? 0;
 
         return prisma.response.upsert({
           where: {
@@ -191,7 +232,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
             frqUserAnswer: resolvedFrqAnswer,
             correctAnswerKey: normalizedCorrectAnswerKey,
             isCorrect,
-            timeSpentOnResponse: student?.timeSpent ?? 0,
+            timeSpentOnResponse: finalTimeSpent,
             usedCalculator: student?.usedCalculator ?? false,
             changedAnswer: student?.changedAnswer ?? false,
           },
@@ -201,7 +242,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
             frqUserAnswer: resolvedFrqAnswer,
             correctAnswerKey: normalizedCorrectAnswerKey,
             isCorrect,
-            timeSpentOnResponse: student?.timeSpent ?? 0,
+            timeSpentOnResponse: finalTimeSpent,
             usedCalculator: student?.usedCalculator ?? undefined,
             changedAnswer: student?.changedAnswer ?? undefined,
           },
@@ -209,11 +250,11 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       })
     );
 
-    // 5. Calculate section-level scaled score via the Scoring Engine
+    // 6. Calculate section-level scaled score via the Scoring Engine
     const roundedRawScore = Math.round(totalEarnedRawScore);
     const scaledScore = calculateSectionScaledScore(sectionId, roundedRawScore, metadata);
 
-    // 6a. Persist the immutable Result row with scaledScore
+    // 7a. Persist the immutable Result row with scaledScore
     const totalQuestions = questions.length;
     await prisma.result.create({
       data: {
@@ -233,7 +274,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       },
     });
 
-    // 6b. Clean up in-flight SectionCheckpoint (draft has completed)
+    // 7b. Clean up in-flight SectionCheckpoint (draft has completed)
     await prisma.sectionCheckpoint.deleteMany({
       where: {
         profileId,
@@ -242,7 +283,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       },
     });
 
-    // 7. Resolve next exam route (linear or adaptive branching)
+    // 8. Resolve next exam route (linear or adaptive branching)
     const submittedResults = await prisma.result.findMany({
       where: { testId, profileId },
       select: {
@@ -262,7 +303,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       submittedSectionIds
     );
 
-    // 8. If an intermission follows this section, set the HTTP-only server cookie
+    // 9. If an intermission follows this section, set the HTTP-only server cookie
     if (routingDecision.isIntermission) {
       const duration = routingDecision.intermissionDuration || 600;
       const breakEndsAt = Date.now() + duration * 1000;
@@ -276,7 +317,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       });
     }
 
-    // 9. Synthesize full exam composite score if complete across all stages
+    // 10. Synthesize full exam composite score if complete across all stages
     if (routingDecision.isTestComplete) {
       const synthesis = synthesizeExamComposite(metadata, submittedResults);
 

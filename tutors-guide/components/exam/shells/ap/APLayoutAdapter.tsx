@@ -185,6 +185,7 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                 question={state.activeQuestion}
                 category={category}
                 testId={metadata.id}
+                sectionId={section.frontmatter.sectionId}
                 manifestBasePath={manifestBasePath}
                 selectedOptionId={state.activeAnswer?.selectedOptionId}
                 frqAnswer={state.activeAnswer?.frqUserAnswer}

@@ -79,6 +79,32 @@ function readStoredSnapshot(key: string): StoredCache | null {
   }
 }
 
+/**
+ * Pure calculation that extracts total accumulated seconds spent on each question
+ * from the navigationHistory intervals.
+ */
+function deriveDwellTimesFromHistory(
+  history: NavigationHistoryEntry[],
+  currentElapsedSeconds: number,
+  questionCount: number
+): number[] {
+  const dwellTimes = new Array(questionCount).fill(0);
+  if (!history || history.length === 0) return dwellTimes;
+
+  for (let i = 0; i < history.length; i++) {
+    const entry = history[i];
+    const nextTime =
+      i + 1 < history.length ? history[i + 1].time : currentElapsedSeconds;
+
+    const dwell = Math.max(0, nextTime - entry.time);
+    if (entry.qIdx >= 0 && entry.qIdx < questionCount) {
+      dwellTimes[entry.qIdx] += dwell;
+    }
+  }
+
+  return dwellTimes;
+}
+
 // Pure helper function for initial state reconciliation
 function resolveInitialProgressState({
   storageKey,
@@ -231,7 +257,6 @@ export function useTestProgress({
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [isFormulaSheetOpen, setIsFormulaSheetOpen] = useState<boolean>(false);
 
-  const timePerQuestionRef = useRef<{ [questionId: string]: number }>({});
   const autosaveTimeoutRef = useRef<{ [questionId: string]: NodeJS.Timeout }>({});
   const checkpointTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isFlushingRef = useRef<boolean>(false);
@@ -396,25 +421,7 @@ export function useTestProgress({
       setCurrentIndexState((prevIdx) => {
         const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
         if (nextIdx !== prevIdx) {
-          const leavingQ = questions[prevIdx];
-          if (leavingQ) {
-            const uncommitted = timePerQuestionRef.current[leavingQ.id] || 0;
-            timePerQuestionRef.current[leavingQ.id] = 0;
-
-            setAnswers((prevAnswers) => {
-              const prevAns = prevAnswers[leavingQ.id] || {};
-              const updated = {
-                ...prevAnswers,
-                [leavingQ.id]: {
-                  ...prevAns,
-                  timeSpent: (prevAns.timeSpent || 0) + uncommitted,
-                },
-              };
-              return updated;
-            });
-          }
-
-          const elapsed = totalAdjustedSeconds - secondsRemaining;
+          const elapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
           const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
 
           setNavigationHistory((prevHistory) => {
@@ -433,7 +440,6 @@ export function useTestProgress({
       });
     },
     [
-      questions,
       totalAdjustedSeconds,
       secondsRemaining,
       answers,
@@ -453,18 +459,12 @@ export function useTestProgress({
           onTimeExpired?.();
           return 0;
         }
-        const updated = prev - 1;
-        const currentQ = questions[currentIndex];
-        if (currentQ) {
-          timePerQuestionRef.current[currentQ.id] =
-            (timePerQuestionRef.current[currentQ.id] || 0) + 1;
-        }
-        return updated;
+        return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isTimerRunning, currentIndex, questions, onTimeExpired]);
+  }, [isTimerRunning, onTimeExpired]);
 
   // Periodic LocalStorage and Checkpoint write (every 10 seconds)
   useEffect(() => {
@@ -483,13 +483,27 @@ export function useTestProgress({
   ]);
 
   const scheduleAutosave = useCallback(
-    (questionId: string, updatedAnswer: StudentAnswers[string], index: number) => {
+    (
+      questionId: string,
+      updatedAnswer: StudentAnswers[string],
+      index: number,
+      currentNavHistory: NavigationHistoryEntry[],
+      currentSecondsRemaining: number
+    ) => {
       if (autosaveTimeoutRef.current[questionId]) {
         clearTimeout(autosaveTimeoutRef.current[questionId]);
       }
 
       const targetQuestion = questions[index];
       if (!targetQuestion) return;
+
+      const elapsed = Math.max(0, totalAdjustedSeconds - currentSecondsRemaining);
+      const dwellTimes = deriveDwellTimesFromHistory(
+        currentNavHistory,
+        elapsed,
+        questions.length
+      );
+      const calculatedTimeSpent = dwellTimes[index] ?? 0;
 
       const payload: AutosavePayload = {
         testId,
@@ -501,7 +515,7 @@ export function useTestProgress({
         selectedOptionId: updatedAnswer.selectedOptionId,
         frqUserAnswer: updatedAnswer.frqUserAnswer,
         correctAnswerKey: targetQuestion.correctAnswer,
-        timeSpentOnResponse: updatedAnswer.timeSpent || 0,
+        timeSpentOnResponse: calculatedTimeSpent,
         usedCalculator: updatedAnswer.usedCalculator || false,
       };
 
@@ -528,7 +542,7 @@ export function useTestProgress({
         }
       }, 750);
     },
-    [testId, sectionId, sectionOrder, questions, flushOfflineQueue]
+    [testId, sectionId, sectionOrder, questions, totalAdjustedSeconds, flushOfflineQueue]
   );
 
   const selectOption = useCallback(
@@ -550,10 +564,6 @@ export function useTestProgress({
           Boolean(currentAnswer.selectedOptionId) &&
           currentAnswer.selectedOptionId !== optionId;
 
-        const currentSpent =
-          (currentAnswer.timeSpent || 0) + (timePerQuestionRef.current[qId] || 0);
-        timePerQuestionRef.current[qId] = 0;
-
         const nextAnswers: StudentAnswers = {
           ...prevAnswers,
           [qId]: {
@@ -562,12 +572,11 @@ export function useTestProgress({
               currentAnswer.selectedOptionId === optionId ? undefined : optionId,
             eliminatedOptions: nextEliminated,
             changedAnswer: currentAnswer.changedAnswer || isDivergent,
-            timeSpent: currentSpent,
           },
         };
 
         persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-        scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+        scheduleAutosave(qId, nextAnswers[qId], currentIndex, navigationHistory, secondsRemaining);
         triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
 
         return nextAnswers;
@@ -594,23 +603,18 @@ export function useTestProgress({
       const isDivergent =
         Boolean(currentAnswer.frqUserAnswer) && currentAnswer.frqUserAnswer !== val;
 
-      const currentSpent =
-        (currentAnswer.timeSpent || 0) + (timePerQuestionRef.current[qId] || 0);
-      timePerQuestionRef.current[qId] = 0;
-
       const nextAnswers: StudentAnswers = {
         ...answers,
         [qId]: {
           ...currentAnswer,
           frqUserAnswer: val,
           changedAnswer: currentAnswer.changedAnswer || isDivergent,
-          timeSpent: currentSpent,
         },
       };
 
       setAnswers(nextAnswers);
       persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-      scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+      scheduleAutosave(qId, nextAnswers[qId], currentIndex, navigationHistory, secondsRemaining);
       triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
     },
     [
@@ -702,25 +706,17 @@ export function useTestProgress({
       };
 
       persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-      scheduleAutosave(qId, nextAnswers[qId], currentIndex);
+      scheduleAutosave(qId, nextAnswers[qId], currentIndex, navigationHistory, secondsRemaining);
       return nextAnswers;
     });
-  }, [currentIndex, questions, secondsRemaining, navigationHistory, persistToLocalStorage, scheduleAutosave]);
-
-  const getFinalizedAnswers = useCallback((): StudentAnswers => {
-    const activeQ = questions[currentIndex];
-    if (!activeQ) return answers;
-
-    const uncommitted = timePerQuestionRef.current[activeQ.id] || 0;
-    const prevAns = answers[activeQ.id] || {};
-    return {
-      ...answers,
-      [activeQ.id]: {
-        ...prevAns,
-        timeSpent: (prevAns.timeSpent || 0) + uncommitted,
-      },
-    };
-  }, [currentIndex, questions, answers]);
+  }, [
+    currentIndex,
+    questions,
+    secondsRemaining,
+    navigationHistory,
+    persistToLocalStorage,
+    scheduleAutosave,
+  ]);
 
   const getFinalizedNavigationHistory = useCallback((): NavigationHistoryEntry[] => {
     const finalElapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
@@ -736,6 +732,27 @@ export function useTestProgress({
 
     return [...navigationHistory, { time: finalElapsed, qIdx: currentIndex }];
   }, [totalAdjustedSeconds, secondsRemaining, navigationHistory, currentIndex]);
+
+  const getFinalizedAnswers = useCallback((): StudentAnswers => {
+    const finalElapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
+    const finalNavHistory = getFinalizedNavigationHistory();
+    const calculatedDwellTimes = deriveDwellTimesFromHistory(
+      finalNavHistory,
+      finalElapsed,
+      questions.length
+    );
+
+    const finalizedAnswers: StudentAnswers = { ...answers };
+    questions.forEach((q, idx) => {
+      const existing = finalizedAnswers[q.id] || {};
+      finalizedAnswers[q.id] = {
+        ...existing,
+        timeSpent: calculatedDwellTimes[idx] ?? 0,
+      };
+    });
+
+    return finalizedAnswers;
+  }, [totalAdjustedSeconds, secondsRemaining, getFinalizedNavigationHistory, questions, answers]);
 
   return {
     activeQuestion: questions[currentIndex],
