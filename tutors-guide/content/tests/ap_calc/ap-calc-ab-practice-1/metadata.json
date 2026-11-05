@@ -2,6 +2,15 @@
   "id": "ap-calc-ab-practice-1",
   "title": "AP Calculus AB Practice Exam 1",
   "category": "AP_CALC",
+  "entitlement": "AP:CALC",
+  "description": "Full-length AP Calculus AB Practice Exam featuring Section I (Multiple-Choice) and Section II (Free Response, Parts A & B).",
+  "assetBasePath": "/content/tests/ap_calc/ap-calc-ab-practice-1/assets",
+  "isAdaptive": false,
+  "config": {
+    "hasCrossOutMode": true,
+    "allowBacktracking": true,
+    "allowSectionReview": true
+  },
   "scoring": {
     "scaleType": "AP_WEIGHTED",
     "apWeights": {
@@ -16,14 +25,14 @@
         "2": 30,
         "1": 0
       }
+    },
+    "percentileTable": {
+      "5": "Top ~20%",
+      "4": "Top ~40%",
+      "3": "Qualified (~60%)",
+      "2": "Possibly Qualified",
+      "1": "No Recommendation"
     }
-  },
-  "description": "Full-length AP Calculus AB Practice Exam featuring Section I (Multiple-Choice) and Section II (Free Response, Parts A & B).",
-  "isAdaptive": false,
-  "config": {
-    "hasCrossOutMode": true,
-    "allowBacktracking": true,
-    "allowSectionReview": true
   },
   "sections": [
     {
@@ -32,6 +41,7 @@
       "order": 1,
       "title": "Section I, Part A (No Calculator)",
       "timeLimit": 3600,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
         "calculator": "none",
@@ -39,8 +49,7 @@
         "hasCrossOutMode": true,
         "allowBacktracking": true,
         "allowSectionReview": true
-      },
-      "hasIntermissionAfter": false
+      }
     },
     {
       "id": "ap-calc-ab-t1-s1b",
@@ -48,6 +57,8 @@
       "order": 2,
       "title": "Section I, Part B (Calculator Active)",
       "timeLimit": 3600,
+      "hasIntermissionAfter": true,
+      "intermissionDuration": 600,
       "config": {
         "layout": "single-column",
         "calculator": "desmos-graphing",
@@ -55,9 +66,7 @@
         "hasCrossOutMode": true,
         "allowBacktracking": true,
         "allowSectionReview": true
-      },
-      "hasIntermissionAfter": true,
-      "intermissionDuration": 600
+      }
     },
     {
       "id": "ap-calc-ab-t1-s2a",
@@ -65,6 +74,7 @@
       "order": 3,
       "title": "Section II, Part A (Calculator Active FRQ)",
       "timeLimit": 2700,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
         "calculator": "desmos-graphing",
@@ -72,8 +82,7 @@
         "hasCrossOutMode": false,
         "allowBacktracking": true,
         "allowSectionReview": true
-      },
-      "hasIntermissionAfter": false
+      }
     },
     {
       "id": "ap-calc-ab-t1-s2b",
@@ -81,6 +90,7 @@
       "order": 4,
       "title": "Section II, Part B (No Calculator FRQ)",
       "timeLimit": 3600,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
         "calculator": "none",
@@ -88,8 +98,7 @@
         "hasCrossOutMode": false,
         "allowBacktracking": true,
         "allowSectionReview": true
-      },
-      "hasIntermissionAfter": false
+      }
     }
   ]
 }

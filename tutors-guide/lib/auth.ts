@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { TOTP } from "otplib";
 import { prisma } from "./prisma";
 import { authConfig } from "./auth.config";
-import { Category, EnrollmentStatus } from "@prisma/client";
+import { EnrollmentStatus } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -59,11 +59,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!isValidToken) throw new Error("INVALID_2FA_CODE");
         }
 
-        // Aggregate unique entitled categories across all active license pools
-        const categorySet = new Set<Category>();
+        // Aggregate unique entitlement strings across all active license pools
+        const entitlementSet = new Set<string>();
         for (const enrollment of profile.enrollments) {
-          for (const cat of enrollment.licensePool.categories) {
-            categorySet.add(cat);
+          for (const token of enrollment.licensePool.categories) {
+            entitlementSet.add(String(token));
           }
         }
 
@@ -73,7 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: `${profile.firstName} ${profile.lastName}`,
           role: profile.role,
           orgId: profile.orgId,
-          entitlements: Array.from(categorySet),
+          entitlements: Array.from(entitlementSet),
         };
       },
     }),

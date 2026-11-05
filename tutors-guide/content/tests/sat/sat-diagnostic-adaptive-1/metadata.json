@@ -2,11 +2,41 @@
   "id": "sat-diagnostic-adaptive-1",
   "title": "Digital SAT Diagnostic Practice 1 (Adaptive)",
   "category": "SAT",
+  "entitlement": "SAT",
   "description": "Full-length 2-stage computer-adaptive diagnostic exam matching official College Board timing and module lengths.",
   "assetBasePath": "/content/tests/sat/sat-diagnostic-adaptive-1/assets",
   "isAdaptive": true,
+  "config": {
+    "hasCrossOutMode": true,
+    "allowBacktracking": true,
+    "allowSectionReview": true
+  },
   "scoring": {
-    "scaleType": "SAT_ADAPTIVE"
+    "scaleType": "SAT_ADAPTIVE",
+    "percentileTable": {
+      "1600": "99+",
+      "1550": "99",
+      "1500": "98",
+      "1450": "96",
+      "1400": "93",
+      "1350": "89",
+      "1300": "84",
+      "1250": "79",
+      "1200": "74",
+      "1150": "67",
+      "1100": "61",
+      "1050": "53",
+      "1000": "45",
+      "950": "38",
+      "900": "30",
+      "850": "23",
+      "800": "17",
+      "750": "11",
+      "700": "6",
+      "650": "3",
+      "600": "1",
+      "400": "1-"
+    }
   },
   "stages": [
     {
@@ -35,6 +65,7 @@
       "order": 1,
       "title": "Reading & Writing - M1",
       "timeLimit": 1920,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "split-passage",
         "calculator": "none",
@@ -84,6 +115,7 @@
       "order": 3,
       "title": "Mathematics - M1",
       "timeLimit": 2100,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
         "calculator": "desmos-graphing",
@@ -100,6 +132,7 @@
       "order": 4,
       "title": "Mathematics - M2H",
       "timeLimit": 2100,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
         "calculator": "desmos-graphing",
@@ -116,6 +149,7 @@
       "order": 4,
       "title": "Mathematics - M2S",
       "timeLimit": 2100,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
         "calculator": "desmos-graphing",

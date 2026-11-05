@@ -2,8 +2,47 @@
   "id": "gre-practice-1",
   "title": "GRE Diagnostic Practice Test 1",
   "category": "GRE",
+  "entitlement": "GRE",
   "description": "ETS PowerPrep simulation with top-action toolbar, single-column quant layout, and on-screen calculator.",
   "assetBasePath": "/content/tests/gre/gre-practice-1/assets",
+  "isAdaptive": false,
+  "config": {
+    "hasCrossOutMode": false,
+    "allowBacktracking": true,
+    "allowSectionReview": true
+  },
+  "scoring": {
+    "scaleType": "GRE_SECTION",
+    "curves": {
+      "gre-practice-1-s1": {
+        "0": 130,
+        "2": 134,
+        "4": 138,
+        "6": 142,
+        "8": 146,
+        "10": 150,
+        "12": 154,
+        "14": 158,
+        "16": 162,
+        "18": 166,
+        "20": 170
+      }
+    },
+    "percentileTable": {
+      "340": "99+",
+      "335": "98",
+      "330": "95",
+      "325": "90",
+      "320": "82",
+      "315": "72",
+      "310": "60",
+      "305": "47",
+      "300": "34",
+      "290": "15",
+      "280": "4",
+      "260": "1"
+    }
+  },
   "sections": [
     {
       "id": "gre-practice-1-s1",
@@ -11,10 +50,14 @@
       "order": 1,
       "title": "Quantitative Reasoning - Section 1",
       "timeLimit": 2100,
+      "hasIntermissionAfter": false,
       "config": {
         "layout": "single-column",
-        "calculator": "scientific",
-        "hasFormulaSheet": false
+        "calculator": "gre-basic",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": false,
+        "allowBacktracking": true,
+        "allowSectionReview": true
       }
     }
   ]

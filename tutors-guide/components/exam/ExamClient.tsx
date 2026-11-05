@@ -25,6 +25,10 @@ import { Category } from "@prisma/client";
 import { TestShellLayout } from "./shells/TestShellLayout";
 import { ExamErrorBoundary } from "./ExamErrorBoundary";
 
+export interface ExtendedServerCheckpointData extends ServerCheckpointData {
+  accommodations?: AccommodationSettings | null;
+}
+
 interface ExamClientProps {
   metadata: TestMetadata;
   section: ParsedSection;
@@ -32,7 +36,7 @@ interface ExamClientProps {
   category?: string;
   testId?: string;
   studentName?: string;
-  serverCheckpoint?: ServerCheckpointData | null;
+  serverCheckpoint?: ExtendedServerCheckpointData | null;
   serverResponses?: ServerResponseRecord[];
 }
 
@@ -64,12 +68,11 @@ export const ExamClient: React.FC<ExamClientProps> = ({
 
   const accommodationsKey = `attempt_accommodations_${testId}`;
 
-  const [hasStoredAccommodations, setHasStoredAccommodations] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(localStorage.getItem(accommodationsKey));
-  });
-
+  // Priority: 1. Server Checkpoint -> 2. Local Storage -> 3. Default Accommodations
   const [accommodations, setAccommodations] = useState<AccommodationSettings>(() => {
+    if (serverCheckpoint?.accommodations) {
+      return serverCheckpoint.accommodations;
+    }
     if (typeof window === "undefined") return DEFAULT_ACCOMMODATIONS;
     try {
       const stored = localStorage.getItem(accommodationsKey);
@@ -79,7 +82,13 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   });
 
-  const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(!hasStoredAccommodations);
+  // Skip Pre-Flight modal if accommodations were already settled on server checkpoint or local storage
+  const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(() => {
+    if (serverCheckpoint?.accommodations) return false;
+    if (typeof window === "undefined") return true;
+    return !Boolean(localStorage.getItem(accommodationsKey));
+  });
+
   const [isSectionStarted, setIsSectionStarted] = useState<boolean>(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,7 +126,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     testId,
     sectionId: frontmatter.sectionId,
     sectionOrder: frontmatter.sectionOrder,
-    timeLimitSeconds: effectiveTimeLimitSeconds,
+    timeLimitSeconds: frontmatter.timeLimit,
+    timeExtensionMultiplier: accommodations.timeMultiplier,
     questions,
     isTimerRunning: isSectionStarted && !isSubmitting,
     onTimeExpired: () => {
@@ -142,9 +152,12 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     } catch {}
 
     const newEffectiveSeconds = Math.round(frontmatter.timeLimit * selected.timeMultiplier);
-    resetTimeLimit(newEffectiveSeconds);
+    
+    // Only reset time remaining if starting fresh; do not overwrite resumed checkpoint time
+    if (!isResuming) {
+      resetTimeLimit(newEffectiveSeconds);
+    }
 
-    setHasStoredAccommodations(true);
     setIsPreFlightOpen(false);
   };
 

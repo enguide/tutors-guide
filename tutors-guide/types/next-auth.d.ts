@@ -1,4 +1,5 @@
-import { Role, Category } from "@prisma/client";
+// types/next-auth.d.ts
+import { Role } from "@prisma/client";
 import "next-auth";
 import "next-auth/jwt";
 
@@ -10,7 +11,7 @@ declare module "next-auth" {
       name?: string | null;
       role: Role;
       orgId?: string | null;
-      entitlements: Category[];
+      entitlements: string[];
     };
   }
 
@@ -20,7 +21,7 @@ declare module "next-auth" {
     name?: string | null;
     role: Role;
     orgId?: string | null;
-    entitlements: Category[];
+    entitlements: string[];
   }
 }
 
@@ -29,6 +30,6 @@ declare module "next-auth/jwt" {
     id: string;
     role: Role;
     orgId?: string | null;
-    entitlements: Category[];
+    entitlements: string[];
   }
 }

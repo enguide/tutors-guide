@@ -34,6 +34,12 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    // Safely extract entitlements while maintaining compatibility if categories still exists
+    const resolvedEntitlements: string[] =
+      (selectedTier as any).entitlements ||
+      (selectedTier as any).categories?.map((c: any) => String(c)) ||
+      [];
+
     // Hash password if unauthenticated candidate registered on the front page
     let hashedPassword = "";
     if (!sessionAuth && rawPassword) {
@@ -63,7 +69,7 @@ export const POST = async (req: NextRequest) => {
               name: isB2B
                 ? `${selectedTier.title} - Institutional (${seats} Seats)`
                 : selectedTier.title,
-              description: `1-Year Comprehensive Access for ${selectedTier.categories.join(", ")}`,
+              description: `1-Year Comprehensive Access for ${resolvedEntitlements.join(", ")}`,
             },
             unit_amount: selectedTier.priceCents,
           },
@@ -73,7 +79,8 @@ export const POST = async (req: NextRequest) => {
       return_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
         buyerId: sessionAuth?.user?.id || "",
-        categories: JSON.stringify(selectedTier.categories),
+        entitlements: JSON.stringify(resolvedEntitlements),
+        categories: JSON.stringify(resolvedEntitlements), // Preserves backwards compatibility with existing webhook
         tierKey,
         isB2B: isB2B ? "true" : "false",
         seatLimit: seats.toString(),

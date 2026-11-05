@@ -1,4 +1,5 @@
 // app/dashboard/page.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
@@ -24,16 +25,24 @@ interface DashboardPageProps {
 }
 
 function resolveActiveCategory(
-  userEntitlements: Category[],
+  userEntitlements: string[],
   paramProgram?: string
 ): Category {
   if (paramProgram) {
-    const normalized = paramProgram.trim().toUpperCase() as Category;
-    if (userEntitlements.includes(normalized)) {
-      return normalized;
+    const normalized = paramProgram.trim().toUpperCase();
+    if (Object.values(Category).includes(normalized as Category)) {
+      return normalized as Category;
     }
   }
-  return userEntitlements[0] || Category.SAT;
+
+  for (const ent of userEntitlements) {
+    const prefix = ent.split(":")[0].toUpperCase();
+    if (Object.values(Category).includes(prefix as Category)) {
+      return prefix as Category;
+    }
+  }
+
+  return Category.SAT;
 }
 
 async function DashboardOverviewContent({
@@ -47,16 +56,25 @@ async function DashboardOverviewContent({
     searchParamsPromise,
   ]);
 
-  const userEntitlements = (session?.user?.entitlements || []) as Category[];
+  const userEntitlements: string[] = session?.user?.entitlements || [];
 
-  // 1. Enforce default ?program= URL canonicalization
-  if (!rawProgram && userEntitlements.length > 0) {
-    redirect(`/dashboard?program=${userEntitlements[0]}`);
+  const availableCategoryTabs = Array.from(
+    new Set(
+      userEntitlements.map((token) => {
+        const prefix = token.split(":")[0].toUpperCase();
+        return Object.values(Category).includes(prefix as Category)
+          ? (prefix as Category)
+          : Category.ACADEMIC;
+      })
+    )
+  );
+
+  if (!rawProgram && availableCategoryTabs.length > 0) {
+    redirect(`/dashboard?program=${availableCategoryTabs[0]}`);
   }
 
   const activeProgram = resolveActiveCategory(userEntitlements, rawProgram);
 
-  // 2. Fetch tests, summaries, response totals, submitted section results, AND active draft checkpoints
   const [
     availableTestsByCategory,
     completedSummaries,
@@ -109,7 +127,6 @@ async function DashboardOverviewContent({
   const recentSummary = completedSummaries[0] || null;
   const completedTestIds = new Set(completedSummaries.map((s) => s.testId));
 
-  // Map of finalized sections per test
   const completedSectionsByTest = new Map<string, Set<string>>();
   for (const r of userSectionResults) {
     if (!completedSectionsByTest.has(r.testId)) {
@@ -118,18 +135,31 @@ async function DashboardOverviewContent({
     completedSectionsByTest.get(r.testId)!.add(r.sectionId);
   }
 
-  // Map of active in-flight checkpoints per test
   const checkpointByTest = new Map<string, string>();
   for (const cp of userSectionCheckpoints) {
     checkpointByTest.set(cp.testId, cp.sectionId);
   }
 
-  // 3. Determine next recommended or in-progress test
-  const activeProgramTests = availableTestsByCategory[activeProgram] || [];
+  const allCategoryTests = availableTestsByCategory[activeProgram] || [];
+
+  // Filter category tests against student's granular entitlements
+  const activeProgramTests = allCategoryTests.filter((t) => {
+    if (session?.user?.role === "ADMIN") return true;
+
+    // Direct category-wide entitlement (e.g., "SAT" or "ACADEMIC")
+    if (userEntitlements.includes(activeProgram)) return true;
+    if (userEntitlements.includes(`${activeProgram}:*`)) return true;
+
+    // Granular course check from metadata
+    return userEntitlements.some((ent) => {
+      const courseSlug = ent.includes(":") ? ent.split(":")[1].toLowerCase() : "";
+      return courseSlug ? t.testId.toLowerCase().includes(courseSlug) : false;
+    });
+  });
+
   let nextTest: NextTestTarget | null = null;
   let nextLaunchUrl: string | null = null;
 
-  // First check if any test is IN PROGRESS (has active SectionCheckpoint or submitted sections)
   for (const t of activeProgramTests) {
     if (!completedTestIds.has(t.testId)) {
       const finishedSections = completedSectionsByTest.get(t.testId) || new Set();
@@ -138,7 +168,6 @@ async function DashboardOverviewContent({
       if (finishedSections.size > 0 || activeDraftSectionId) {
         const meta = await getTestMetadata(activeProgram.toLowerCase(), t.testId);
         if (meta && meta.sections) {
-          // Prioritize active draft section; otherwise pick the first unsubmitted section
           const resumeSection =
             (activeDraftSectionId && meta.sections.find((s) => s.id === activeDraftSectionId)) ||
             meta.sections.find((s) => !finishedSections.has(s.id));
@@ -160,7 +189,6 @@ async function DashboardOverviewContent({
     }
   }
 
-  // If no in-progress tests, find the first completely untouched test
   if (!nextTest) {
     for (const t of activeProgramTests) {
       if (!completedTestIds.has(t.testId)) {
@@ -179,7 +207,6 @@ async function DashboardOverviewContent({
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
-      {/* Welcome Banner & Program Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground">
@@ -191,13 +218,12 @@ async function DashboardOverviewContent({
         </div>
 
         <ProgramTabSwitcher
-          userEntitlements={userEntitlements}
+          userEntitlements={availableCategoryTabs}
           activeProgram={activeProgram}
         />
       </div>
 
-      {/* Tier 1: Horizon & Target Score Runway */}
-      {userEntitlements.length > 0 && (
+      {availableCategoryTabs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
           <RecentPerformanceCard recentSummary={recentSummary} />
           <ScoreTargetGauge
@@ -209,11 +235,9 @@ async function DashboardOverviewContent({
         </div>
       )}
 
-      {/* Tier 2: Next Up Hero Action Card (Shows "Resume Exam" if in-progress) */}
       <NextRecommendedHeroCard nextTest={nextTest} launchUrl={nextLaunchUrl} />
 
-      {/* Tier 3: Diagnostic Cadence & Preparation Time Bank */}
-      {userEntitlements.length > 0 && (
+      {availableCategoryTabs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
           <div className="md:col-span-8">
             <StudyInvestmentWidget
@@ -232,7 +256,6 @@ async function DashboardOverviewContent({
         </div>
       )}
 
-      {/* Tier 4: Quick Navigation Hub */}
       <QuickNavTiles />
     </main>
   );

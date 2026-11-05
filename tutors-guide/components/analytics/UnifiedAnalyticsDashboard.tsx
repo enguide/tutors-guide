@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/analytics/UnifiedAnalyticsDashboard.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import * as React from "react";
@@ -38,7 +38,6 @@ import {
 import { TestMetadata } from "@/types/content";
 import { TopicSkillAccuracyAccordion } from "@/components/analytics/TopicSkillAccuracyAccordion";
 
-// --- Difficulty Mapping ---
 const DIFFICULTY_LABELS: Record<string, string> = {
   "1": "Easy",
   "2": "Moderate",
@@ -140,7 +139,6 @@ export default function UnifiedAnalyticsDashboard({
       .sort((a, b) => a.responseOrder - b.responseOrder);
   }, [responses, activeSectionId]);
 
-  // Top Bar Chart Data
   const topChartData = React.useMemo(() => {
     return activeResponses.map((r, index) => ({
       question: `${index + 1}`,
@@ -150,7 +148,6 @@ export default function UnifiedAnalyticsDashboard({
     }));
   }, [activeResponses]);
 
-  // Section metrics for tabs
   const sectionStats = React.useMemo(() => {
     const stats: Record<
       string,
@@ -183,9 +180,23 @@ export default function UnifiedAnalyticsDashboard({
     return stats;
   }, [sectionResults, responses]);
 
-  // Unified Total / Composite Score definition
   const scoreCard = React.useMemo(() => {
     const category = metadata.category.toUpperCase();
+
+    // 1. Collegiate Academic / Chapter Tests: Pure Percentage
+    if (category === "ACADEMIC" || (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE") {
+      const totalEarned = sectionResults.reduce((acc, sr) => acc + (sr.rawScore || 0), 0);
+      const totalPossible = sectionResults.reduce((acc, sr) => acc + (sr.totalQuestions || 0), 0);
+      const calcPct = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+      const displayScore = testSummary?.compositeScore ?? calcPct;
+
+      return {
+        label: "Mastery Score",
+        score: `${displayScore}%`,
+        maxScore: null,
+        subtext: `${totalEarned}/${totalPossible} pts earned`,
+      };
+    }
 
     if (category === "SAT") {
       if (adaptiveTrajectory?.compositeScore) {
@@ -321,60 +332,58 @@ export default function UnifiedAnalyticsDashboard({
   };
 
   const isSatCategory = metadata.category.toUpperCase() === "SAT";
+  const isAcademicCategory =
+    metadata.category.toUpperCase() === "ACADEMIC" ||
+    (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE";
+
   const hasAdaptiveScores =
     isSatCategory &&
     Boolean(adaptiveTrajectory?.stageSummaries && adaptiveTrajectory.stageSummaries.length > 0);
 
   const getSatModuleAbbreviation = (sr: SectionResultData, index: number) => {
-  const id = (sr.sectionId || "").toLowerCase();
-  const title = (sr.section?.title || "").toLowerCase();
-  
-  // Use sectionOrder if present on section, otherwise array index
-  const orderIndex = sr.section?.sectionOrder !== undefined 
-    ? sr.section.sectionOrder - 1 
-    : index;
+    const id = (sr.sectionId || "").toLowerCase();
+    const title = (sr.section?.title || "").toLowerCase();
 
-  // 1. Direct Module 2 checks
-  const isModule2 =
-    title.includes("module 2") ||
-    title.includes("module-2") ||
-    title.includes("section 2") ||
-    title.includes("stage 2") ||
-    title.includes("routed") ||
-    title.includes("tier") ||
-    id.includes("m2") ||
-    id.includes("s2") ||
-    id.includes("sec2") ||
-    id.includes("hard") ||
-    id.includes("easy") ||
-    id.includes("standard") ||
-    orderIndex === 1 ||
-    orderIndex === 3;
+    const orderIndex =
+      sr.section?.sectionOrder !== undefined
+        ? sr.section.sectionOrder - 1
+        : index;
 
-  const isMath =
-    title.includes("math") ||
-    id.includes("math") ||
-    orderIndex >= 2;
+    const isModule2 =
+      title.includes("module 2") ||
+      title.includes("module-2") ||
+      title.includes("section 2") ||
+      title.includes("stage 2") ||
+      title.includes("routed") ||
+      title.includes("tier") ||
+      id.includes("m2") ||
+      id.includes("s2") ||
+      id.includes("sec2") ||
+      id.includes("hard") ||
+      id.includes("easy") ||
+      id.includes("standard") ||
+      orderIndex === 1 ||
+      orderIndex === 3;
 
-  if (isMath) {
-    return isModule2 ? "M2" : "M1";
-  }
+    const isMath =
+      title.includes("math") ||
+      id.includes("math") ||
+      orderIndex >= 2;
 
-  // Reading & Writing
-  return isModule2 ? "RW2" : "RW1";
-};
+    if (isMath) {
+      return isModule2 ? "M2" : "M1";
+    }
+
+    return isModule2 ? "RW2" : "RW1";
+  };
 
   return (
     <div className="flex flex-col items-center align-middle mx-1 sm:mx-8 gap-4 w-full min-w-0">
-      {/* =========================================================================
-          1. TOP RESULTS & PACING BAR CHART
-         ========================================================================= */}
       <Card
         key={`chart-${activeSectionId}`}
         className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 border border-slate-200 dark:border-slate-800 shadow-sm"
       >
         <CardHeader className="flex flex-col items-stretch justify-between space-y-0 border-b border-slate-200 dark:border-slate-800 p-0 md:flex-row">
-          {/* Title & Legend */}
           <div className="flex md:flex-col flex-row justify-between md:justify-center items-center md:items-start gap-1 px-4 py-3">
             <CardTitle>{metadata.title || "Exam Results"}</CardTitle>
             <CardDescription className="hidden md:block">
@@ -399,20 +408,19 @@ export default function UnifiedAnalyticsDashboard({
             </div>
           </div>
 
-          {/* Section Buttons, Domain Scores, & Master Score Anchor */}
           <div className="flex flex-col md:flex-row items-stretch">
-            {/* Clickable Section Navigation Tabs */}
             <div className="flex flex-row overflow-x-auto md:overflow-visible no-scrollbar">
               {sectionResults.map((sr, idx) => {
                 const stats = sectionStats[sr.sectionId];
                 const isCurrent = activeSectionId === sr.sectionId;
 
-                const displayScore =
-                  sr.scaledScore !== null && sr.scaledScore !== undefined
-                    ? sr.scaledScore
-                    : stats
-                    ? `${stats.percentage.toFixed(0)}%`
-                    : "0%";
+                const displayScore = isAcademicCategory
+                  ? stats ? `${stats.percentage.toFixed(0)}%` : "0%"
+                  : sr.scaledScore !== null && sr.scaledScore !== undefined
+                  ? sr.scaledScore
+                  : stats
+                  ? `${stats.percentage.toFixed(0)}%`
+                  : "0%";
 
                 const sectionTitle = isSatCategory
                   ? getSatModuleAbbreviation(sr, idx)
@@ -446,7 +454,6 @@ export default function UnifiedAnalyticsDashboard({
               })}
             </div>
 
-            {/* Adaptive SAT Domain Scores (Reading & Writing / Math 200–800) */}
             {hasAdaptiveScores && (
               <div className="flex flex-row border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-muted/20">
                 {adaptiveTrajectory!.stageSummaries.map((summary) => {
@@ -478,7 +485,6 @@ export default function UnifiedAnalyticsDashboard({
               </div>
             )}
 
-            {/* Master Composite Score Pillar (Rightmost Anchor) */}
             {scoreCard.score !== null && (
               <div className="flex flex-col gap-1 justify-center items-center px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 lg:min-w-36 shrink-0">
                 <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
@@ -507,7 +513,6 @@ export default function UnifiedAnalyticsDashboard({
             <div className="h-32 w-full animate-pulse bg-muted/20" />
           ) : topChartData.length > 0 ? (
             !isLg ? (
-              /* MOBILE VIEW (Mounted only when screen is < lg) */
               <div className="w-full min-w-0">
                 <ChartContainer
                   config={topBarConfig}
@@ -562,7 +567,6 @@ export default function UnifiedAnalyticsDashboard({
                 </ChartContainer>
               </div>
             ) : (
-              /* DESKTOP VIEW (Mounted only when screen is >= lg) */
               <div className="w-full min-w-0">
                 <ChartContainer
                   config={topBarConfig}
@@ -592,7 +596,7 @@ export default function UnifiedAnalyticsDashboard({
                         angle: -90,
                         position: "insideLeft",
                         fontSize: 10,
-                        fontWeight: "bold",                 
+                        fontWeight: "bold",
                         dy: 15,
                       }}
                     />
@@ -625,9 +629,6 @@ export default function UnifiedAnalyticsDashboard({
         </CardContent>
       </Card>
 
-      {/* =========================================================================
-          2. SECTION NAVIGATION CHART
-         ========================================================================= */}
       {activeSectionResult && (
         <Card className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 min-w-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b h-16 px-5 py-3.5">
@@ -654,7 +655,7 @@ export default function UnifiedAnalyticsDashboard({
             ) : navData.length > 0 ? (
               <ChartContainer
                 config={navChartConfig}
-                className="aspect-video sm:aspect-2/1 md:aspect-3/1 lg:aspect-4/1 w-full min-w-0 min-h-[220px]"
+                className="aspect-video sm:aspect-2/1 md:aspect-3/1 lg:aspect-4/1 w-full min-w-0 min-h-55"
               >
                 <LineChart
                   data={navData}
@@ -720,16 +721,11 @@ export default function UnifiedAnalyticsDashboard({
         </Card>
       )}
 
-      {/* =========================================================================
-          3. ACCURACY CHARTS
-         ========================================================================= */}
       <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-337.5 xl:min-w-337.5 min-w-0">
-        {/* Left Column: Topics with Nested Skills Accordion */}
         <div className="w-full lg:w-2/3 min-w-0">
           <TopicSkillAccuracyAccordion responses={activeResponses} />
         </div>
 
-        {/* Right Column: Difficulty Breakdown */}
         <div className="w-full lg:w-1/3 flex flex-col gap-4 min-w-0">
           <Card className="rounded-none w-full h-fit min-w-0">
             <CardHeader className="border-b">

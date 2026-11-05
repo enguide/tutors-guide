@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { evaluateAnswer } from "@/lib/scoring/mathEvaluator";
 import { Prisma, QuestionType } from "@prisma/client";
+import { AccommodationSettings } from "@/types/accommodations";
 
 export interface AutosavePayload {
   testId: string;
@@ -26,6 +27,7 @@ export interface CheckpointPayload {
   timeRemainingSeconds: number;
   lastQuestionIndex: number;
   navigationHistory?: { time: number; qIdx: number }[];
+  accommodations?: AccommodationSettings;
   clientUpdatedAt?: number;
 }
 
@@ -59,6 +61,9 @@ export async function saveSectionCheckpoint(payload: CheckpointPayload) {
         navigationHistory: payload.navigationHistory
           ? (payload.navigationHistory as unknown as Prisma.InputJsonValue)
           : Prisma.JsonNull,
+        accommodations: payload.accommodations
+          ? (payload.accommodations as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
         clientUpdatedAt: clientDate,
       },
       update: {
@@ -66,6 +71,9 @@ export async function saveSectionCheckpoint(payload: CheckpointPayload) {
         lastQuestionIndex: payload.lastQuestionIndex,
         navigationHistory: payload.navigationHistory
           ? (payload.navigationHistory as unknown as Prisma.InputJsonValue)
+          : undefined,
+        accommodations: payload.accommodations
+          ? (payload.accommodations as unknown as Prisma.InputJsonValue)
           : undefined,
         clientUpdatedAt: clientDate,
       },

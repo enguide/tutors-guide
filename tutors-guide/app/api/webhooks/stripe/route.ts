@@ -1,8 +1,9 @@
+// app/api/webhooks/stripe/route.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Stripe from "stripe";
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Category, ClassYear, EnrollmentStatus, Role } from "@prisma/client";
+import { ClassYear, EnrollmentStatus, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -35,9 +36,13 @@ export const POST = async (req: NextRequest) => {
     const metadata = session.metadata || {};
     const isB2B = metadata.isB2B === "true";
     const seatLimit = Math.max(1, parseInt(metadata.seatLimit || "1", 10));
-    const categories: Category[] = metadata.categories
-      ? JSON.parse(metadata.categories)
-      : [Category.SAT];
+
+    // Support both granular string entitlements and legacy category arrays
+    const rawEntitlements = metadata.entitlements || metadata.categories;
+    const entitlements: string[] = rawEntitlements
+      ? JSON.parse(rawEntitlements)
+      : ["SAT"];
+
     const orgName = metadata.orgName || "Purchased Organization";
     const buyerEmail = (
       session.customer_details?.email ||
@@ -113,10 +118,10 @@ export const POST = async (req: NextRequest) => {
 
           await tx.licensePool.create({
             data: {
-              name: `${orgName} ${categories.join("/")} Pool`,
+              name: `${orgName} ${entitlements.join("/")} Pool`,
               stripeSessionId: session.id,
               seatLimit,
-              categories,
+              categories: entitlements as any, // Casts cleanly to string[] (or Prisma enum during transition)
               startsAt: new Date(),
               expiresAt: oneYearExpiry,
               purchaserId: profile.id,
@@ -128,10 +133,10 @@ export const POST = async (req: NextRequest) => {
           // 2B. B2C Individual Flow: Pool (1 seat) + Direct Active Enrollment
           const pool = await tx.licensePool.create({
             data: {
-              name: `Individual ${categories.join("/")} Access`,
+              name: `Individual ${entitlements.join("/")} Access`,
               stripeSessionId: session.id,
               seatLimit: 1,
-              categories,
+              categories: entitlements as any, // Casts cleanly to string[] (or Prisma enum during transition)
               startsAt: new Date(),
               expiresAt: oneYearExpiry,
               purchaserId: profile.id,

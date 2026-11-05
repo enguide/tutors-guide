@@ -165,7 +165,7 @@ model LicensePool {
   stripeSessionId      String?       @unique
   stripeSubscriptionId String?
   seatLimit            Int           @default(1)
-  categories           Category[]
+  categories           String[]      // Changed from Category[] to String[]
   startsAt             DateTime      @default(now())
   expiresAt            DateTime
   
@@ -272,6 +272,7 @@ model SectionCheckpoint {
   timeRemainingSeconds Int
   lastQuestionIndex    Int      @default(0)
   navigationHistory    Json?
+  accommodations       Json?    // Mirror Result schema
   clientUpdatedAt      DateTime @default(now())
 
   profileId            String
