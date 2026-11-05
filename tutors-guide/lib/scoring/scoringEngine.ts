@@ -1,6 +1,8 @@
+// lib/scoring/scoringEngine.ts
 import { TestMetadata } from "@/types/content";
 import { DEFAULT_SAT_CURVE, lookupScaledScore } from "./curveEngine";
 import { synthesizeAdaptiveTestScores } from "./adaptiveScorer";
+import { lookupPercentile, PercentileTable } from "./percentileEngine";
 
 export interface SectionScoreInput {
   sectionId: string;
@@ -11,6 +13,7 @@ export interface SectionScoreInput {
 
 export interface FinalScoreSynthesis {
   compositeScore: number;
+  percentile: string | null;
   scaledSectionScores: Record<string, number>;
   displayBadge: string;
   subscoreDetails: Record<string, unknown>;
@@ -28,25 +31,20 @@ export function calculateSectionScaledScore(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scoring = (metadata as any).scoring;
 
-  // 1. Direct form-specific curve lookup if present in metadata
   if (scoring?.curves && scoring.curves[sectionId]) {
     return lookupScaledScore(scoring.curves[sectionId], rawScore);
   }
 
-  // 2. Category-specific linear defaults
   if (metadata.category === "ACT") {
-    // Default ACT section curve: raw score scaled to 1-36
     const ratio = Math.max(0, Math.min(1, rawScore / 40));
     return Math.max(1, Math.min(36, Math.round(ratio * 35) + 1));
   }
 
   if (metadata.category === "GRE") {
-    // Default GRE Quantitative / Verbal section scale: 130-170
     const ratio = Math.max(0, Math.min(1, rawScore / 20));
     return Math.max(130, Math.min(170, Math.round(130 + ratio * 40)));
   }
 
-  // For AP exams, sections retain their raw earned points (scaled grade is composite-level)
   if (metadata.category === "AP_CALC") {
     return rawScore;
   }
@@ -64,10 +62,16 @@ export function synthesizeExamComposite(
 ): FinalScoreSynthesis {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scoring = (metadata as any).scoring;
+  const customPercentileTable: PercentileTable | undefined = scoring?.percentileTable;
+
+  // Helper to resolve percentile consistently across exam types
+  const resolvePercentile = (score: number) => {
+    const res = lookupPercentile(metadata.category, score, customPercentileTable);
+    return res || null;
+  };
 
   // -------------------------------------------------------------
   // 1. AP EXAMINATIONS (Calculus AB/BC, etc.)
-  // Composite raw = (MC_raw * 1.2) + (FRQ_raw * 1.0) -> Scaled AP Grade 1-5
   // -------------------------------------------------------------
   if (metadata.category === "AP_CALC" || scoring?.scaleType === "AP_WEIGHTED") {
     const mcIds: string[] = scoring?.apWeights?.mcSectionIds || [
@@ -116,6 +120,7 @@ export function synthesizeExamComposite(
 
     return {
       compositeScore: apGrade,
+      percentile: resolvePercentile(apGrade),
       scaledSectionScores,
       displayBadge: `Score: ${apGrade} / 5 (${compositeRaw}/108 pts)`,
       subscoreDetails: {
@@ -149,6 +154,7 @@ export function synthesizeExamComposite(
 
       return {
         compositeScore: adaptiveSynthesis.compositeScore,
+        percentile: resolvePercentile(adaptiveSynthesis.compositeScore),
         scaledSectionScores,
         displayBadge: `${adaptiveSynthesis.compositeScore} / 1600`,
         subscoreDetails: {
@@ -157,11 +163,11 @@ export function synthesizeExamComposite(
         },
       };
     } else {
-      // Linear SAT fallback
       const totalCorrect = results.reduce((acc, r) => acc + r.numCorrect, 0);
       const scaled = lookupScaledScore(DEFAULT_SAT_CURVE.sectionCurves.English, totalCorrect);
       return {
         compositeScore: scaled,
+        percentile: resolvePercentile(scaled),
         scaledSectionScores: {},
         displayBadge: `${scaled} / 1600`,
         subscoreDetails: {},
@@ -170,7 +176,7 @@ export function synthesizeExamComposite(
   }
 
   // -------------------------------------------------------------
-  // 3. ACT EXAMINATIONS (1-36 Composite Average across sections)
+  // 3. ACT EXAMINATIONS
   // -------------------------------------------------------------
   if (metadata.category === "ACT") {
     const scaledSectionScores: Record<string, number> = {};
@@ -190,11 +196,11 @@ export function synthesizeExamComposite(
       sectionCount++;
     });
 
-    // ACT standard rounding rule: >= 0.5 rounds up
     const compositeScore = sectionCount > 0 ? Math.round(subscoreSum / sectionCount) : 1;
 
     return {
       compositeScore,
+      percentile: resolvePercentile(compositeScore),
       scaledSectionScores,
       displayBadge: `ACT Composite: ${compositeScore}`,
       subscoreDetails: {
@@ -204,7 +210,7 @@ export function synthesizeExamComposite(
   }
 
   // -------------------------------------------------------------
-  // 4. GRE EXAMINATIONS (Verbal 130-170, Quant 130-170)
+  // 4. GRE EXAMINATIONS
   // -------------------------------------------------------------
   if (metadata.category === "GRE") {
     const scaledSectionScores: Record<string, number> = {};
@@ -224,6 +230,7 @@ export function synthesizeExamComposite(
 
     return {
       compositeScore,
+      percentile: resolvePercentile(compositeScore),
       scaledSectionScores,
       displayBadge: `GRE Score: ${compositeScore}`,
       subscoreDetails: {
@@ -238,6 +245,7 @@ export function synthesizeExamComposite(
   const totalRaw = results.reduce((acc, r) => acc + r.numCorrect, 0);
   return {
     compositeScore: totalRaw,
+    percentile: null,
     scaledSectionScores: {},
     displayBadge: `Raw Score: ${totalRaw}`,
     subscoreDetails: {},

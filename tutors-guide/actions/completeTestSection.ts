@@ -334,9 +334,11 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
           testTitle,
           category,
           compositeScore: synthesis.compositeScore,
+          percentile: synthesis.percentile,
         },
         update: {
           compositeScore: synthesis.compositeScore,
+          percentile: synthesis.percentile,
         },
       });
     }
