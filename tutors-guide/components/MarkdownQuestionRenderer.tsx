@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/MarkdownQuestionRenderer.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -19,7 +19,7 @@ interface MarkdownQuestionRendererProps {
   manifestBasePath?: string;
   enableLightbox?: boolean;
   className?: string;
-  activeQuestionNumber?: number; // Active item to highlight and auto-scroll to
+  activeQuestionNumber?: number;
 }
 
 interface LightboxState {
@@ -28,6 +28,184 @@ interface LightboxState {
   alt: string;
   isSvg: boolean;
 }
+
+/**
+ * College Board (SAT & AP) Authentic Diagram Viewer
+ * - Completely stable box dimensions (never grows/shrinks on zoom)
+ * - True zoom with zero clipping on left/top
+ * - Click-and-drag panning synchronized with native scrollbars
+ */
+const CollegeBoardFigureViewer: React.FC<{
+  src: string;
+  alt: string;
+  onExpand?: () => void;
+}> = React.memo(({ src, alt, onExpand }) => {
+  const [zoom, setZoom] = useState(1);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Drag-to-pan state
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const scrollTopRef = useRef(0);
+  const [isGrabbing, setIsGrabbing] = useState(false);
+
+  // Base fixed display frame (matches 100% view)
+  const VIEWPORT_WIDTH = 360;
+  const VIEWPORT_HEIGHT = 360;
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoom((prev) => Math.min(Number((prev + 0.25).toFixed(2)), 2.5));
+  };
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoom((prev) => Math.max(Number((prev - 0.25).toFixed(2)), 0.5));
+  };
+
+  const handleReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoom(1);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        left: 0,
+        top: 0,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const isZoomed = zoom > 1;
+
+  // --- Click & Drag Pan Handlers ---
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isZoomed || !scrollContainerRef.current) return;
+    isDraggingRef.current = true;
+    setIsGrabbing(true);
+    startXRef.current = e.pageX - scrollContainerRef.current.offsetLeft;
+    startYRef.current = e.pageY - scrollContainerRef.current.offsetTop;
+    scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
+    scrollTopRef.current = scrollContainerRef.current.scrollTop;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const y = e.pageY - scrollContainerRef.current.offsetTop;
+    scrollContainerRef.current.scrollLeft = scrollLeftRef.current - (x - startXRef.current);
+    scrollContainerRef.current.scrollTop = scrollTopRef.current - (y - startYRef.current);
+  };
+
+  const handleMouseUpOrLeave = () => {
+    isDraggingRef.current = false;
+    setIsGrabbing(false);
+  };
+
+  return (
+    <div
+      style={{ width: `${VIEWPORT_WIDTH}px` }}
+      className="border border-neutral-300 dark:border-neutral-700 rounded-lg overflow-hidden bg-white dark:bg-neutral-900 shadow-xs select-none"
+    >
+      {/* College Board Header Toolbar */}
+      <div className="h-8 bg-neutral-100 dark:bg-neutral-800/90 border-b border-neutral-200 dark:border-neutral-700/80 px-2.5 flex items-center justify-end gap-2.5 text-xs font-sans text-neutral-800 dark:text-neutral-200">
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          disabled={zoom >= 2.5}
+          title="Zoom In"
+          aria-label="Zoom In"
+          className="p-1 hover:text-[#2050c8] dark:hover:text-blue-400 disabled:opacity-30 transition-colors cursor-pointer"
+        >
+          <ZoomIn className="w-3.5 h-3.5 stroke-[2]" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          disabled={zoom <= 0.5}
+          title="Zoom Out"
+          aria-label="Zoom Out"
+          className="p-1 hover:text-[#2050c8] dark:hover:text-blue-400 disabled:opacity-30 transition-colors cursor-pointer"
+        >
+          <ZoomOut className="w-3.5 h-3.5 stroke-[2]" />
+        </button>
+
+        <span className="font-semibold text-xs text-neutral-700 dark:text-neutral-300 min-w-[36px] text-center">
+          {Math.round(zoom * 100)}%
+        </span>
+
+        <button
+          type="button"
+          onClick={handleReset}
+          className="font-medium hover:text-[#2050c8] dark:hover:text-blue-400 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer text-xs"
+        >
+          Reset
+        </button>
+
+        <div className="w-px h-3 bg-neutral-300 dark:bg-neutral-600 mx-0.5" />
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onExpand?.();
+          }}
+          title="Expand Figure"
+          aria-label="Expand Figure"
+          className="p-1 hover:text-[#2050c8] dark:hover:text-blue-400 transition-colors cursor-pointer"
+        >
+          <Maximize2 className="w-3.5 h-3.5 stroke-[2.2]" />
+        </button>
+      </div>
+
+      {/* Viewport: Strictly locked to VIEWPORT_WIDTH x VIEWPORT_HEIGHT */}
+      <div
+        ref={scrollContainerRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        style={{
+          width: `${VIEWPORT_WIDTH}px`,
+          height: `${VIEWPORT_HEIGHT}px`,
+        }}
+        className={`relative bg-white dark:bg-neutral-900 ${
+          isZoomed
+            ? `overflow-auto ${isGrabbing ? "cursor-grabbing" : "cursor-grab"}`
+            : "overflow-hidden cursor-default"
+        }`}
+      >
+        {/* Canvas that expands layout bounds in positive coordinates without shifting (0,0) */}
+        <div
+          style={{
+            width: `${VIEWPORT_WIDTH * zoom}px`,
+            height: `${VIEWPORT_HEIGHT * zoom}px`,
+            transition: isGrabbing ? "none" : "width 0.12s ease-out, height 0.12s ease-out",
+          }}
+          className="relative shrink-0 flex items-center justify-center p-2"
+        >
+          <img
+            src={src}
+            alt={alt}
+            draggable={false}
+            style={{
+              width: `${(VIEWPORT_WIDTH - 16) * zoom}px`,
+              height: `${(VIEWPORT_HEIGHT - 16) * zoom}px`,
+              transition: isGrabbing ? "none" : "width 0.12s ease-out, height 0.12s ease-out",
+            }}
+            className="block object-contain select-none pointer-events-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
+            loading="eager"
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+CollegeBoardFigureViewer.displayName = "CollegeBoardFigureViewer";
 
 export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> = ({
   content,
@@ -44,47 +222,38 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
   const processedContent = useMemo(() => {
     if (!content) return "";
 
-    // A. Temporarily mask inline and display LaTeX so math remains untouched
     const mathTokens: string[] = [];
-    
-    // Match display math ($$...$$) first across lines, then inline math ($...$)
+
     let text = content.replace(/(\$\$[\s\S]*?\$\$|\$(?!\$)[^$\n]+?\$)/g, (match) => {
       mathTokens.push(match);
-      // Use an alphanumeric placeholder without '$' symbols to prevent regex replacement collision
       return `XKMATHBLOCKTOKEN${mathTokens.length - 1}ENDX`;
     });
 
-    // B. Placement markers: [[[A]:15]] -> <span data-act-placement="A" data-act-target="15">[A]</span>
     text = text.replace(
       /\[\[\[([A-D])\]:(\d+)\]\]/g,
       '<span data-act-placement="$1" data-act-target="$2">[$1]</span>'
     );
 
-    // C. Invisible scroll anchor: [[#1]]
     text = text.replace(
       /\[\[#(\d+)\]\]/g,
       '<span data-act-target="$1" data-act-anchor="true" class="inline-block w-0 h-0 overflow-hidden pointer-events-none"></span>'
     );
 
-    // D. Question Underline Targets: [[u:1]]text[[/u]] -> <span data-act-target="1">text</span>
     text = text.replace(
       /\[\[u:(\d+)\]\]([\s\S]*?)\[\[\/u\]\]/g,
       '<span data-act-target="$1">$2</span>'
     );
 
-    // E. Plain Underlines: [[u]]text[[/u]] -> <span data-act-underline="true">text</span>
     text = text.replace(
       /\[\[u\]\]([\s\S]*?)\[\[\/u\]\]/g,
       '<span data-act-underline="true">$1</span>'
     );
 
-    // F. Static Highlights: [[hl]]text[[/hl]] -> <span data-act-highlight="true">text</span>
     text = text.replace(
       /\[\[hl\]\]([\s\S]*?)\[\[\/hl\]\]/g,
       '<span data-act-highlight="true">$1</span>'
     );
 
-    // G. Safely restore masked LaTeX tokens using a callback function
     text = text.replace(/XKMATHBLOCKTOKEN(\d+)ENDX/g, (_, index) => {
       return mathTokens[Number(index)] ?? "";
     });
@@ -100,7 +269,6 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       const container = containerRef.current;
       if (!container) return;
 
-      // Check if current active question is a placement question ([A], [B], [C], [D])
       const placementElements = container.querySelectorAll(
         `[data-act-placement][data-act-target="${activeQuestionNumber}"]`
       );
@@ -114,7 +282,6 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         return;
       }
 
-      // Otherwise, scroll target or anchor to the center
       const activeEl = container.querySelector(
         `[data-act-target="${activeQuestionNumber}"]`
       );
@@ -153,6 +320,308 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightbox.isOpen, closeLightbox]);
 
+  // Normalized exam category check
+  const normalizedCategory = category?.trim().toUpperCase();
+  const isCollegeBoard =
+    normalizedCategory === "SAT" ||
+    normalizedCategory?.startsWith("AP") ||
+    normalizedCategory === "AP_CALC";
+
+  // Memoize markdown components to avoid unmounting child elements on state changes
+  const markdownComponents = useMemo(
+    () => ({
+      span: ({ node, children, ...props }: any) => {
+        const targetNum = props["data-act-target"]
+          ? Number(props["data-act-target"])
+          : undefined;
+        const placementLetter = props["data-act-placement"];
+        const isAnchor = props["data-act-anchor"] === "true";
+        const isPlainUnderline = props["data-act-underline"] === "true";
+        const isHighlight = props["data-act-highlight"] === "true";
+
+        if (placementLetter) {
+          const isActive = activeQuestionNumber === targetNum;
+          return (
+            <span
+              data-act-placement={placementLetter}
+              data-act-target={targetNum}
+              data-act-active={isActive ? "true" : undefined}
+              className={`inline-flex items-center justify-center font-bold text-[12px] px-1 py-0.5 mx-1 rounded-[2px] transition-all duration-150 select-none ${
+                isActive
+                  ? "ring-1 ring-black/20 shadow-xs"
+                  : "text-[var(--act-text-main)] opacity-75 font-semibold"
+              }`}
+              {...props}
+            >
+              [{placementLetter}]
+            </span>
+          );
+        }
+
+        if (isAnchor) {
+          return (
+            <span
+              data-act-target={targetNum}
+              aria-hidden="true"
+              className="inline-block w-0 h-0 -m-px overflow-hidden select-none pointer-events-none"
+            />
+          );
+        }
+
+        if (isHighlight) {
+          return (
+            <span
+              data-act-highlight="true"
+              className="transition-colors duration-150 rounded-[2px] px-0.5"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        if (isPlainUnderline) {
+          return (
+            <span
+              className="underline underline-offset-4 decoration-1 text-inherit"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        if (targetNum !== undefined) {
+          const isActive = activeQuestionNumber === targetNum;
+          return (
+            <span
+              data-act-target={targetNum}
+              data-act-active={isActive ? "true" : undefined}
+              className={`underline underline-offset-4 decoration-1 transition-all duration-200 ${
+                isActive ? "font-normal rounded-[1px] px-0.5 shadow-xs" : "text-inherit"
+              }`}
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        return <span {...props}>{children}</span>;
+      },
+
+      u: ({ children, ...props }: any) => (
+        <span className="underline underline-offset-4 decoration-1" {...props}>
+          {children}
+        </span>
+      ),
+
+      p: ({ children }: any) => {
+        const childrenArray = React.Children.toArray(children);
+        const hasBlockElement = childrenArray.some((child) => {
+          if (React.isValidElement(child)) {
+            return (
+              child.type === "figure" ||
+              (child.props as any)?.node?.tagName === "img" ||
+              (child.props as any)?.src !== undefined
+            );
+          }
+          return false;
+        });
+
+        if (hasBlockElement) {
+          return <div className="my-3 last:mb-0">{children}</div>;
+        }
+
+        return <p className="mb-4 last:mb-0 leading-[28px]">{children}</p>;
+      },
+
+      h1: ({ children }: any) => (
+        <h1 className="text-base font-bold tracking-tight mb-3 text-neutral-900 dark:text-neutral-100">
+          {children}
+        </h1>
+      ),
+      h2: ({ children }: any) => (
+        <h2 className="text-sm font-bold tracking-tight mb-2 text-neutral-900 dark:text-neutral-100">
+          {children}
+        </h2>
+      ),
+      h3: ({ children }: any) => (
+        <h3 className="text-sm font-medium mb-2">{children}</h3>
+      ),
+      ul: ({ children }: any) => (
+        <ul className="list-none my-3 pl-6 sm:pl-8 space-y-2 not-prose">{children}</ul>
+      ),
+
+      li: ({ children }: any) => {
+        const childrenArray = React.Children.toArray(children);
+        const firstChild = childrenArray[0];
+
+        if (typeof firstChild === "string") {
+          const match = firstChild.match(/^([IVXLCDM]+\.)\s*(.*)/);
+          if (match) {
+            const romanLabel = match[1];
+            const remainingFirstChild = match[2];
+
+            return (
+              <li className="flex items-start text-base leading-relaxed">
+                <span className="w-8 shrink-0 text-right pr-3 font-normal select-none">
+                  {romanLabel}
+                </span>
+                <div className="flex-1 min-w-0">
+                  {remainingFirstChild}
+                  {childrenArray.slice(1)}
+                </div>
+              </li>
+            );
+          }
+        }
+
+        return (
+          <li className="flex items-start text-base leading-relaxed">
+            <span className="w-8 shrink-0 text-right pr-3 text-neutral-400 select-none">•</span>
+            <div className="flex-1 min-w-0">{children}</div>
+          </li>
+        );
+      },
+
+      ol: ({ children }: any) => (
+        <ol className="list-decimal pl-6 space-y-1 my-3">{children}</ol>
+      ),
+      strong: ({ children }: any) => (
+        <strong className="font-semibold text-foreground">{children}</strong>
+      ),
+      table: ({ children }: any) => (
+        <div className="my-5 overflow-x-auto">
+          <table className="border-collapse border border-border mx-auto text-center font-sans prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert">
+            {children}
+          </table>
+        </div>
+      ),
+      thead: ({ children }: any) => (
+        <thead className="border-b border-border">{children}</thead>
+      ),
+      tbody: ({ children }: any) => (
+        <tbody className="divide-y divide-border">{children}</tbody>
+      ),
+      tr: ({ children }: any) => (
+        <tr className="border-b border-border last:border-b-0">{children}</tr>
+      ),
+      th: ({ children }: any) => (
+        <th className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
+          {children}
+        </th>
+      ),
+      td: ({ children }: any) => (
+        <td className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
+          {children}
+        </td>
+      ),
+      img: ({ src, alt = "" }: any) => {
+        if (typeof src !== "string" || !src.trim()) {
+          return null;
+        }
+
+        let resolvedSrc =
+          category && testId
+            ? resolveTestAssetUrl(category, testId, src, manifestBasePath)
+            : src;
+
+        if (
+          !resolvedSrc.startsWith("http://") &&
+          !resolvedSrc.startsWith("https://") &&
+          !resolvedSrc.startsWith("/")
+        ) {
+          resolvedSrc = "/" + resolvedSrc.replace(/^(\.\/|\/)?/, "");
+        }
+
+        const isSvg = resolvedSrc.toLowerCase().endsWith(".svg");
+
+        // Authentic College Board (SAT/AP) SVG Box
+        if (isCollegeBoard && isSvg) {
+          return (
+            <figure className="my-4 flex flex-col items-center w-full">
+              <CollegeBoardFigureViewer
+                src={resolvedSrc}
+                alt={alt || "Question diagram"}
+                onExpand={() =>
+                  setLightbox({
+                    isOpen: true,
+                    src: resolvedSrc,
+                    alt: alt || "Question diagram",
+                    isSvg: true,
+                  })
+                }
+              />
+              {alt && (
+                <figcaption className="text-xs text-neutral-500 dark:text-neutral-400 mt-1.5 text-center tracking-tight font-mono">
+                  {alt}
+                </figcaption>
+              )}
+            </figure>
+          );
+        }
+
+        // Generic fallback for ACT, GRE, or PNG/JPEG
+        return (
+          <figure className="my-5 flex flex-col items-center w-full group">
+            <div className="relative border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-[4px] p-4 shadow-xs transition-all duration-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-700 w-full max-w-xl flex items-center justify-center">
+              {isSvg ? (
+                <img
+                  src={resolvedSrc}
+                  alt={alt}
+                  className="w-full max-w-[520px] max-h-[380px] h-auto object-contain mx-auto select-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
+                  loading="eager"
+                />
+              ) : (
+                <Image
+                  src={resolvedSrc}
+                  alt={alt}
+                  width={700}
+                  height={450}
+                  priority={true}
+                  className="max-h-[380px] w-auto h-auto object-contain mx-auto select-none rounded-[2px]"
+                />
+              )}
+
+              {enableLightbox && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLightbox({
+                      isOpen: true,
+                      src: resolvedSrc,
+                      alt: alt || "Test Stimulus Figure",
+                      isSvg,
+                    })
+                  }
+                  aria-label="Expand image"
+                  className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-neutral-800/90 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-[4px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-xs"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
+                </button>
+              )}
+            </div>
+
+            {alt && (
+              <figcaption className="text-xs text-neutral-500 dark:text-neutral-400 mt-2 text-center tracking-tight font-mono">
+                {alt}
+              </figcaption>
+            )}
+          </figure>
+        );
+      },
+    }),
+    [
+      activeQuestionNumber,
+      category,
+      testId,
+      manifestBasePath,
+      isCollegeBoard,
+      enableLightbox,
+    ]
+  );
+
   return (
     <>
       <div
@@ -173,348 +642,40 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
               },
             ],
           ]}
-          components={{
-            span: ({ node, children, ...props }: any) => {
-              const targetNum = props["data-act-target"]
-                ? Number(props["data-act-target"])
-                : undefined;
-              const placementLetter = props["data-act-placement"];
-              const isAnchor = props["data-act-anchor"] === "true";
-              const isPlainUnderline = props["data-act-underline"] === "true";
-              const isHighlight = props["data-act-highlight"] === "true";
-
-              // Case 1: Placement markers [A], [B], [C], [D]
-              if (placementLetter) {
-                const isActive = activeQuestionNumber === targetNum;
-                return (
-                  <span
-                    data-act-placement={placementLetter}
-                    data-act-target={targetNum}
-                    data-act-active={isActive ? "true" : undefined}
-                    className={`inline-flex items-center justify-center font-bold text-[12px] px-1 py-0.5 mx-1 rounded-[2px] transition-all duration-150 select-none ${
-                      isActive
-                        ? "ring-1 ring-black/20 shadow-xs"
-                        : "text-[var(--act-text-main)] opacity-75 font-semibold"
-                    }`}
-                    {...props}
-                  >
-                    [{placementLetter}]
-                  </span>
-                );
-              }
-
-              // Case 2: Invisible scroll anchor [[#1]]
-              if (isAnchor) {
-                return (
-                  <span
-                    data-act-target={targetNum}
-                    aria-hidden="true"
-                    className="inline-block w-0 h-0 -m-px overflow-hidden select-none pointer-events-none"
-                  />
-                );
-              }
-
-              // Case 3: Plain Highlight [[hl]]text[[/hl]]
-              if (isHighlight) {
-                return (
-                  <span
-                    data-act-highlight="true"
-                    className="transition-colors duration-150 rounded-[2px] px-0.5"
-                    {...props}
-                  >
-                    {children}
-                  </span>
-                );
-              }
-
-              // Case 4: Plain underline [[u]]text[[/u]]
-              if (isPlainUnderline) {
-                return (
-                  <span
-                    className="underline underline-offset-4 decoration-1 text-inherit"
-                    {...props}
-                  >
-                    {children}
-                  </span>
-                );
-              }
-
-              // Case 5: Standard Question Underline Target [[u:1]]text[[/u]]
-              if (targetNum !== undefined) {
-                const isActive = activeQuestionNumber === targetNum;
-                return (
-                  <span
-                    data-act-target={targetNum}
-                    data-act-active={isActive ? "true" : undefined}
-                    className={`underline underline-offset-4 decoration-1 transition-all duration-200 ${
-                      isActive ? "font-normal rounded-[1px] px-0.5 shadow-xs" : "text-inherit"
-                    }`}
-                    {...props}
-                  >
-                    {children}
-                  </span>
-                );
-              }
-
-              return <span {...props}>{children}</span>;
-            },
-
-            // Native <u> support
-            u: ({ children, ...props }: any) => (
-              <span className="underline underline-offset-4 decoration-1" {...props}>
-                {children}
-              </span>
-            ),
-
-            p: ({ children }) => {
-              const childrenArray = React.Children.toArray(children);
-              const hasBlockElement = childrenArray.some((child) => {
-                if (React.isValidElement(child)) {
-                  return (
-                    child.type === "figure" ||
-                    (child.props as any)?.node?.tagName === "img" ||
-                    (child.props as any)?.src !== undefined
-                  );
-                }
-                return false;
-              });
-
-              if (hasBlockElement) {
-                return <div className="my-3 last:mb-0">{children}</div>;
-              }
-
-              return <p className="mb-4 last:mb-0 leading-[28px]">{children}</p>;
-            },
-
-            h1: ({ children }) => (
-              <h1 className="text-base font-bold tracking-tight mb-3 text-neutral-900 dark:text-neutral-100">
-                {children}
-              </h1>
-            ),
-            h2: ({ children }) => (
-              <h2 className="text-sm font-bold tracking-tight mb-2 text-neutral-900 dark:text-neutral-100">
-                {children}
-              </h2>
-            ),
-            h3: ({ children }) => (
-              <h3 className="text-sm font-medium mb-2">{children}</h3>
-            ),
-            ul: ({ children }) => (
-              <ul className="list-none my-3 pl-6 sm:pl-8 space-y-2 not-prose">{children}</ul>
-            ),
-
-            li: ({ children }) => {
-              const childrenArray = React.Children.toArray(children);
-              const firstChild = childrenArray[0];
-
-              if (typeof firstChild === "string") {
-                const match = firstChild.match(/^([IVXLCDM]+\.)\s*(.*)/);
-                if (match) {
-                  const romanLabel = match[1];
-                  const remainingFirstChild = match[2];
-
-                  return (
-                    <li className="flex items-start text-base leading-relaxed">
-                      <span className="w-8 shrink-0 text-right pr-3 font-normal select-none">
-                        {romanLabel}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        {remainingFirstChild}
-                        {childrenArray.slice(1)}
-                      </div>
-                    </li>
-                  );
-                }
-              }
-
-              return (
-                <li className="flex items-start text-base leading-relaxed">
-                  <span className="w-8 shrink-0 text-right pr-3 text-neutral-400 select-none">•</span>
-                  <div className="flex-1 min-w-0">{children}</div>
-                </li>
-              );
-            },
-
-            ol: ({ children }) => (
-              <ol className="list-decimal pl-6 space-y-1 my-3">{children}</ol>
-            ),
-            strong: ({ children }) => (
-              <strong className="font-semibold text-foreground">{children}</strong>
-            ),
-            table: ({ children }) => (
-              <div className="my-5 overflow-x-auto">
-                <table className="border-collapse border border-border mx-auto text-center font-sans prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert">
-                  {children}
-                </table>
-              </div>
-            ),
-            thead: ({ children }) => (
-              <thead className="border-b border-border">{children}</thead>
-            ),
-            tbody: ({ children }) => (
-              <tbody className="divide-y divide-border">{children}</tbody>
-            ),
-            tr: ({ children }) => (
-              <tr className="border-b border-border last:border-b-0">{children}</tr>
-            ),
-            th: ({ children }) => (
-              <th className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
-                {children}
-              </th>
-            ),
-            td: ({ children }) => (
-              <td className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
-                {children}
-              </td>
-            ),
-            img: ({ src, alt = "" }) => {
-              if (typeof src !== "string" || !src.trim()) {
-                return null;
-              }
-
-              let resolvedSrc =
-                category && testId
-                  ? resolveTestAssetUrl(category, testId, src, manifestBasePath)
-                  : src;
-
-              if (
-                !resolvedSrc.startsWith("http://") &&
-                !resolvedSrc.startsWith("https://") &&
-                !resolvedSrc.startsWith("/")
-              ) {
-                resolvedSrc = "/" + resolvedSrc.replace(/^(\.\/|\/)?/, "");
-              }
-
-              const isSvg = resolvedSrc.toLowerCase().endsWith(".svg");
-
-              return (
-                <figure className="my-5 flex flex-col items-center w-full group">
-                  <div className="relative border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-[4px] p-4 shadow-xs transition-all duration-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-700 w-full max-w-xl flex items-center justify-center">
-                    {isSvg ? (
-                      <img
-                        src={resolvedSrc}
-                        alt={alt}
-                        className="w-full max-w-[520px] max-h-[380px] h-auto object-contain mx-auto select-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
-                        loading="eager"
-                      />
-                    ) : (
-                      <Image
-                        src={resolvedSrc}
-                        alt={alt}
-                        width={700}
-                        height={450}
-                        priority={true}
-                        className="max-h-[380px] w-auto h-auto object-contain mx-auto select-none rounded-[2px]"
-                      />
-                    )}
-
-                    {enableLightbox && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setLightbox({
-                            isOpen: true,
-                            src: resolvedSrc,
-                            alt: alt || "Test Stimulus Figure",
-                            isSvg,
-                          })
-                        }
-                        aria-label="Expand image"
-                        className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-neutral-800/90 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-[4px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-xs"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
-                      </button>
-                    )}
-                  </div>
-
-                  {alt && (
-                    <figcaption className="text-xs text-neutral-500 dark:text-neutral-400 mt-2 text-center tracking-tight font-mono">
-                      {alt}
-                    </figcaption>
-                  )}
-                </figure>
-              );
-            },
-          }}
+          components={markdownComponents}
         >
           {processedContent}
         </ReactMarkdown>
       </div>
 
-      {/* Lightbox Modal */}
-      {enableLightbox && lightbox.isOpen && (
+      {/* Lightbox / Fullscreen Modal */}
+      {lightbox.isOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-xs p-4 sm:p-8 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-150 cursor-pointer select-none"
           onClick={closeLightbox}
         >
+          {/* Card: Locked 1:1 aspect ratio, scales uniformly down on mobile/tablets */}
           <div
-            className="flex items-center gap-2 mb-3 bg-neutral-900/90 border border-neutral-800 rounded-[4px] px-3 py-1.5 shadow-lg"
+            className="w-[min(900px,85vw,80vh)] aspect-square rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 sm:p-5 shadow-2xl flex items-center justify-center cursor-default shrink-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={() => setZoomLevel((z) => Math.min(z + 0.25, 3))}
-              className="p-1 text-neutral-300 hover:text-white transition-colors"
-              aria-label="Zoom in"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <span className="text-xs font-mono text-neutral-400 min-w-[45px] text-center select-none">
-              {Math.round(zoomLevel * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => setZoomLevel((z) => Math.max(z - 0.25, 0.5))}
-              className="p-1 text-neutral-300 hover:text-white transition-colors"
-              aria-label="Zoom out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <div className="w-[1px] h-4 bg-neutral-700 mx-1" />
-            <button
-              type="button"
-              onClick={closeLightbox}
-              className="p-1 text-neutral-300 hover:text-white transition-colors"
-              aria-label="Close dialog"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {lightbox.isSvg ? (
+              <img
+                src={lightbox.src}
+                alt={lightbox.alt}
+                className="w-full h-full object-contain select-none pointer-events-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
+                loading="eager"
+              />
+            ) : (
+              <img
+                src={lightbox.src}
+                alt={lightbox.alt}
+                className="w-full h-full object-contain select-none rounded-[2px] pointer-events-none"
+              />
+            )}
           </div>
-
-          <div
-            className="max-w-[90vw] max-h-[80vh] overflow-auto rounded-[4px] border border-neutral-800 bg-neutral-950 p-4 flex items-center justify-center cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                transform: `scale(${zoomLevel})`,
-                transition: "transform 0.15s ease-out",
-              }}
-              className="origin-center"
-            >
-              {lightbox.isSvg ? (
-                <img
-                  src={lightbox.src}
-                  alt={lightbox.alt}
-                  className="max-h-[75vh] w-auto object-contain dark:invert dark:contrast-200 select-none"
-                />
-              ) : (
-                <img
-                  src={lightbox.src}
-                  alt={lightbox.alt}
-                  className="max-h-[75vh] w-auto object-contain select-none rounded-[2px]"
-                />
-              )}
-            </div>
-          </div>
-
-          {lightbox.alt && (
-            <p className="mt-3 text-sm font-mono text-neutral-400 tracking-tight text-center max-w-xl">
-              {lightbox.alt}
-            </p>
-          )}
         </div>
       )}
     </>
