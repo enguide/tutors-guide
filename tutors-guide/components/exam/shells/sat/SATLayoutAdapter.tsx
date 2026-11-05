@@ -8,6 +8,7 @@ import { SATFooter } from "./SATFooter";
 import { SATCheckYourWorkScreen } from "./SATCheckYourWorkScreen";
 import { MarkdownQuestionRenderer } from "@/components/MarkdownQuestionRenderer";
 import { QuestionOptions } from "../../QuestionOptions";
+import { SATCrossOutIcon } from "./SATCrossOutIcon";
 
 function ItemBookmarkRibbon({
   isFlagged,
@@ -89,17 +90,20 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
 
       <div className="flex items-center pr-2">
         <button
-          type="button"
-          onClick={actions.toggleCrossOut}
-          title="Eliminate Answer Choices"
-          className={`px-2 py-0.5 rounded-sm text-xs font-sans font-bold tracking-tight transition-colors border cursor-pointer ${
-            state.isCrossOutMode
-              ? "bg-neutral-900 text-white border-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100"
-              : "bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-          }`}
-        >
-          <span className="line-through tracking-tighter text-[13px]">ABC</span>
-        </button>
+  type="button"
+  onClick={actions.toggleCrossOut}
+  title="Eliminate Answer Choices"
+  className={`px-1 py-0.75 rounded-sm transition-colors border cursor-pointer flex items-center justify-center ${
+    state.isCrossOutMode
+      ? "bg-[#2050c8] text-white border-[#292b31]"
+      : "bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+  }`}
+>
+  <SATCrossOutIcon
+    className="w-6 h-5"
+    isActive={state.isCrossOutMode}
+  />
+</button>
       </div>
     </div>
   );

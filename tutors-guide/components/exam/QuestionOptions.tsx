@@ -217,7 +217,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                 isApTheme ? "rounded-md" : "rounded-xl"
               } ${
                 isSelected
-                  ? "border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-900 dark:ring-neutral-100 bg-white dark:bg-neutral-900 opacity-100"
+                  ? "border-[#2050c8] ring-2 ring-[#2050c8] bg-white dark:bg-neutral-900 opacity-100"
                   : isEliminated
                   ? "opacity-40 bg-neutral-50 dark:bg-neutral-900/40 border-neutral-200 dark:border-neutral-800"
                   : "border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600"
@@ -228,10 +228,11 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
               )}
 
               <div className="flex items-center gap-3.5 flex-1 min-w-0 pointer-events-none">
+                {/* Bluebook Letter Disc */}
                 <div
                   className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-sans font-bold transition-colors ${
                     isSelected
-                      ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                      ? "bg-[#2050c8] text-white"
                       : "border-2 border-neutral-500 dark:border-neutral-400 text-neutral-800 dark:text-neutral-200"
                   }`}
                 >
