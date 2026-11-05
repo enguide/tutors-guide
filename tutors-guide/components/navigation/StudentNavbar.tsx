@@ -3,7 +3,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, BarChart3, Users, LogOut, GraduationCap } from "lucide-react";
+import {
+  LayoutDashboard,
+  BookOpen,
+  BarChart3,
+  Users,
+  LogOut,
+  GraduationCap,
+} from "lucide-react";
 
 interface StudentNavbarProps {
   user: {
@@ -17,15 +24,45 @@ export function StudentNavbar({ user, onSignOut }: StudentNavbarProps) {
   const pathname = usePathname();
 
   // Completely hide the student navbar when inside an active exam runner
-  const isInsideExamRunner = pathname.startsWith("/tests/") && !pathname.includes("/results");
+  const isInsideExamRunner =
+    pathname.startsWith("/tests/") && !pathname.includes("/results");
   if (isInsideExamRunner) {
     return null;
   }
 
   const isDashboard = pathname === "/dashboard";
   const isTests = pathname.startsWith("/dashboard/tests");
-  const isResults = pathname.startsWith("/dashboard/results") || (pathname.startsWith("/tests/") && pathname.includes("/results"));
+  const isResults =
+    pathname.startsWith("/dashboard/results") ||
+    (pathname.startsWith("/tests/") && pathname.includes("/results"));
   const isMentors = pathname.startsWith("/settings/mentors");
+
+  const navLinks = [
+    {
+      href: "/dashboard",
+      title: "Overview",
+      icon: LayoutDashboard,
+      isActive: isDashboard,
+    },
+    {
+      href: "/dashboard/tests",
+      title: "Practice Tests",
+      icon: BookOpen,
+      isActive: isTests,
+    },
+    {
+      href: "/dashboard/results",
+      title: "My Results",
+      icon: BarChart3,
+      isActive: isResults,
+    },
+    {
+      href: "/settings/mentors",
+      title: "Mentors",
+      icon: Users,
+      isActive: isMentors,
+    },
+  ];
 
   return (
     <header className="border-b border-border bg-card sticky top-0 z-40">
@@ -40,75 +77,45 @@ export function StudentNavbar({ user, onSignOut }: StudentNavbarProps) {
             <div className="p-1.5 bg-primary text-primary-foreground">
               <GraduationCap size={18} />
             </div>
-            <div className="flex flex-row"><span className="hidden md:inline">TheTutors</span>
-            <span className="hidden md:inline text-foreground/75">Guide</span></div>
+            <div className="flex flex-row">
+              <span className="hidden md:inline">TheTutors</span>
+              <span className="hidden md:inline text-foreground/75">Guide</span>
+            </div>
           </Link>
 
           {/* Student Navigation Links */}
           <nav className="flex items-center gap-0.5 sm:gap-1 md:gap-2 text-xs font-bold shrink-0">
-            <Link
-              href="/dashboard"
-              title="Overview"
-              aria-label="Overview"
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 transition-colors border-b-2 ${
-                isDashboard
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <LayoutDashboard size={16} className="shrink-0" />
-              <span className="hidden lg:inline">Overview</span>
-            </Link>
-
-            <Link
-              href="/dashboard/tests"
-              title="Practice Tests"
-              aria-label="Practice Tests"
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 transition-colors border-b-2 ${
-                isTests
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BookOpen size={16} className="shrink-0" />
-              <span className="hidden lg:inline">Practice Tests</span>
-            </Link>
-
-            <Link
-              href="/dashboard/results"
-              title="My Results"
-              aria-label="My Results"
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 transition-colors border-b-2 ${
-                isResults
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BarChart3 size={16} className="shrink-0" />
-              <span className="hidden lg:inline">My Results</span>
-            </Link>
-
-            <Link
-              href="/settings/mentors"
-              title="Mentors & Privacy"
-              aria-label="Mentors & Privacy"
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 transition-colors border-b-2 ${
-                isMentors
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Users size={16} className="shrink-0" />
-              <span className="hidden lg:inline">Mentors</span>
-            </Link>
+            {navLinks.map(({ href, title, icon: Icon, isActive }) => (
+              <Link
+                key={href}
+                href={href}
+                title={title}
+                aria-label={title}
+                className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 border-b-2 ${
+                  isActive
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon size={16} className="shrink-0" />
+                {/* Visible if active on small screens; always visible on lg screens */}
+                <span className={isActive ? "inline" : "hidden lg:inline"}>
+                  {title}
+                </span>
+              </Link>
+            ))}
           </nav>
         </div>
 
         {/* User Identity & Sign Out */}
         <div className="flex items-center gap-2 sm:gap-4 text-xs shrink-0">
           <div className="hidden md:flex flex-col text-right max-w-40 truncate">
-            <span className="font-bold text-foreground truncate">{user.name || "Student"}</span>
-            <span className="text-[10px] text-muted-foreground font-mono truncate">{user.email}</span>
+            <span className="font-bold text-foreground truncate">
+              {user.name || "Student"}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-mono truncate">
+              {user.email}
+            </span>
           </div>
 
           <button

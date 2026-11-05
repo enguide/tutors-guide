@@ -1,31 +1,28 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // types/examLayout.ts
-import React from "react";
-import type { SyncStatus } from "@/hooks/useTestProgress";
-import { SupportedExamCategory, SectionExamConfig } from "@/types/examConfig";
 import { QuestionFrontmatter, ParsedSection, TestMetadata } from "@/types/content";
+import { SectionExamConfig, SupportedExamCategory } from "@/types/examConfig";
 import { AccommodationSettings } from "@/types/accommodations";
+import { SyncStatus } from "@/hooks/useTestProgress";
 
-export interface TestShellExamState {
+export interface TestShellState {
   currentIndex: number;
   totalQuestions: number;
   secondsRemaining: number;
   syncStatus?: SyncStatus;
   activeQuestion: QuestionFrontmatter;
-  activeAnswer?: {
-    selectedOptionId?: string;
-    frqUserAnswer?: string;
-    eliminatedOptions?: string[];
-    flagged?: boolean;
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  activeAnswer?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answers: Record<string, any>;
   isCrossOutMode: boolean;
   isTTSPlaying: boolean;
   isTTSSupported: boolean;
+  isCalculatorOpen?: boolean;
+  isFormulaSheetOpen?: boolean;
   accommodations: AccommodationSettings;
 }
 
-export interface TestShellExamActions {
+export interface TestShellActions {
   setCurrentIndex: (index: number | ((prev: number) => number)) => void;
   selectOption: (optionId: string) => void;
   setFrqAnswer: (value: string) => void;
@@ -36,6 +33,7 @@ export interface TestShellExamActions {
   openFormulaSheet: () => void;
   toggleTTS: () => void;
   openReviewModal: () => void;
+  submitSection: () => void;
 }
 
 export interface TestShellLayoutProps {
@@ -45,7 +43,6 @@ export interface TestShellLayoutProps {
   effectiveConfig: SectionExamConfig;
   manifestBasePath?: string;
   studentName?: string;
-  state: TestShellExamState;
-  actions: TestShellExamActions;
-  children?: React.ReactNode;
+  state: TestShellState;
+  actions: TestShellActions;
 }

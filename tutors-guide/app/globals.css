@@ -472,3 +472,13 @@ span[data-act-highlight="true"] {
   padding: 0 2px;
   border-radius: 2px;
 }
+
+/* Native Dark Mode adaptation for embedded Desmos Calculator */
+.dark .dcg-calculator-api-container {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* Ensure canvas background blends cleanly with your dark theme */
+.dark .dcg-calculator-api-container .dcg-grapher {
+  background-color: transparent !important;
+}

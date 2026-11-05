@@ -3,13 +3,15 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Script from "next/script";
-import { X, GripHorizontal, MoveDiagonal } from "lucide-react";
+import { X, MoveDiagonal } from "lucide-react";
 
 interface ToggleGraphProps {
   isOpen: boolean;
   onClose: () => void;
   onInteract?: () => void;
 }
+
+type CalculatorMode = "graphing" | "scientific";
 
 declare global {
   interface Window {
@@ -22,8 +24,72 @@ declare global {
         destroy: () => void;
         observeEvent: (eventName: string, callback: () => void) => void;
       };
+      ScientificCalculator: (
+        element: HTMLElement,
+        options?: Record<string, unknown>
+      ) => {
+        resize: () => void;
+        destroy: () => void;
+        observeEvent: (eventName: string, callback: () => void) => void;
+      };
     };
   }
+}
+
+function GraphingIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M1 8.5C2.5 4 4.5 4 6 8.5C7.5 13 9.5 13 11 8.5C12.5 4 14.5 4 15 8.5" />
+    </svg>
+  );
+}
+
+function ScientificIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="2" y="1" width="12" height="14" rx="1.5" />
+      <rect x="4" y="3" width="8" height="3" rx="0.5" />
+      <circle cx="5" cy="8.5" r="0.6" fill="currentColor" />
+      <circle cx="8" cy="8.5" r="0.6" fill="currentColor" />
+      <circle cx="11" cy="8.5" r="0.6" fill="currentColor" />
+      <circle cx="5" cy="11.5" r="0.6" fill="currentColor" />
+      <circle cx="8" cy="11.5" r="0.6" fill="currentColor" />
+      <circle cx="11" cy="11.5" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SixDotGrip({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 12"
+      fill="currentColor"
+      className={className}
+    >
+      <circle cx="3" cy="3" r="1.3" />
+      <circle cx="8" cy="3" r="1.3" />
+      <circle cx="13" cy="3" r="1.3" />
+      <circle cx="3" cy="9" r="1.3" />
+      <circle cx="8" cy="9" r="1.3" />
+      <circle cx="13" cy="9" r="1.3" />
+    </svg>
+  );
 }
 
 export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInteract }) => {
@@ -31,17 +97,16 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const calculatorInstance = useRef<any>(null);
 
-  // Keep interaction callback reference synced with active question index
+  const [mode, setMode] = useState<CalculatorMode>("graphing");
+
   const onInteractRef = useRef(onInteract);
   useEffect(() => {
     onInteractRef.current = onInteract;
   }, [onInteract]);
 
-  // Position and Dimension State
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 80, y: 80 });
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 440, height: 560 });
+  const [size, setSize] = useState<{ width: number; height: number }>({ width: 440, height: 580 });
 
-  // Refs for tracking mouse drag and resize operations
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
@@ -57,42 +122,65 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
     startH: 0,
   });
 
-  const initDesmos = useCallback(() => {
-    if (window.Desmos && containerRef.current && !calculatorInstance.current) {
-      const calc = window.Desmos.GraphingCalculator(
-        containerRef.current,
-        {
+  const initDesmos = useCallback(
+    (targetMode: CalculatorMode = mode) => {
+      if (!window.Desmos || !containerRef.current) return;
+
+      if (calculatorInstance.current) {
+        calculatorInstance.current.destroy();
+        calculatorInstance.current = null;
+      }
+
+      if (targetMode === "graphing") {
+        const calc = window.Desmos.GraphingCalculator(containerRef.current, {
           keypad: true,
           graphpaper: true,
           expressions: true,
+          settingsMenu: true,
+          zoomButtons: true,
+          border: false,
+          fontSize: 14,
+        });
+        calculatorInstance.current = calc;
+
+        calc.observeEvent("change", () => {
+          onInteractRef.current?.();
+        });
+      } else {
+        const calc = window.Desmos.ScientificCalculator(containerRef.current, {
+          keypad: true,
           settingsMenu: false,
           border: false,
           fontSize: 14,
-        }
-      );
-      calculatorInstance.current = calc;
+        });
+        calculatorInstance.current = calc;
 
-      // Fires on user interactions: typing expressions, moving sliders, panning, zooming
-      calc.observeEvent("change", () => {
-        onInteractRef.current?.();
-      });
-    }
-  }, []);
+        calc.observeEvent("change", () => {
+          onInteractRef.current?.();
+        });
+      }
+    },
+    [mode]
+  );
 
-  // When revealed, prompt Desmos to recalibrate canvas bounds
   useEffect(() => {
     if (isOpen) {
       if (!calculatorInstance.current && window.Desmos) {
-        initDesmos();
+        initDesmos(mode);
       } else if (calculatorInstance.current) {
         setTimeout(() => {
           calculatorInstance.current?.resize();
         }, 50);
       }
     }
-  }, [isOpen, initDesmos]);
+  }, [isOpen, initDesmos, mode]);
 
-  // Window-level mouse listeners for smooth drag & resize
+  const handleModeChange = (newMode: CalculatorMode) => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    initDesmos(newMode);
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDraggingRef.current) {
@@ -156,7 +244,7 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
       <Script
         src="https://www.desmos.com/api/v1.9/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"
         strategy="lazyOnload"
-        onLoad={initDesmos}
+        onLoad={() => initDesmos(mode)}
       />
 
       <div
@@ -167,37 +255,67 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
           width: `${size.width}px`,
           height: `${size.height}px`,
         }}
-        className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg shadow-2xl flex flex-col select-none"
+        className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 rounded-none shadow-2xl flex flex-col select-none"
       >
-        {/* Header Bar */}
+        {/* Bluebook Dark Header with Exact 3-Column Centering Grid */}
         <div
           onMouseDown={handleMouseDownHeader}
-          className="h-10 bg-neutral-900 text-white pl-4 pr-2 grid grid-cols-3 items-center cursor-move select-none shrink-0 rounded-t-[7px]"
+          className="h-10 bg-[#1c1c1c] text-white px-2.5 grid grid-cols-3 items-center cursor-move select-none shrink-0 rounded-none"
         >
-          <span className="text-sm font-sans font-bold tracking-tight justify-self-start">
-            Calculator
-          </span>
+          {/* Column 1: Left-aligned Segmented Switcher */}
+          <div className="justify-self-start flex items-center bg-[#2a2a2a] rounded-[5px] border border-neutral-700">
+            <button
+              type="button"
+              onClick={() => handleModeChange("graphing")}
+              className={`flex items-center gap-1 px-1 py-1 text-[10px] font-semibold rounded-l-sm transition-colors cursor-pointer ${
+                mode === "graphing"
+                  ? "bg-white text-neutral-950 shadow-xs font-bold"
+                  : "text-white hover:text-neutral-200"
+              }`}
+            >
+              <GraphingIcon className="w-3.5 h-3.5" />
+              <span>Graphing</span>
+            </button>
 
-          <div className="justify-self-center flex items-center">
-            <GripHorizontal className="w-5 h-5 text-neutral-400" />
+            <button
+              type="button"
+              onClick={() => handleModeChange("scientific")}
+              className={`flex items-center gap-1 px-1 py-1 text-[10px] font-semibold rounded-r-sm transition-colors cursor-pointer ${
+                mode === "scientific"
+                  ? "bg-white text-neutral-950 shadow-xs font-bold"
+                  : "text-white hover:text-neutral-200"
+              }`}
+            >
+              <ScientificIcon className="w-3.5 h-3.5" />
+              <span>Scientific</span>
+            </button>
           </div>
 
+          {/* Column 2: Exact Center Grip */}
+          <div className="justify-self-center flex items-center text-neutral-200">
+            <SixDotGrip className="w-6 h-6" />
+          </div>
+
+          {/* Column 3: Right-aligned Close Button */}
           <div className="justify-self-end flex items-center">
             <button
               type="button"
               onClick={onClose}
-              className="p-1 text-neutral-400 hover:text-white rounded transition-colors"
+              className="p-1 text-neutral-200 hover:text-white transition-colors cursor-pointer"
               title="Close calculator"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 stroke-2" />
             </button>
           </div>
         </div>
 
         {/* Desmos Mounting Container */}
-        <div ref={containerRef} className="flex-1 w-full h-full relative overflow-hidden rounded-b-[7px]" />
+        <div
+          ref={containerRef}
+          className="flex-1 w-full h-full relative overflow-hidden rounded-b-[7px] bg-white"
+        />
 
-        {/* Bottom-Right Resize Handle */}
+        {/* Circular Bottom-Right Resize Handle */}
         <div
           onMouseDown={handleMouseDownResize}
           className="absolute -bottom-2 -right-2 w-7 h-7 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-full shadow-md cursor-nwse-resize flex items-center justify-center text-neutral-800 hover:text-black dark:text-neutral-200 dark:hover:text-white z-30 transition-transform active:scale-95"

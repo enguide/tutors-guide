@@ -17,13 +17,12 @@ import {
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { CalculatorToolbar } from "../tools/CalculatorToolbar";
 import { FormulaSheetModal } from "../tools/FormulaSheetModal";
-import { SectionReviewModal } from "./SectionReviewModal";
 import { TestPreFlightModal } from "./TestPreFlightModal";
-import { SectionDirectionsModal } from "./SectionDirectionsModal";
 import { completeTestSection } from "@/actions/completeTestSection";
 import { Category } from "@prisma/client";
-import { TestShellLayout } from "./shells/TestShellLayout";
 import { ExamErrorBoundary } from "./ExamErrorBoundary";
+import { resolveExamTheme } from "./presentationRegistry";
+import { BaseModuleTransition } from "./themes/base/BaseModuleTransition";
 
 export interface ExtendedServerCheckpointData extends ServerCheckpointData {
   accommodations?: AccommodationSettings | null;
@@ -66,9 +65,10 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const manifestBasePath = (metadata as any).assetBasePath;
   const examCat = (category.toUpperCase() || metadata.category) as SupportedExamCategory;
 
+  const theme = resolveExamTheme(category);
+
   const accommodationsKey = `attempt_accommodations_${testId}`;
 
-  // Priority: 1. Server Checkpoint -> 2. Local Storage -> 3. Default Accommodations
   const [accommodations, setAccommodations] = useState<AccommodationSettings>(() => {
     if (serverCheckpoint?.accommodations) {
       return serverCheckpoint.accommodations;
@@ -82,14 +82,16 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   });
 
-  // Skip Pre-Flight modal if accommodations were already settled on server checkpoint or local storage
   const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(() => {
     if (serverCheckpoint?.accommodations) return false;
     if (typeof window === "undefined") return true;
     return !Boolean(localStorage.getItem(accommodationsKey));
   });
 
-  const [isSectionStarted, setIsSectionStarted] = useState<boolean>(false);
+ // Check whether this exam category bypasses interstitial directions
+  const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
+    return Boolean(theme.autoStartSection);
+  });
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -137,7 +139,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     serverResponses,
   });
 
-  // Test is resuming if local buffer exists OR if a server checkpoint/prior responses exist
   const isResuming =
     secondsRemaining < effectiveTimeLimitSeconds ||
     Object.keys(answers).length > 0 ||
@@ -152,8 +153,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     } catch {}
 
     const newEffectiveSeconds = Math.round(frontmatter.timeLimit * selected.timeMultiplier);
-    
-    // Only reset time remaining if starting fresh; do not overwrite resumed checkpoint time
     if (!isResuming) {
       resetTimeLimit(newEffectiveSeconds);
     }
@@ -200,22 +199,16 @@ export const ExamClient: React.FC<ExamClientProps> = ({
           clearAllTestBuffers(testId);
           localStorage.removeItem(accommodationsKey);
         } catch {}
-        router.push(
-          `/tests/${metadata.category.toLowerCase()}/${testId}/results`
-        );
+        router.push(`/tests/${metadata.category.toLowerCase()}/${testId}/results`);
         return;
       }
 
       if (result.isIntermission) {
-        router.push(
-          `/tests/${metadata.category.toLowerCase()}/${testId}/break`
-        );
+        router.push(`/tests/${metadata.category.toLowerCase()}/${testId}/break`);
         return;
       }
 
-      router.push(
-        `/tests/${metadata.category.toLowerCase()}/${testId}/${result.nextSectionId}`
-      );
+      router.push(`/tests/${metadata.category.toLowerCase()}/${testId}/${result.nextSectionId}`);
     } catch (error) {
       console.error("Submission failed:", error);
       alert("An unexpected error occurred while finalizing the section.");
@@ -261,14 +254,15 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
+  // Active theme-based submission transition screen
   if (isSubmitting) {
+    const TransitionComponent = theme.Transition || BaseModuleTransition;
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-neutral-900">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white mb-4" />
-        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 font-mono tracking-tight">
-          Finalizing section and loading next module...
-        </p>
-      </div>
+      <TransitionComponent
+        category={examCat}
+        testTitle={metadata.title}
+        sectionTitle={frontmatter.sectionTitle}
+      />
     );
   }
 
@@ -285,9 +279,10 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  if (!isSectionStarted) {
+  if (!isSectionStarted && theme.Directions) {
+    const DirectionsComponent = theme.Directions;
     return (
-      <SectionDirectionsModal
+      <DirectionsComponent
         category={examCat}
         testTitle={metadata.title}
         sectionTitle={frontmatter.sectionTitle}
@@ -301,10 +296,12 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   }
 
   const activeAnswer = activeQuestion ? answers[activeQuestion.id] : undefined;
+  const ShellComponent = theme.Shell;
+  const ReviewComponent = theme.Review;
 
   return (
     <ExamErrorBoundary testId={testId} sectionId={frontmatter.sectionId}>
-      <TestShellLayout
+      <ShellComponent
         category={examCat}
         metadata={metadata}
         section={section}
@@ -322,6 +319,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
           isCrossOutMode,
           isTTSPlaying,
           isTTSSupported,
+          isCalculatorOpen,
+          isFormulaSheetOpen,
           accommodations,
         }}
         actions={{
@@ -335,6 +334,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
           openFormulaSheet: () => setIsFormulaSheetOpen(true),
           toggleTTS: handleToggleTTS,
           openReviewModal: () => setIsReviewOpen(true),
+          submitSection: handleSubmitSection,
         }}
       />
 
@@ -351,15 +351,14 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         onClose={() => setIsFormulaSheetOpen(false)}
       />
 
-      <SectionReviewModal
+      <ReviewComponent
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
         onSubmit={handleSubmitSection}
         isSubmitting={isSubmitting}
-        category={metadata.category}
-        sectionTitle={frontmatter.sectionTitle}
         testId={testId}
         sectionId={frontmatter.sectionId}
+        sectionTitle={frontmatter.sectionTitle}
         questions={questions}
         answers={answers}
         onJumpToQuestion={(idx) => setCurrentIndex(idx)}

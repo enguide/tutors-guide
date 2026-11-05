@@ -2,7 +2,7 @@
 import { TestMetadata } from "@/types/content";
 import { DEFAULT_SAT_CURVE, lookupScaledScore } from "./curveEngine";
 import { synthesizeAdaptiveTestScores } from "./adaptiveScorer";
-import { lookupPercentile, PercentileTable } from "./percentileEngine";
+import { lookupPercentile } from "./percentileEngine";
 
 export interface SectionScoreInput {
   sectionId: string;
@@ -19,10 +19,6 @@ export interface FinalScoreSynthesis {
   subscoreDetails: Record<string, unknown>;
 }
 
-/**
- * Calculates individual section scaled scores (e.g., ACT 1-36, SAT 200-800, GRE 130-170)
- * using metadata-defined curves or category-specific defaults.
- */
 export function calculateSectionScaledScore(
   sectionId: string,
   rawScore: number,
@@ -52,27 +48,15 @@ export function calculateSectionScaledScore(
   return null;
 }
 
-/**
- * Synthesizes completed section results into a category-accurate composite score
- * and structured subscore breakdown.
- */
 export function synthesizeExamComposite(
   metadata: TestMetadata,
   results: SectionScoreInput[]
 ): FinalScoreSynthesis {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scoring = (metadata as any).scoring;
-  const customPercentileTable: PercentileTable | undefined = scoring?.percentileTable;
+  const formOverrideTable = scoring?.percentileTable;
 
-  // Helper to resolve percentile consistently across exam types
-  const resolvePercentile = (score: number) => {
-    const res = lookupPercentile(metadata.category, score, customPercentileTable);
-    return res || null;
-  };
-
-  // -------------------------------------------------------------
-  // 1. AP EXAMINATIONS (Calculus AB/BC, etc.)
-  // -------------------------------------------------------------
+  // 1. AP EXAMINATIONS
   if (metadata.category === "AP_CALC" || scoring?.scaleType === "AP_WEIGHTED") {
     const mcIds: string[] = scoring?.apWeights?.mcSectionIds || [
       "ap-calc-ab-t1-s1a",
@@ -84,13 +68,8 @@ export function synthesizeExamComposite(
     ];
     const mcMultiplier: number = scoring?.apWeights?.mcMultiplier ?? 1.2;
     const frqMultiplier: number = scoring?.apWeights?.frqMultiplier ?? 1.0;
-
     const cutoffs: Record<number, number> = scoring?.apWeights?.gradeCutoffs ?? {
-      5: 68,
-      4: 54,
-      3: 41,
-      2: 30,
-      1: 0,
+      5: 68, 4: 54, 3: 41, 2: 30, 1: 0,
     };
 
     let mcRaw = 0;
@@ -111,7 +90,6 @@ export function synthesizeExamComposite(
     });
 
     const compositeRaw = Math.round(mcRaw * mcMultiplier + frqRaw * frqMultiplier);
-
     let apGrade = 1;
     if (compositeRaw >= cutoffs[5]) apGrade = 5;
     else if (compositeRaw >= cutoffs[4]) apGrade = 4;
@@ -120,22 +98,14 @@ export function synthesizeExamComposite(
 
     return {
       compositeScore: apGrade,
-      percentile: resolvePercentile(apGrade),
+      percentile: lookupPercentile(metadata.category, apGrade, formOverrideTable),
       scaledSectionScores,
       displayBadge: `Score: ${apGrade} / 5 (${compositeRaw}/108 pts)`,
-      subscoreDetails: {
-        compositeRaw,
-        mcRaw,
-        frqRaw,
-        mcWeighted: Math.round(mcRaw * mcMultiplier * 10) / 10,
-        frqWeighted: Math.round(frqRaw * frqMultiplier * 10) / 10,
-      },
+      subscoreDetails: { compositeRaw, mcRaw, frqRaw },
     };
   }
 
-  // -------------------------------------------------------------
   // 2. DIGITAL SAT (Adaptive Multi-Stage or Linear)
-  // -------------------------------------------------------------
   if (metadata.category === "SAT") {
     if (metadata.isAdaptive) {
       const adaptiveMap = new Map<string, { numCorrect: number; totalQuestions: number }>();
@@ -154,7 +124,7 @@ export function synthesizeExamComposite(
 
       return {
         compositeScore: adaptiveSynthesis.compositeScore,
-        percentile: resolvePercentile(adaptiveSynthesis.compositeScore),
+        percentile: lookupPercentile("SAT", adaptiveSynthesis.compositeScore, formOverrideTable),
         scaledSectionScores,
         displayBadge: `${adaptiveSynthesis.compositeScore} / 1600`,
         subscoreDetails: {
@@ -167,7 +137,7 @@ export function synthesizeExamComposite(
       const scaled = lookupScaledScore(DEFAULT_SAT_CURVE.sectionCurves.English, totalCorrect);
       return {
         compositeScore: scaled,
-        percentile: resolvePercentile(scaled),
+        percentile: lookupPercentile("SAT", scaled, formOverrideTable),
         scaledSectionScores: {},
         displayBadge: `${scaled} / 1600`,
         subscoreDetails: {},
@@ -175,9 +145,7 @@ export function synthesizeExamComposite(
     }
   }
 
-  // -------------------------------------------------------------
   // 3. ACT EXAMINATIONS
-  // -------------------------------------------------------------
   if (metadata.category === "ACT") {
     const scaledSectionScores: Record<string, number> = {};
     let subscoreSum = 0;
@@ -200,18 +168,14 @@ export function synthesizeExamComposite(
 
     return {
       compositeScore,
-      percentile: resolvePercentile(compositeScore),
+      percentile: lookupPercentile("ACT", compositeScore, formOverrideTable),
       scaledSectionScores,
       displayBadge: `ACT Composite: ${compositeScore}`,
-      subscoreDetails: {
-        scaledSectionScores,
-      },
+      subscoreDetails: { scaledSectionScores },
     };
   }
 
-  // -------------------------------------------------------------
   // 4. GRE EXAMINATIONS
-  // -------------------------------------------------------------
   if (metadata.category === "GRE") {
     const scaledSectionScores: Record<string, number> = {};
     let compositeScore = 0;
@@ -230,24 +194,23 @@ export function synthesizeExamComposite(
 
     return {
       compositeScore,
-      percentile: resolvePercentile(compositeScore),
+      percentile: lookupPercentile("GRE", compositeScore, formOverrideTable),
       scaledSectionScores,
       displayBadge: `GRE Score: ${compositeScore}`,
-      subscoreDetails: {
-        scaledSectionScores,
-      },
+      subscoreDetails: { scaledSectionScores },
     };
   }
 
-  // -------------------------------------------------------------
-  // 5. GENERIC / FALLBACK SCORER
-  // -------------------------------------------------------------
-  const totalRaw = results.reduce((acc, r) => acc + r.numCorrect, 0);
+  // 5. ACADEMIC COURSE / RAW PERCENTAGE MASTERY
+  const totalEarned = results.reduce((acc, r) => acc + (r.rawScore ?? r.numCorrect), 0);
+  const totalQuestions = results.reduce((acc, r) => acc + r.totalQuestions, 0);
+  const pct = totalQuestions > 0 ? Math.round((totalEarned / totalQuestions) * 100) : 0;
+
   return {
-    compositeScore: totalRaw,
-    percentile: null,
+    compositeScore: pct,
+    percentile: null, // Academic courses do not use cohort percentiles
     scaledSectionScores: {},
-    displayBadge: `Raw Score: ${totalRaw}`,
-    subscoreDetails: {},
+    displayBadge: `${pct}% Mastery`,
+    subscoreDetails: { totalEarned, totalQuestions },
   };
 }
