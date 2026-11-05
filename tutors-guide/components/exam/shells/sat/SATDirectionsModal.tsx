@@ -28,7 +28,7 @@ export const SATDirectionsModal: React.FC<SATDirectionsModalProps> = ({
   const isMath = sectionTitle.toLowerCase().includes("math");
 
   return (
-    <div className="fixed inset-x-0 top-16 bottom-0 z-50 bg-[#1e1e1e]/90 select-none font-sans animate-in fade-in duration-100">
+    <div className="fixed inset-x-0 top-18 bottom-0 z-50 bg-[#1e1e1e]/90 select-none font-sans animate-in fade-in duration-100">
       {/* Background click catcher */}
       <div className="absolute inset-0" onClick={onClose} />
 
