@@ -331,7 +331,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
           toggleFlag,
           toggleCrossOut: () => setIsCrossOutMode((prev) => !prev),
           toggleCalculator,
-          openFormulaSheet: () => setIsFormulaSheetOpen(true),
+          openFormulaSheet: () => setIsFormulaSheetOpen((prev) => !prev),
           toggleTTS: handleToggleTTS,
           openReviewModal: () => setIsReviewOpen(true),
           submitSection: handleSubmitSection,
