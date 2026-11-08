@@ -31,10 +31,35 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
   onClose,
 }) => {
   const sheet = getFormulaSheet(sheetId);
+  const isSatReference = !sheetId || sheetId.toLowerCase().includes("sat");
 
-  // Position and Dimension State (Default size matches official reference proportions)
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 120, y: 70 });
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 500, height: 600 });
+  // Landscape dimensions tailored for the official SAT Reference Sheet SVG
+  const DEFAULT_WIDTH = isSatReference ? 720 : 520;
+  const DEFAULT_HEIGHT = isSatReference ? 400 : 640;
+
+  // Initialize size and position synchronously via lazy initializers (no setState in useEffect)
+  const [size, setSize] = useState<{ width: number; height: number }>(() => {
+    if (typeof window === "undefined") {
+      return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+    }
+    const targetWidth = Math.min(DEFAULT_WIDTH, window.innerWidth - 60);
+    const targetHeight = Math.min(DEFAULT_HEIGHT, window.innerHeight - 100);
+    return {
+      width: Math.max(360, targetWidth),
+      height: Math.max(300, targetHeight),
+    };
+  });
+
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === "undefined") {
+      return { x: 80, y: 65 };
+    }
+    const targetWidth = Math.min(DEFAULT_WIDTH, window.innerWidth - 60);
+    const targetHeight = Math.min(DEFAULT_HEIGHT, window.innerHeight - 100);
+    const initialX = Math.max(20, Math.min(window.innerWidth - targetWidth - 20, 80));
+    const initialY = Math.max(20, Math.min(window.innerHeight - targetHeight - 20, 65));
+    return { x: initialX, y: initialY };
+  });
 
   // Drag and resize tracking refs
   const isDraggingRef = useRef(false);
@@ -76,8 +101,8 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
       if (isResizingRef.current) {
         const deltaW = e.clientX - resizeStartRef.current.mouseX;
         const deltaH = e.clientY - resizeStartRef.current.mouseY;
-        const nextW = Math.max(320, Math.min(window.innerWidth - 40, resizeStartRef.current.startW + deltaW));
-        const nextH = Math.max(340, Math.min(window.innerHeight - 40, resizeStartRef.current.startH + deltaH));
+        const nextW = Math.max(340, Math.min(window.innerWidth - 40, resizeStartRef.current.startW + deltaW));
+        const nextH = Math.max(260, Math.min(window.innerHeight - 40, resizeStartRef.current.startH + deltaH));
         setSize({ width: nextW, height: nextH });
       }
     };
@@ -117,7 +142,7 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
     };
   };
 
-  if (!isOpen || !sheet) return null;
+  if (!isOpen) return null;
 
   return (
     <div
@@ -139,27 +164,39 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
           Reference
         </span>
 
-        {/* Column 2: Exact Center Grip */}
-                  <div className="justify-self-center flex items-center text-neutral-200">
-                    <SixDotGrip className="w-6 h-6" />
-                  </div>
-        
-                  {/* Column 3: Right-aligned Close Button */}
-                  <div className="justify-self-end flex items-center">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="p-1 text-neutral-200 hover:text-white transition-colors cursor-pointer"
-                      title="Close calculator"
-                    >
-                      <X className="w-5 h-5 stroke-2" />
-                    </button>
-                  </div>
+        {/* Column 2: Center Grip */}
+        <div className="justify-self-center flex items-center text-neutral-200">
+          <SixDotGrip className="w-6 h-6" />
+        </div>
+
+        {/* Column 3: Right Close Button */}
+        <div className="justify-self-end flex items-center">
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 text-neutral-200 hover:text-white transition-colors cursor-pointer"
+            title="Close reference"
+          >
+            <X className="w-5 h-5 stroke-2" />
+          </button>
+        </div>
       </div>
 
-      {/* Reference Body: Scrollable & responsive container */}
-      <div className="flex-1 w-full h-full overflow-y-auto p-5 font-serif text-[15px] leading-relaxed">
-        <MarkdownQuestionRenderer content={sheet.content} />
+      {/* Reference Body: Centered display for landscape SVG */}
+      <div className="flex-1 w-full h-full overflow-y-auto p-4 flex items-center justify-center bg-white dark:bg-neutral-900">
+        {isSatReference ? (
+          <img
+            src="/content/references/ReferenceEquations.svg"
+            alt="Reference Equations"
+            draggable={false}
+            className="w-full h-full max-w-full max-h-full object-contain pointer-events-none select-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
+            loading="eager"
+          />
+        ) : sheet ? (
+          <div className="w-full h-full font-serif text-[15px] leading-relaxed">
+            <MarkdownQuestionRenderer content={sheet.content} />
+          </div>
+        ) : null}
       </div>
 
       {/* Circular Bottom-Right Resize Handle */}
