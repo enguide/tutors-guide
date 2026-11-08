@@ -7,15 +7,18 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { QuestionFrontmatter } from "@/types/content";
 import { SATQuestionNavigatorPopover } from "./SATQuestionNavigatorPopover";
 import { SATDashedDivider } from "./SATDashedDivider";
+import { NetworkStatusPill } from "@/components/exam/NetworkStatusPill";
+import type { SyncStatus } from "@/hooks/useTestProgress";
 
 interface SATFooterProps {
   currentIndex: number;
   totalQuestions: number;
   studentName?: string;
+  syncStatus?: SyncStatus;
   sectionTitle: string;
   questions: QuestionFrontmatter[];
   answers: Record<string, any>;
-  isReviewScreen?: boolean; // <-- Added
+  isReviewScreen?: boolean;
   onSelectIndex: (idx: number) => void;
   onOpenReviewModal: () => void;
   onPrev: () => void;
@@ -24,8 +27,8 @@ interface SATFooterProps {
 
 export const SATFooter: React.FC<SATFooterProps> = ({
   currentIndex,
-  totalQuestions,
   studentName,
+  syncStatus,
   sectionTitle,
   questions,
   answers,
@@ -40,9 +43,14 @@ export const SATFooter: React.FC<SATFooterProps> = ({
 
   return (
     <footer className="relative h-18 bg-[#EBF3FA] dark:bg-neutral-950 px-4 sm:px-8 grid grid-cols-3 items-center select-none z-30">
-      {/* Left Column: Student Profile Name */}
-      <div className="justify-self-start text-xs sm:text-[14px] md:text-lg md:font-semibold text-neutral-800 dark:text-neutral-200 font-normal truncate max-w-30 sm:max-w-xs font-sans">
-        {studentName || "Student Preview"}
+      {/* Left Column: Student Profile Name & Network Status Indicator */}
+      <div className="justify-self-start flex items-center gap-2">
+        <span className="text-xs sm:text-[14px] md:text-lg md:font-semibold text-neutral-800 dark:text-neutral-200 font-normal truncate max-w-30 sm:max-w-xs font-sans">
+          {studentName || "Student Preview"}
+        </span>
+        {syncStatus && (
+          <NetworkStatusPill status={syncStatus} className="shrink-0" />
+        )}
       </div>
 
       {/* Center Column: Render navigator only when not on Check Your Work review */}

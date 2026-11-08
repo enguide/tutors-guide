@@ -40,7 +40,7 @@ questions:
     stimulus: |
       The following text is adapted from Maya Angelou's 1986 memoir *All God's Children Need Traveling Shoes*.
 
-      Once I developed a passion for reading, my nose was glued to a book. On summer afternoons, the neighborhood children could hardly persuade me to leave the front porch steps. I was absorbed and unreachable.
+      > Once I developed a passion for reading, my nose was glued to a book. On summer afternoons, the neighborhood children could hardly persuade me to leave the front porch steps. I was absorbed and unreachable.
     prompt: "As used in the text, what does the author most nearly mean by 'my nose was glued to a book'?"
     explanation: "The text explains that once the author developed a passion for reading, other children could barely persuade her to leave the porch steps, and she describes herself as 'absorbed and unreachable.' Thus, the figurative phrase indicates that she spent almost all of her time reading."
     options:
@@ -203,7 +203,7 @@ questions:
     stimulus: |
       The following text is adapted from a contemporary novel. The narrator and Julian are both classical pianists.
 
-      When my younger brother remarked during afternoon tea that he found acoustic music, especially classical piano, utterly monotonous, Julian stiffened, placed his teacup down with deliberate slowness, and pressed his temples; he then stood up, claiming an urgent errand across town had just sprung to mind, while making it entirely obvious that he had no errands to run whatsoever.
+      > When my younger brother remarked during afternoon tea that he found acoustic music, especially classical piano, utterly monotonous, Julian stiffened, placed his teacup down with deliberate slowness, and pressed his temples; he then stood up, claiming an urgent errand across town had just sprung to mind, while making it entirely obvious that he had no errands to run whatsoever.
     prompt: "Based on the text, what is notable about Julian's behavior?"
     explanation: "Julian responds to the brother's comment through exaggerated physical gestures (stiffening, slowly setting down his cup, pressing his temples) and an obviously fabricated excuse to leave early, thus making his displeasure clearly felt without directly verbalizing an insult or argument."
     options:
@@ -249,7 +249,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      [GRAPH: A bar chart titled "Tensile Strength of Four Structural Fibers" showing the tensile strength in megapascals (MPa) of four fibers: cotton (~350 MPa), nylon (~800 MPa), Kevlar (~3,600 MPa), and Spider silk (~1,100 MPa).]
+      ![](./assets/dSAT-T1-RW2E-Q11.svg)
 
       Materials scientists synthesized an artificial structural fiber inspired by natural polymers, which they designated Synth-X. To evaluate the mechanical performance of Synth-X relative to conventional fibers, the team measured the tensile strength, in megapascals (MPa), of each material. According to the researchers' findings, the fiber that exhibited the highest tensile strength was ______
     prompt: "Which choice most effectively uses data from the graph to complete the sentence?"
@@ -274,7 +274,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      [GRAPH: A line graph titled "Percentage of State Legislators Holding Advanced Degrees, 1960–2020" showing percentages over time for two legislative bodies: State Senates (dashed line with open squares) and State Assemblies (solid line with filled triangles). In 1960, State Senates was at ~68% and State Assemblies was at ~58%. Both peaked around 1970 (~75% and ~70%, respectively), followed by a steep and steady drop: by 2010, State Senates fell to ~22% and State Assemblies fell to ~19%, with both leveling off near 18% in 2020.]
+      ![](./assets/dSAT-T1-RW2E-Q12.svg)
 
       Throughout modern state governance, both chambers of state legislative bodies have included elected officials holding advanced academic degrees, such as law degrees or doctorates. A political science institute collected historical data regarding the educational backgrounds of state legislators between 1960 and 2020 and observed that ______
     prompt: "Which choice most effectively uses data from the graph to complete the sentence?"

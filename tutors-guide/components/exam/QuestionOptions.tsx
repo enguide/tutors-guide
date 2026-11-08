@@ -153,6 +153,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                         category={category}
                         testId={testId}
                         manifestBasePath={manifestBasePath}
+                        disableFigureViewer={true} // <-- Add here
                         className={`inline prose-p:inline prose-p:m-0 ${optionImageStyles}`}
                       />
                     </span>
@@ -251,6 +252,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                     category={category}
                     testId={testId}
                     manifestBasePath={manifestBasePath}
+                    disableFigureViewer={true} // <-- Add here
                     className={
                       isAcademicSerif
                         ? `font-serif prose-p:font-serif text-[15.5px] leading-[1.6] prose-p:mb-0 ${optionImageStyles}`

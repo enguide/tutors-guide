@@ -138,7 +138,7 @@ questions:
     stimulus: |
       The following text is adapted from a critical essay examining the works of Virginia Woolf.
 
-      Woolf's narrative technique, particularly in novels such as *Mrs. Dalloway*, is characterized by its stream-of-consciousness approach, often delving deep into the subjective experiences of her characters. This method, while offering unparalleled psychological insight, sometimes came at the expense of conventional plot progression. [[u:6]]Thus, while the narrative's intricate interiority occasionally challenged readers accustomed to more straightforward storytelling, it nonetheless offered a revolutionary exploration of consciousness.[[/u]]
+      > Woolf's narrative technique, particularly in novels such as *Mrs. Dalloway*, is characterized by its stream-of-consciousness approach, often delving deep into the subjective experiences of her characters. This method, while offering unparalleled psychological insight, sometimes came at the expense of conventional plot progression. [[u:6]]Thus, while the narrative's intricate interiority occasionally challenged readers accustomed to more straightforward storytelling, it nonetheless offered a revolutionary exploration of consciousness.[[/u]]
     prompt: "Which choice best describes the function of the underlined portion in the text as a whole?"
     explanation: "The underlined portion acknowledges a drawback or challenge for readers ('challenged readers accustomed to more straightforward storytelling') while affirming the novel's major artistic contribution ('offered a revolutionary exploration of consciousness')."
     options:
@@ -208,9 +208,11 @@ questions:
     containsDiagram: false
     stimulus: |
       **Text 1**
+
       The notion that creativity is a purely individualistic pursuit often overlooks the profound influence of collaborative environments. [[u:9]]Many groundbreaking innovations stem not from solitary genius, but from the dynamic exchange of ideas and iterative feedback within a collective.[[/u]] To isolate creativity from its social matrix is to fundamentally misunderstand its most fertile origins.
 
       **Text 2**
+
       While collaboration certainly plays a role in refining and disseminating ideas, the initial spark of innovation frequently arises from an individual's unique insight or imaginative leap. Historical accounts of scientific breakthroughs and artistic movements often highlight singular figures who first conceived of radical new approaches, subsequently developing them with peers. The collective then serves more as an accelerator and validator than the primary generator of novel concepts.
     prompt: "Based on the texts, how would the author of Text 2 most likely respond to the claim in the underlined sentence of Text 1?"
     explanation: "Text 1 claims that groundbreaking innovations stem from collective exchange rather than solitary genius. Text 2 argues that initial sparks arise from individuals while collectives serve to refine and validate. Thus, the author of Text 2 would concede that communal feedback facilitates development while maintaining that the creative genesis remains a solitary phenomenon."
@@ -234,27 +236,74 @@ questions:
     containsChart: true
     containsDiagram: false
     stimulus: |
-      To investigate how different types of distractions affect task completion times, researchers conducted an experiment with three groups. Group A performed a set of novel tasks without distraction, Group B with auditory distraction, and Group C with visual distraction. Compared to the mean times for the group that operated without distraction, the mean times for the group that was forced to contend with visual distraction ______
+      Mean Response Times for Task Completion (in seconds)
 
-      | Mean Response Times for Task Completion (in seconds) |
+      | Condition | Group A | Group B | Group C |
       | :--- | :---: | :---: | :---: |
-      | Condition | Mean Time for Group A | Mean Time for Group B | Mean Time for Group C |
-      | Simple Calculation | 15.2 | 18.5 | 19.1 |
-      | Data Entry | 28.9 | 35.1 | 37.8 |
-      | Problem Solving | 42.1 | 55.6 | 61.3 |
+      | Simple Calculation | $15.2$ | $18.5$ | $19.1$ |
+      | Data Entry | $28.9$ | $35.1$ | $37.8$ |
+      | Problem Solving | $42.1$ | $55.6$ | $61.3$ |
+
+      To investigate how different types of distractions affect task completion times, researchers conducted an experiment with three groups. Group A performed a set of novel tasks without distraction, Group B with auditory distraction, and Group C with visual distraction. Compared to the mean times for the group that operated without distraction, the mean times for the group that was forced to contend with visual distraction ______
     prompt: "Which choice most effectively uses data from the table to complete the statement?"
     explanation: "Looking at the table, Group C (visual distraction) has higher mean times (19.1, 37.8, 61.3) across all three tasks compared to Group A without distraction (15.2, 28.9, 42.1), indicating that visual distractions generally slowed task completion."
     options:
       - id: "A"
-        text: "ranged from 19.1 to 61.3 seconds, indicating that task completion varied widely."
+        text: "ranged from $19.1$ to $61.3$ seconds, indicating that task completion varied widely."
       - id: "B"
         text: "were higher for all three tasks, indicating that visual distractions generally slowed task completion."
       - id: "C"
-        text: "ranged from 15.2 to 42.1 seconds, with Problem Solving requiring the most time."
+        text: "ranged from $15.2$ to $42.1$ seconds, with Problem Solving requiring the most time."
       - id: "D"
         text: "were primarily influenced by the type of task rather than the presence of distraction."
   - id: "sat-t1-rwh2-q11"
     questionNumber: 11
+    questionType: "MC"
+    correctAnswer: "A"
+    domain: "Information and Ideas"
+    skill: "Central Ideas and Details"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    stimulus: |
+      With the 1855 publication of *Leaves of Grass*, Walt Whitman fundamentally redefined the \"poetic speaker.\" While contemporary verse typically employed a detached, lyrical persona, Whitman utilized an immersive \"I\" designed to dissolve the boundary between poet and reader. This shift was a calculated social maneuver; by adopting a first-person perspective that claimed to contain \"multitudes,\" Whitman transformed the individual voice into a microcosm of democratic pluralism, where personal and collective identities become indistinguishable.
+    prompt: "According to the passage, a key effect of Whitman's embrace of free verse was to:"
+    explanation: "The text explains that Whitman's immersive first-person perspective dissolved boundaries between poet and reader, transforming the individual voice into a microcosm of democratic pluralism where personal and collective identities merge."
+    options:
+      - id: "A"
+        text: "replace established lyrical traditions with a style that merges individual and communal identities."
+      - id: "B"
+        text: "provide a literal historical record of the diverse individuals who influenced his work."
+      - id: "C"
+        text: "underscore the poet's sense of personal isolation from nineteenth-century society."
+      - id: "D"
+        text: "maintain the detached, objective perspective characteristic of contemporary European verse."
+  - id: "sat-t1-rwh2-q12"
+    questionNumber: 12
+    questionType: "MC"
+    correctAnswer: "C"
+    domain: "Information and Ideas"
+    skill: "Inferences"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    stimulus: |
+      For much of history, astronomical observations were limited by the naked eye and early optical instruments, restricting our understanding of the universe to relatively bright, nearby objects. This limitation fostered a geocentric or, later, a heliocentric model confined to our solar system and nearby stars. The advent of radio astronomy in the mid-20th century, however, revolutionized our cosmic perspective. By detecting radiation invisible to optical telescopes, radio astronomers uncovered distant galaxies, quasars, and the cosmic microwave background radiation, profoundly expanding the observable universe and revealing phenomena previously unimaginable, thereby demonstrating that the boundaries of our cosmic knowledge are ______
+    prompt: "Which choice most logically completes the text?"
+    explanation: "The text describes how our knowledge was restricted by limited tools, and how new tools (radio astronomy) expanded our cosmic view, demonstrating that our knowledge boundaries are tied to and limited/constrained by our observational tools."
+    options:
+      - id: "A"
+        text: "primarily determined by the physical distance of celestial objects."
+      - id: "B"
+        text: "best advanced through the development of ever-larger optical telescopes."
+      - id: "C"
+        text: "constrained by the reach of our observational tools."
+      - id: "D"
+        text: "independent of the specific wavelengths of light being measured."
+  - id: "sat-t1-rwh2-q13"
+    questionNumber: 13
     questionType: "MC"
     correctAnswer: "B"
     domain: "Information and Ideas"
@@ -278,52 +327,6 @@ questions:
         text: "All three groups took longer on average to complete their measured task in week 3 than they did in week 1."
       - id: "D"
         text: "During the third week of observation, the group with commute times under 30 minutes took less than 21 minutes complete their task."
-  - id: "sat-t1-rwh2-q12"
-    questionNumber: 12
-    questionType: "MC"
-    correctAnswer: "A"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
-    difficulty: "Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    stimulus: |
-      With the 1855 publication of *Leaves of Grass*, Walt Whitman fundamentally redefined the \"poetic speaker.\" While contemporary verse typically employed a detached, lyrical persona, Whitman utilized an immersive \"I\" designed to dissolve the boundary between poet and reader. This shift was a calculated social maneuver; by adopting a first-person perspective that claimed to contain \"multitudes,\" Whitman transformed the individual voice into a microcosm of democratic pluralism, where personal and collective identities become indistinguishable.
-    prompt: "According to the passage, a key effect of Whitman's embrace of free verse was to:"
-    explanation: "The text explains that Whitman's immersive first-person perspective dissolved boundaries between poet and reader, transforming the individual voice into a microcosm of democratic pluralism where personal and collective identities merge."
-    options:
-      - id: "A"
-        text: "replace established lyrical traditions with a style that merges individual and communal identities."
-      - id: "B"
-        text: "provide a literal historical record of the diverse individuals who influenced his work."
-      - id: "C"
-        text: "underscore the poet's sense of personal isolation from nineteenth-century society."
-      - id: "D"
-        text: "maintain the detached, objective perspective characteristic of contemporary European verse."
-  - id: "sat-t1-rwh2-q13"
-    questionNumber: 13
-    questionType: "MC"
-    correctAnswer: "C"
-    domain: "Information and Ideas"
-    skill: "Inferences"
-    difficulty: "Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    stimulus: |
-      For much of history, astronomical observations were limited by the naked eye and early optical instruments, restricting our understanding of the universe to relatively bright, nearby objects. This limitation fostered a geocentric or, later, a heliocentric model confined to our solar system and nearby stars. The advent of radio astronomy in the mid-20th century, however, revolutionized our cosmic perspective. By detecting radiation invisible to optical telescopes, radio astronomers uncovered distant galaxies, quasars, and the cosmic microwave background radiation, profoundly expanding the observable universe and revealing phenomena previously unimaginable, thereby demonstrating that the boundaries of our cosmic knowledge are ______
-    prompt: "Which choice most logically completes the text?"
-    explanation: "The text describes how our knowledge was restricted by limited tools, and how new tools (radio astronomy) expanded our cosmic view, demonstrating that our knowledge boundaries are tied to and limited/constrained by our observational tools."
-    options:
-      - id: "A"
-        text: "primarily determined by the physical distance of celestial objects."
-      - id: "B"
-        text: "best advanced through the development of ever-larger optical telescopes."
-      - id: "C"
-        text: "constrained by the reach of our observational tools."
-      - id: "D"
-        text: "independent of the specific wavelengths of light being measured."
   - id: "sat-t1-rwh2-q14"
     questionNumber: 14
     questionType: "MC"

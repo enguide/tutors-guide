@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import Image from "next/image";
-import { Maximize2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { resolveTestAssetUrl } from "@/lib/contentPaths";
 
 interface MarkdownQuestionRendererProps {
@@ -18,6 +18,7 @@ interface MarkdownQuestionRendererProps {
   testId?: string;
   manifestBasePath?: string;
   enableLightbox?: boolean;
+  disableFigureViewer?: boolean;
   className?: string;
   activeQuestionNumber?: number;
 }
@@ -51,9 +52,9 @@ const CollegeBoardFigureViewer: React.FC<{
   const scrollTopRef = useRef(0);
   const [isGrabbing, setIsGrabbing] = useState(false);
 
-  // Base fixed display frame (matches 100% view)
-  const VIEWPORT_WIDTH = 360;
-  const VIEWPORT_HEIGHT = 360;
+  // Base fixed display frame (120% / 1.2x scale)
+  const VIEWPORT_WIDTH = 432;
+  const VIEWPORT_HEIGHT = 432;
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -79,7 +80,7 @@ const CollegeBoardFigureViewer: React.FC<{
 
   const isZoomed = zoom > 1;
 
-  // --- Click & Drag Pan Handlers ---
+  // Click & Drag Pan Handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isZoomed || !scrollContainerRef.current) return;
     isDraggingRef.current = true;
@@ -178,7 +179,6 @@ const CollegeBoardFigureViewer: React.FC<{
             : "overflow-hidden cursor-default"
         }`}
       >
-        {/* Canvas that expands layout bounds in positive coordinates without shifting (0,0) */}
         <div
           style={{
             width: `${VIEWPORT_WIDTH * zoom}px`,
@@ -213,6 +213,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
   testId,
   manifestBasePath,
   enableLightbox = false,
+  disableFigureViewer = false,
   className = "",
   activeQuestionNumber,
 }) => {
@@ -303,11 +304,9 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
     alt: "",
     isSvg: false,
   });
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   const closeLightbox = useCallback(() => {
     setLightbox((prev) => ({ ...prev, isOpen: false }));
-    setZoomLevel(1);
   }, []);
 
   useEffect(() => {
@@ -416,6 +415,22 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         </span>
       ),
 
+      // 1. Passage Block Indentation ("The following text is adapted from...")
+      blockquote: ({ children }: any) => {
+        if (isCollegeBoard) {
+          return (
+            <blockquote className="pl-6 sm:pl-8 my-3 border-none not-italic font-normal font-serif text-neutral-900 dark:text-neutral-100">
+              {children}
+            </blockquote>
+          );
+        }
+        return (
+          <blockquote className="pl-4 my-3 border-l-2 border-neutral-300 dark:border-neutral-700 italic">
+            {children}
+          </blockquote>
+        );
+      },
+
       p: ({ children }: any) => {
         const childrenArray = React.Children.toArray(children);
         const hasBlockElement = childrenArray.some((child) => {
@@ -453,6 +468,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         <ul className="list-none my-3 pl-6 sm:pl-8 space-y-2 not-prose">{children}</ul>
       ),
 
+      // 2. Adaptive Bullets that match body text color across light/dark mode
       li: ({ children }: any) => {
         const childrenArray = React.Children.toArray(children);
         const firstChild = childrenArray[0];
@@ -478,8 +494,10 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         }
 
         return (
-          <li className="flex items-start text-base leading-relaxed">
-            <span className="w-8 shrink-0 text-right pr-3 text-neutral-400 select-none">•</span>
+          <li className="flex items-start text-base leading-relaxed text-neutral-900 dark:text-neutral-100">
+            <span className="w-6 shrink-0 text-left pr-2 text-neutral-900 dark:text-neutral-100 select-none text-base">
+              •
+            </span>
             <div className="flex-1 min-w-0">{children}</div>
           </li>
         );
@@ -491,32 +509,98 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       strong: ({ children }: any) => (
         <strong className="font-semibold text-foreground">{children}</strong>
       ),
-      table: ({ children }: any) => (
-        <div className="my-5 overflow-x-auto">
-          <table className="border-collapse border border-border mx-auto text-center font-sans prose prose-neutral text-neutral-950 dark:text-neutral-50 dark:prose-invert">
+
+      // 3. College Board Authentic Simple Grid Tables vs Generic Fallback
+      table: ({ children }: any) => {
+        if (isCollegeBoard) {
+          return (
+            <div className="my-5 w-full flex justify-center overflow-x-auto not-prose">
+              <table className="border-collapse border border-neutral-700 dark:border-neutral-300 text-[14.5px] font-serif text-neutral-900 dark:text-neutral-100 mx-auto">
+                {children}
+              </table>
+            </div>
+          );
+        }
+        return (
+          <div className="my-6 w-full flex justify-center overflow-x-auto not-prose">
+            <table className="border-collapse text-[14px] font-sans text-neutral-900 dark:text-neutral-100 min-w-[260px] max-w-full">
+              {children}
+            </table>
+          </div>
+        );
+      },
+
+      thead: ({ children }: any) => {
+        if (isCollegeBoard) {
+          return <thead className="border-b border-neutral-700 dark:border-neutral-300">{children}</thead>;
+        }
+        return <thead className="border-b-2 border-neutral-800 dark:border-neutral-200">{children}</thead>;
+      },
+
+      tbody: ({ children }: any) => {
+        if (isCollegeBoard) {
+          return <tbody>{children}</tbody>;
+        }
+        return (
+          <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800 border-b-2 border-neutral-800 dark:border-neutral-200">
             {children}
-          </table>
-        </div>
-      ),
-      thead: ({ children }: any) => (
-        <thead className="border-b border-border">{children}</thead>
-      ),
-      tbody: ({ children }: any) => (
-        <tbody className="divide-y divide-border">{children}</tbody>
-      ),
-      tr: ({ children }: any) => (
-        <tr className="border-b border-border last:border-b-0">{children}</tr>
-      ),
-      th: ({ children }: any) => (
-        <th className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
-          {children}
-        </th>
-      ),
-      td: ({ children }: any) => (
-        <td className="border-r border-border last:border-r-0 px-4 py-2 text-sm text-foreground text-center align-middle whitespace-nowrap">
-          {children}
-        </td>
-      ),
+          </tbody>
+        );
+      },
+
+      tr: ({ children }: any) => {
+        if (isCollegeBoard) {
+          return <tr className="border-b border-neutral-700 dark:border-neutral-300 last:border-b-0">{children}</tr>;
+        }
+        return (
+          <tr className="transition-colors hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50">
+            {children}
+          </tr>
+        );
+      },
+
+      th: ({ children, style }: any) => {
+        if (isCollegeBoard) {
+          return (
+            <th
+              style={style}
+              className="border-r border-neutral-700 dark:border-neutral-300 last:border-r-0 px-3.5 py-2 font-normal text-center align-middle whitespace-normal leading-snug"
+            >
+              {children}
+            </th>
+          );
+        }
+        return (
+          <th
+            style={style}
+            className="px-4 py-2 font-semibold text-neutral-950 dark:text-neutral-50 text-center align-middle whitespace-nowrap"
+          >
+            {children}
+          </th>
+        );
+      },
+
+      td: ({ children, style }: any) => {
+        if (isCollegeBoard) {
+          return (
+            <td
+              style={style}
+              className="border-r border-neutral-700 dark:border-neutral-300 last:border-r-0 px-3.5 py-2.5 text-center align-middle whitespace-nowrap"
+            >
+              {children}
+            </td>
+          );
+        }
+        return (
+          <td
+            style={style}
+            className="px-4 py-2.5 text-center align-middle text-neutral-800 dark:text-neutral-200 whitespace-nowrap"
+          >
+            {children}
+          </td>
+        );
+      },
+
       img: ({ src, alt = "" }: any) => {
         if (typeof src !== "string" || !src.trim()) {
           return null;
@@ -537,7 +621,19 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
 
         const isSvg = resolvedSrc.toLowerCase().endsWith(".svg");
 
-        // Authentic College Board (SAT/AP) SVG Box
+        // 1. If inside an answer choice, render strictly as an inline image (no viewer/toolbar/lightbox)
+        if (disableFigureViewer) {
+          return (
+            <img
+              src={resolvedSrc}
+              alt={alt || "Option diagram"}
+              className="max-h-56 max-w-full w-auto h-auto object-contain select-none pointer-events-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200 my-1 mx-auto block"
+              loading="eager"
+            />
+          );
+        }
+
+        // 2. Authentic College Board (SAT/AP) SVG Box for Stimulus / Prompt
         if (isCollegeBoard && isSvg) {
           return (
             <figure className="my-4 flex flex-col items-center w-full">
@@ -562,7 +658,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
           );
         }
 
-        // Generic fallback for ACT, GRE, or PNG/JPEG
+        // 3. Generic fallback for ACT, GRE, or PNG/JPEG in prompt/stimulus
         return (
           <figure className="my-5 flex flex-col items-center w-full group">
             <div className="relative border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-[4px] p-4 shadow-xs transition-all duration-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-700 w-full max-w-xl flex items-center justify-center">
@@ -619,6 +715,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       manifestBasePath,
       isCollegeBoard,
       enableLightbox,
+      disableFigureViewer,
     ]
   );
 
@@ -656,7 +753,6 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-150 cursor-pointer select-none"
           onClick={closeLightbox}
         >
-          {/* Card: Locked 1:1 aspect ratio, scales uniformly down on mobile/tablets */}
           <div
             className="w-[min(900px,85vw,80vh)] aspect-square rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 sm:p-5 shadow-2xl flex items-center justify-center cursor-default shrink-0"
             onClick={(e) => e.stopPropagation()}

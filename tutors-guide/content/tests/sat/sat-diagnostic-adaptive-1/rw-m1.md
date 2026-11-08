@@ -107,9 +107,9 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The following text is adapted from Charles Dickens's 1854 novel Hard Times. The passage describes the town of Coketown.
+      The following text is adapted from Charles Dickens's 1854 novel *Hard Times*. The passage describes the town of Coketown.
 
-      It was a town of red brick, or of brick that would have been red if the smoke and ashes had allowed it; but, as matters stood, it was a town of unnatural red and black like the painted face of a savage. It was a town of machinery and tall chimneys, out of which interminable serpents of smoke trailed themselves for ever and ever, and never got uncoiled. It had a black canal in it, and a river that ran purple with ill-smelling dye.
+      > It was a town of red brick, or of brick that would have been red if the smoke and ashes had allowed it; but, as matters stood, it was a town of unnatural red and black like the painted face of a savage. It was a town of machinery and tall chimneys, out of which interminable serpents of smoke trailed themselves for ever and ever, and never got uncoiled. It had a black canal in it, and a river that ran purple with ill-smelling dye.
     prompt: "Which choice best states the main purpose of the text?"
     explanation: "The passage uses vivid, sensory descriptions (smoke, ashes, machinery, black canal, purple river) to paint a bleak and negative picture of an industrialized factory town."
     options:
@@ -354,7 +354,7 @@ questions:
   - id: "sat-t1-rw1-q16"
     questionNumber: 16
     questionType: "MC"
-    correctAnswer: "C"
+    correctAnswer: "A"
     domain: "Standard English Conventions"
     skill: "Boundaries"
     difficulty: "Hard"
@@ -364,7 +364,7 @@ questions:
     stimulus: |
       While newly developed AI language models show remarkable promise in generating natural-sounding ______ now commonly referred to as "hallucination."
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The introductory dependent clause ends after 'natural-sounding text'. The main clause begins with 'critics point out that they often fabricate facts'. Because 'a phenomenon' is an appositive describing the fabrication of facts, it should be set off from the independent clause with a semicolon or comma (specifically, option C uses a comma after 'text', followed by the independent clause, and a semicolon before the appositive 'a phenomenon'). Wait, let's look closer at standard punctuation: option C provides 'text, critics point out that they often fabricate facts; a phenomenon', which correctly joins the clauses and sets off the appositive."
+    explanation: ""
     options:
       - id: "A"
         text: "text, critics point out that they often fabricate facts, a phenomenon"

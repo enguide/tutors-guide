@@ -15,15 +15,6 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      <!-- GRAPH PLACEHOLDER: 
-           Asset: ./assets/dSAT-T1-M2E-Q1.svg
-           Description: An xy-plane showing the graph of an absolute value / V-shaped function f(x) opening upward.
-           - x-axis labeled with tick marks at integers from -6 to 6.
-           - y-axis labeled with tick marks every 2 units from -10 to 6.
-           - The vertex of the graph is at (4, -8), which sits directly on the vertical grid line at x = 4.
-           - The graph passes cleanly through (0, -4) and (8, 0).
-           - An open coordinate callout or bold dot marks the lowest point of the graph at (4, -8).
-      -->
       ![](./assets/dSAT-T1-M2E-Q1.svg)
     prompt: |
       The graph of the function $f$, where $y = f(x)$, is shown in the $xy$-plane. What is the minimum value of $f(x)$?
@@ -75,18 +66,6 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      <!-- GRAPH PLACEHOLDER: 
-           Asset: ./assets/dSAT-T1-M2E-Q3.svg
-           Description: A dot plot titled "Number of Books Checked Out per Student".
-           - Horizontal axis labeled "Books checked out" with tick marks at 0, 1, 2, 3, 4, 5.
-           - Number of dots above each value:
-             * 0: 2 dots
-             * 1: 4 dots
-             * 2: 7 dots
-             * 3: 5 dots
-             * 4: 3 dots
-             * 5: 1 dot
-      -->
       ![](./assets/dSAT-T1-M2E-Q3.svg)
     prompt: |
       A librarian recorded the number of books checked out by each student in a reading group during the semester, as shown in the dot plot. What was the most frequent number of books checked out by a student in this group?
@@ -203,6 +182,7 @@ questions:
       | :---: | :---: |
       | $0$ | $9$ |
       | $2$ | $17$ |
+      | $5$ | $41$ |
     prompt: |
       Which equation defines the function $g$?
     explanation: |
@@ -272,14 +252,7 @@ questions:
     containsChart: false
     containsDiagram: true
     stimulus: |
-      <!-- DIAGRAM PLACEHOLDER: 
-           Asset: ./assets/dSAT-T1-M2E-Q9.svg
-           Description: A geometric diagram showing two horizontal parallel lines, line p and line q, intersected by a transversal line r slanting up and to the right.
-           - Line p is the upper horizontal line, line q is the lower horizontal line.
-           - At the intersection with line p, the acute angle in the top-right position (exterior) is labeled 58°.
-           - At the intersection with line q, the acute angle in the interior alternate position (or corresponding top-right position) is labeled w°.
-           - Below the diagram: "Note: Figure not drawn to scale."
-      -->
+      
       ![](./assets/dSAT-T1-M2E-Q9.svg)
 
       Note: Figure not drawn to scale.
@@ -312,17 +285,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      <!-- GRAPH PLACEHOLDER: 
-           Asset: ./assets/dSAT-T1-M2E-Q10.svg
-           Description: A vertical bar chart titled "Primary Purpose of Library Visit".
-           - Vertical axis labeled "Number of visitors" with grid lines from 0 to 20 in increments of 2.
-           - Horizontal axis displays 4 distinct categories:
-             * "Group study": bar height at 18
-             * "Computer access": bar height at 17
-             * "Author workshop": bar height at 11
-             * "Tech assistance": bar height at 4
-           - The total number of surveyed visitors across all 4 bars is 50.
-      -->
+      
       ![](./assets/dSAT-T1-M2E-Q10.svg)
     prompt: |
       A community library surveyed a random sample of $50$ patrons to determine the primary reason for their visit on a Saturday afternoon. The results are summarized in the bar graph shown. If one of these patrons is selected at random, what is the probability that the patron's primary reason for visiting was to attend an author workshop?
@@ -359,7 +322,7 @@ questions:
       A catering service charges for events using the pricing model:
 
       $$
-      \begin{aligned} 4x &= 48 \\ 5x - 38 &= y \end{aligned}
+      \begin{aligned} 4x &= 48 \\ 5x - &38 = y \end{aligned}
       $$
 
       where $x$ is the scheduled duration of an event in hours, and $y$ is the equipment preparation surcharge in dollars. What is the value of $y$?
@@ -470,15 +433,7 @@ questions:
     containsChart: false
     containsDiagram: true
     stimulus: |
-      <!-- DIAGRAM PLACEHOLDER: 
-           Asset: ./assets/dSAT-T1-M2E-Q15.svg
-           Description: A geometric diagram of large triangle ABC with a horizontal base AC.
-           - Point B is the top vertex.
-           - Point D lies on segment AB, and point E lies on segment BC.
-           - Segment DE is drawn parallel to segment AC, creating smaller triangle BDE nested inside triangle ABC.
-           - Parallel markings (arrows) are shown on segments DE and AC.
-           - Note: Figure not drawn to scale.
-      -->
+      
       ![](./assets/dSAT-T1-M2E-Q15.svg)
 
       Note: Figure not drawn to scale.
@@ -552,14 +507,7 @@ questions:
     containsChart: false
     containsDiagram: true
     stimulus: |
-      <!-- DIAGRAM PLACEHOLDER: 
-           Asset: ./assets/dSAT-T1-M2E-Q17.svg
-           Description: A diagram showing a corner formed by a vertical wall and a horizontal shelf meeting at a 90-degree right angle (indicated by a square right-angle symbol).
-           - A straight metal brace connects a point on the wall to a point on the shelf, forming a right triangle.
-           - Hash marks (tick marks) indicate that the vertical segment along the wall and the horizontal segment along the shelf have equal length.
-           - The angle between the brace and the vertical wall is labeled a°.
-           - Note: Figure not drawn to scale.
-      -->
+      
       ![](./assets/dSAT-T1-M2E-Q17.svg)
 
       Note: Figure not drawn to scale.
@@ -615,7 +563,7 @@ questions:
       A vertical line and a parabola are defined by the system:
 
       $$
-      \begin{aligned} 2x - 3 &= 11 \\ y &= 3x^2 - 15 \end{aligned}
+      \begin{aligned} &2x - 3 = 11 \\ &y = 3x^2 - 15 \end{aligned}
       $$
 
       At what point $(x, y)$ in the $xy$-plane do the graphs of these two equations intersect?
@@ -681,7 +629,7 @@ questions:
   - id: "sat-t1-m2e-q21"
     questionNumber: 21
     questionType: "MC"
-    correctAnswer: "A"
+    correctAnswer: "D"
     domain: "Algebra"
     skill: "Linear equations in two variables"
     difficulty: "Easy"
@@ -715,44 +663,24 @@ questions:
       - Along the horizontal $x$-axis, the line for $x + y = 40$ extends farther to $(40, 0)$ than the line for $12x + 8y = 360$ at $(30, 0)$.
       - The two lines intersect at $(10, 30)$.
 
-      Graph A is the only graph showing both downward-sloping lines with intercepts at $(0, 40)$ and $(40, 0)$ for one line, and $(0, 45)$ and $(30, 0)$ for the second line.
+      Graph D is the only graph showing both downward-sloping lines with intercepts at $(0, 40)$ and $(40, 0)$ for one line, and $(0, 45)$ and $(30, 0)$ for the second line.
     options:
       - id: "A"
         text: |
-          <!-- GRAPH PLACEHOLDER: 
-               Asset: ./assets/dSAT-T1-M2E-Q21-OptA.svg
-               Description: First-quadrant graph with x-axis and y-axis scaled from 0 to 50 in increments of 10.
-               - Line 1 passes through (0, 40) and (40, 0).
-               - Line 2 passes through (0, 45) and (30, 0).
-               - The two lines intersect cleanly at (10, 30). Both lines slope downward. (CORRECT)
-          -->
-          ![](./assets/dSAT-T1-M2E-Q21-OptA.svg)
+          
+          ![](./assets/dSAT-T1-M2E-Q21-A.svg)
       - id: "B"
         text: |
-          <!-- GRAPH PLACEHOLDER: 
-               Asset: ./assets/dSAT-T1-M2E-Q21-OptB.svg
-               Description: First-quadrant graph with x-axis and y-axis scaled from 0 to 50 in increments of 10.
-               - Line 1 passes through (0, 40) and (40, 0).
-               - Line 2 is an upward-sloping line passing through the origin (0, 0) and (20, 30). (DISTRACTOR: sign error)
-          -->
-          ![](./assets/dSAT-T1-M2E-Q21-OptB.svg)
+          
+          ![](./assets/dSAT-T1-M2E-Q21-B.svg)
       - id: "C"
         text: |
-          <!-- GRAPH PLACEHOLDER: 
-               Asset: ./assets/dSAT-T1-M2E-Q21-OptC.svg
-               Description: First-quadrant graph with x-axis and y-axis scaled from 0 to 50 in increments of 10.
-               - Line 1 passes through (0, 30) and (30, 0).
-               - Line 2 passes through (0, 40) and (45, 0). (DISTRACTOR: inverted intercepts)
-          -->
-          ![](./assets/dSAT-T1-M2E-Q21-OptC.svg)
+          
+          ![](./assets/dSAT-T1-M2E-Q21-C.svg)
       - id: "D"
         text: |
-          <!-- GRAPH PLACEHOLDER: 
-               Asset: ./assets/dSAT-T1-M2E-Q21-OptD.svg
-               Description: First-quadrant graph with x-axis and y-axis scaled from 0 to 50 in increments of 10.
-               - Both lines slope upward from the positive axes into the upper-right quadrant. (DISTRACTOR: inverted slope orientation)
-          -->
-          ![](./assets/dSAT-T1-M2E-Q21-OptD.svg)
+          
+          ![](./assets/dSAT-T1-M2E-Q21-D.svg)
   - id: "sat-t1-m2e-q22"
     questionNumber: 22
     questionType: "MC"

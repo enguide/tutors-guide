@@ -29,7 +29,7 @@ export const SATDashedDivider: React.FC<SATDashedDividerProps> = ({
         y2="1"
         stroke="currentColor"
         strokeWidth="2"
-        strokeDasharray="46 3"
+        strokeDasharray="30 2"
         vectorEffect="non-scaling-stroke"
         className="text-[#2b2b2b] dark:text-neutral-600"
       />

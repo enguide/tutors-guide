@@ -106,7 +106,7 @@ export const SATQuestionNavigatorPopover: React.FC<
   return (
     <div ref={containerRef} className="relative inline-block text-left">
       {isOpen && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 w-[380px] sm:w-[480px] md:w-[520px] bg-white dark:bg-neutral-900 border border-neutral-300/20 dark:border-neutral-700/20 shadow-lg rounded-lg p-5 z-50 animate-in fade-in zoom-in-95 duration-100 select-none">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 w-95 sm:w-120 md:w-130 bg-white dark:bg-neutral-900 border border-neutral-300/20 dark:border-neutral-700/20 shadow-lg rounded-lg p-5 z-50 animate-in fade-in zoom-in-95 duration-100 select-none">
           <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-neutral-900 rotate-45 border-b border-r border-neutral-300 dark:border-neutral-700 pointer-events-none" />
 
           {/* Header with Centered Title & Pinned Close Button */}
@@ -214,7 +214,7 @@ export const SATQuestionNavigatorPopover: React.FC<
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-4 py-2 bg-[#222222] hover:bg-[#111111] text-white rounded-[6px] text-xs font-bold tracking-tight transition-colors shadow-xs cursor-pointer select-none"
+        className="flex items-center gap-2 px-4 py-2 bg-[#222222] hover:bg-[#111111] text-white rounded-md text-xs font-bold tracking-tight transition-colors shadow-xs cursor-pointer select-none"
       >
         <span>
           Question {currentIndex + 1} of {questions.length}

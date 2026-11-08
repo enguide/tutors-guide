@@ -23,6 +23,8 @@ declare global {
         resize: () => void;
         destroy: () => void;
         observeEvent: (eventName: string, callback: () => void) => void;
+        getState: () => Record<string, unknown>;
+        setState: (state: Record<string, unknown>) => void;
       };
       ScientificCalculator: (
         element: HTMLElement,
@@ -31,6 +33,8 @@ declare global {
         resize: () => void;
         destroy: () => void;
         observeEvent: (eventName: string, callback: () => void) => void;
+        getState: () => Record<string, unknown>;
+        setState: (state: Record<string, unknown>) => void;
       };
     };
   }
@@ -77,11 +81,7 @@ function ScientificIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
 
 function SixDotGrip({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 16 12"
-      fill="currentColor"
-      className={className}
-    >
+    <svg viewBox="0 0 16 12" fill="currentColor" className={className}>
       <circle cx="3" cy="3" r="1.3" />
       <circle cx="8" cy="3" r="1.3" />
       <circle cx="13" cy="3" r="1.3" />
@@ -93,9 +93,14 @@ function SixDotGrip({ className = "w-4 h-4" }: { className?: string }) {
 }
 
 export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInteract }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Dual persistent mounting containers
+  const graphingContainerRef = useRef<HTMLDivElement>(null);
+  const scientificContainerRef = useRef<HTMLDivElement>(null);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const calculatorInstance = useRef<any>(null);
+  const graphingInstance = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scientificInstance = useRef<any>(null);
 
   const [mode, setMode] = useState<CalculatorMode>("graphing");
 
@@ -122,63 +127,70 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
     startH: 0,
   });
 
-  const initDesmos = useCallback(
-    (targetMode: CalculatorMode = mode) => {
-      if (!window.Desmos || !containerRef.current) return;
+  // Mount an instance only once, never destroy on mode switches
+  const initCalculator = useCallback((targetMode: CalculatorMode) => {
+    if (!window.Desmos) return;
 
-      if (calculatorInstance.current) {
-        calculatorInstance.current.destroy();
-        calculatorInstance.current = null;
-      }
-
-      if (targetMode === "graphing") {
-        const calc = window.Desmos.GraphingCalculator(containerRef.current, {
-          keypad: true,
-          graphpaper: true,
-          expressions: true,
-          settingsMenu: true,
-          zoomButtons: true,
-          border: false,
-          fontSize: 14,
-        });
-        calculatorInstance.current = calc;
-
-        calc.observeEvent("change", () => {
-          onInteractRef.current?.();
-        });
-      } else {
-        const calc = window.Desmos.ScientificCalculator(containerRef.current, {
-          keypad: true,
-          settingsMenu: false,
-          border: false,
-          fontSize: 14,
-        });
-        calculatorInstance.current = calc;
-
-        calc.observeEvent("change", () => {
-          onInteractRef.current?.();
-        });
-      }
-    },
-    [mode]
-  );
-
-  useEffect(() => {
-    if (isOpen) {
-      if (!calculatorInstance.current && window.Desmos) {
-        initDesmos(mode);
-      } else if (calculatorInstance.current) {
-        setTimeout(() => {
-          calculatorInstance.current?.resize();
-        }, 50);
-      }
+    if (targetMode === "graphing" && graphingContainerRef.current && !graphingInstance.current) {
+      const calc = window.Desmos.GraphingCalculator(graphingContainerRef.current, {
+        keypad: true,
+        graphpaper: true,
+        expressions: true,
+        settingsMenu: true,
+        zoomButtons: true,
+        border: false,
+        fontSize: 14,
+      });
+      graphingInstance.current = calc;
+      calc.observeEvent("change", () => onInteractRef.current?.());
     }
-  }, [isOpen, initDesmos, mode]);
+
+    if (targetMode === "scientific" && scientificContainerRef.current && !scientificInstance.current) {
+      const calc = window.Desmos.ScientificCalculator(scientificContainerRef.current, {
+        keypad: true,
+        settingsMenu: false,
+        border: false,
+        fontSize: 14,
+      });
+      scientificInstance.current = calc;
+      calc.observeEvent("change", () => onInteractRef.current?.());
+    }
+  }, []);
+
+  // When opened or mode changed, ensure initialized and resize the active calculator
+  useEffect(() => {
+    if (isOpen && window.Desmos) {
+      initCalculator(mode);
+
+      const activeInstance = mode === "graphing" ? graphingInstance.current : scientificInstance.current;
+      setTimeout(() => {
+        activeInstance?.resize();
+      }, 50);
+    }
+  }, [isOpen, mode, initCalculator]);
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      graphingInstance.current?.destroy();
+      scientificInstance.current?.destroy();
+      graphingInstance.current = null;
+      scientificInstance.current = null;
+    };
+  }, []);
 
   const handleModeChange = (newMode: CalculatorMode) => {
     if (newMode === mode) return;
     setMode(newMode);
-    initDesmos(newMode);
+    initCalculator(newMode);
+
+    setTimeout(() => {
+      if (newMode === "graphing") {
+        graphingInstance.current?.resize();
+      } else {
+        scientificInstance.current?.resize();
+      }
+    }, 50);
   };
 
   useEffect(() => {
@@ -197,7 +209,9 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
         const nextW = Math.max(340, Math.min(window.innerWidth - 40, resizeStartRef.current.startW + deltaW));
         const nextH = Math.max(380, Math.min(window.innerHeight - 40, resizeStartRef.current.startH + deltaH));
         setSize({ width: nextW, height: nextH });
-        calculatorInstance.current?.resize();
+
+        const activeInstance = mode === "graphing" ? graphingInstance.current : scientificInstance.current;
+        activeInstance?.resize();
       }
     };
 
@@ -205,7 +219,8 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
       if (isDraggingRef.current || isResizingRef.current) {
         isDraggingRef.current = false;
         isResizingRef.current = false;
-        calculatorInstance.current?.resize();
+        const activeInstance = mode === "graphing" ? graphingInstance.current : scientificInstance.current;
+        activeInstance?.resize();
       }
     };
 
@@ -215,7 +230,7 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, []);
+  }, [mode]);
 
   const handleMouseDownHeader = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
@@ -244,7 +259,7 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
       <Script
         src="https://www.desmos.com/api/v1.9/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"
         strategy="lazyOnload"
-        onLoad={() => initDesmos(mode)}
+        onLoad={() => initCalculator(mode)}
       />
 
       <div
@@ -309,11 +324,19 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
           </div>
         </div>
 
-        {/* Desmos Mounting Container */}
-        <div
-          ref={containerRef}
-          className="flex-1 w-full h-full relative overflow-hidden rounded-b-[7px] bg-white"
-        />
+        {/* Persistent Desmos Containers (toggled via CSS display) */}
+        <div className="flex-1 w-full h-full relative overflow-hidden rounded-b-[7px] bg-white">
+          <div
+            ref={graphingContainerRef}
+            style={{ display: mode === "graphing" ? "block" : "none" }}
+            className="w-full h-full"
+          />
+          <div
+            ref={scientificContainerRef}
+            style={{ display: mode === "scientific" ? "block" : "none" }}
+            className="w-full h-full"
+          />
+        </div>
 
         {/* Circular Bottom-Right Resize Handle */}
         <div
