@@ -93,7 +93,6 @@ function SixDotGrip({ className = "w-4 h-4" }: { className?: string }) {
 }
 
 export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInteract }) => {
-  // Dual persistent mounting containers
   const graphingContainerRef = useRef<HTMLDivElement>(null);
   const scientificContainerRef = useRef<HTMLDivElement>(null);
 
@@ -109,25 +108,41 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
     onInteractRef.current = onInteract;
   }, [onInteract]);
 
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 80, y: 80 });
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 440, height: 580 });
+  // Synchronously compute responsive dimensions based on active viewport
+  const [size, setSize] = useState<{ width: number; height: number }>(() => {
+    if (typeof window === "undefined") return { width: 440, height: 580 };
+    const isMobile = window.innerWidth < 768;
+    return {
+      width: isMobile ? Math.min(window.innerWidth - 16, 440) : 440,
+      height: isMobile ? Math.min(window.innerHeight - 140, 520) : 580,
+    };
+  });
+
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === "undefined") return { x: 80, y: 80 };
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      return { x: 8, y: 72 };
+    }
+    const maxLeft = Math.max(20, window.innerWidth - 460);
+    return { x: Math.min(80, maxLeft), y: 80 };
+  });
 
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
-  const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
-    mouseX: 0,
-    mouseY: 0,
+  const dragStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number }>({
+    clientX: 0,
+    clientY: 0,
     startX: 0,
     startY: 0,
   });
-  const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startW: number; startH: number }>({
-    mouseX: 0,
-    mouseY: 0,
+  const resizeStartRef = useRef<{ clientX: number; clientY: number; startW: number; startH: number }>({
+    clientX: 0,
+    clientY: 0,
     startW: 0,
     startH: 0,
   });
 
-  // Mount an instance only once, never destroy on mode switches
   const initCalculator = useCallback((targetMode: CalculatorMode) => {
     if (!window.Desmos) return;
 
@@ -157,7 +172,6 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
     }
   }, []);
 
-  // When opened or mode changed, ensure initialized and resize the active calculator
   useEffect(() => {
     if (isOpen && window.Desmos) {
       initCalculator(mode);
@@ -169,7 +183,6 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
     }
   }, [isOpen, mode, initCalculator]);
 
-  // Clean up on component unmount
   useEffect(() => {
     return () => {
       graphingInstance.current?.destroy();
@@ -193,21 +206,25 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
     }, 50);
   };
 
+  // Unified Mouse & Touch movement handlers for drag & resize
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const currentX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const currentY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
       if (isDraggingRef.current) {
-        const deltaX = e.clientX - dragStartRef.current.mouseX;
-        const deltaY = e.clientY - dragStartRef.current.mouseY;
-        const nextX = Math.max(10, Math.min(window.innerWidth - 150, dragStartRef.current.startX + deltaX));
-        const nextY = Math.max(10, Math.min(window.innerHeight - 80, dragStartRef.current.startY + deltaY));
+        const deltaX = currentX - dragStartRef.current.clientX;
+        const deltaY = currentY - dragStartRef.current.clientY;
+        const nextX = Math.max(4, Math.min(window.innerWidth - 120, dragStartRef.current.startX + deltaX));
+        const nextY = Math.max(4, Math.min(window.innerHeight - 60, dragStartRef.current.startY + deltaY));
         setPosition({ x: nextX, y: nextY });
       }
 
       if (isResizingRef.current) {
-        const deltaW = e.clientX - resizeStartRef.current.mouseX;
-        const deltaH = e.clientY - resizeStartRef.current.mouseY;
-        const nextW = Math.max(340, Math.min(window.innerWidth - 40, resizeStartRef.current.startW + deltaW));
-        const nextH = Math.max(380, Math.min(window.innerHeight - 40, resizeStartRef.current.startH + deltaH));
+        const deltaW = currentX - resizeStartRef.current.clientX;
+        const deltaH = currentY - resizeStartRef.current.clientY;
+        const nextW = Math.max(280, Math.min(window.innerWidth - 12, resizeStartRef.current.startW + deltaW));
+        const nextH = Math.max(300, Math.min(window.innerHeight - 20, resizeStartRef.current.startH + deltaH));
         setSize({ width: nextW, height: nextH });
 
         const activeInstance = mode === "graphing" ? graphingInstance.current : scientificInstance.current;
@@ -215,7 +232,7 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
       }
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
       if (isDraggingRef.current || isResizingRef.current) {
         isDraggingRef.current = false;
         isResizingRef.current = false;
@@ -224,31 +241,46 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
       }
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleEnd);
+    window.addEventListener("touchcancel", handleEnd);
+
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+      window.removeEventListener("touchcancel", handleEnd);
     };
   }, [mode]);
 
-  const handleMouseDownHeader = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return;
+  const startDrag = (clientX: number, clientY: number) => {
     isDraggingRef.current = true;
     dragStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
+      clientX,
+      clientY,
       startX: position.x,
       startY: position.y,
     };
   };
 
-  const handleMouseDownResize = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleMouseDownHeader = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    startDrag(e.clientX, e.clientY);
+  };
+
+  const handleTouchStartHeader = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    startDrag(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const startResize = (clientX: number, clientY: number) => {
     isResizingRef.current = true;
     resizeStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
+      clientX,
+      clientY,
       startW: size.width,
       startH: size.height,
     };
@@ -269,49 +301,52 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
           top: `${position.y}px`,
           width: `${size.width}px`,
           height: `${size.height}px`,
+          maxWidth: "calc(100vw - 12px)",
+          maxHeight: "calc(100dvh - 75px)",
         }}
-        className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 rounded-none shadow-2xl flex flex-col select-none"
+        className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 rounded-none shadow-2xl flex flex-col select-none touch-none"
       >
-        {/* Bluebook Dark Header with Exact 3-Column Centering Grid */}
+        {/* Bluebook Dark Header with Drag Grip */}
         <div
           onMouseDown={handleMouseDownHeader}
-          className="h-10 bg-[#1c1c1c] text-white px-2.5 grid grid-cols-3 items-center cursor-move select-none shrink-0 rounded-none"
+          onTouchStart={handleTouchStartHeader}
+          className="h-10 bg-[#1c1c1c] text-white px-2 sm:px-2.5 grid grid-cols-3 items-center cursor-move select-none shrink-0 rounded-none touch-none"
         >
-          {/* Column 1: Left-aligned Segmented Switcher */}
+          {/* Segmented Switcher */}
           <div className="justify-self-start flex items-center bg-[#2a2a2a] rounded-[5px] border border-neutral-700">
             <button
               type="button"
               onClick={() => handleModeChange("graphing")}
-              className={`flex items-center gap-1 px-1 py-1 text-[10px] font-semibold rounded-l-sm transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 px-1.5 py-1 text-[9px] sm:text-[10px] font-semibold rounded-l-sm transition-colors cursor-pointer ${
                 mode === "graphing"
                   ? "bg-white text-neutral-950 shadow-xs font-bold"
                   : "text-white hover:text-neutral-200"
               }`}
             >
               <GraphingIcon className="w-3.5 h-3.5" />
-              <span>Graphing</span>
+              <span>Graph</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleModeChange("scientific")}
-              className={`flex items-center gap-1 px-1 py-1 text-[10px] font-semibold rounded-r-sm transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 px-1.5 py-1 text-[9px] sm:text-[10px] font-semibold rounded-r-sm transition-colors cursor-pointer ${
                 mode === "scientific"
                   ? "bg-white text-neutral-950 shadow-xs font-bold"
                   : "text-white hover:text-neutral-200"
               }`}
             >
               <ScientificIcon className="w-3.5 h-3.5" />
-              <span>Scientific</span>
+              <span>Sci</span>
             </button>
           </div>
 
-          {/* Column 2: Exact Center Grip */}
+          {/* Center Grip */}
           <div className="justify-self-center flex items-center text-neutral-200">
             <SixDotGrip className="w-6 h-6" />
           </div>
 
-          {/* Column 3: Right-aligned Close Button */}
+          {/* Close Button */}
           <div className="justify-self-end flex items-center">
             <button
               type="button"
@@ -324,8 +359,8 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
           </div>
         </div>
 
-        {/* Persistent Desmos Containers (toggled via CSS display) */}
-        <div className="flex-1 w-full h-full relative overflow-hidden rounded-b-[7px] bg-white">
+        {/* Persistent Desmos Containers */}
+        <div className="flex-1 w-full h-full relative overflow-hidden bg-white">
           <div
             ref={graphingContainerRef}
             style={{ display: mode === "graphing" ? "block" : "none" }}
@@ -340,8 +375,15 @@ export const ToggleGraph: React.FC<ToggleGraphProps> = ({ isOpen, onClose, onInt
 
         {/* Circular Bottom-Right Resize Handle */}
         <div
-          onMouseDown={handleMouseDownResize}
-          className="absolute -bottom-2 -right-2 w-7 h-7 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-full shadow-md cursor-nwse-resize flex items-center justify-center text-neutral-800 hover:text-black dark:text-neutral-200 dark:hover:text-white z-30 transition-transform active:scale-95"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            startResize(e.clientX, e.clientY);
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            startResize(e.touches[0].clientX, e.touches[0].clientY);
+          }}
+          className="absolute -bottom-2 -right-2 w-7 h-7 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-full shadow-md cursor-nwse-resize flex items-center justify-center text-neutral-800 hover:text-black dark:text-neutral-200 dark:hover:text-white z-30 transition-transform active:scale-95 touch-none"
           title="Resize calculator"
         >
           <MoveDiagonal className="w-4 h-4 rotate-90" />

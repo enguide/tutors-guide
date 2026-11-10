@@ -33,51 +33,54 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
   const sheet = getFormulaSheet(sheetId);
   const isSatReference = !sheetId || sheetId.toLowerCase().includes("sat");
 
-  // Landscape dimensions tailored for the official SAT Reference Sheet SVG
   const DEFAULT_WIDTH = isSatReference ? 720 : 520;
   const DEFAULT_HEIGHT = isSatReference ? 400 : 640;
 
-  // Initialize size and position synchronously via lazy initializers (no setState in useEffect)
+  // Responsive size initialization
   const [size, setSize] = useState<{ width: number; height: number }>(() => {
     if (typeof window === "undefined") {
       return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
     }
-    const targetWidth = Math.min(DEFAULT_WIDTH, window.innerWidth - 60);
-    const targetHeight = Math.min(DEFAULT_HEIGHT, window.innerHeight - 100);
+    const isMobile = window.innerWidth < 768;
+    const targetWidth = isMobile
+      ? Math.min(window.innerWidth - 16, DEFAULT_WIDTH)
+      : Math.min(DEFAULT_WIDTH, window.innerWidth - 60);
+    const targetHeight = isMobile
+      ? Math.min(window.innerHeight - 140, 360)
+      : Math.min(DEFAULT_HEIGHT, window.innerHeight - 100);
+
     return {
-      width: Math.max(360, targetWidth),
-      height: Math.max(300, targetHeight),
+      width: Math.max(280, targetWidth),
+      height: Math.max(240, targetHeight),
     };
   });
 
+  // Responsive initial position
   const [position, setPosition] = useState<{ x: number; y: number }>(() => {
-    if (typeof window === "undefined") {
-      return { x: 80, y: 65 };
-    }
+    if (typeof window === "undefined") return { x: 80, y: 65 };
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) return { x: 8, y: 72 };
+    
     const targetWidth = Math.min(DEFAULT_WIDTH, window.innerWidth - 60);
-    const targetHeight = Math.min(DEFAULT_HEIGHT, window.innerHeight - 100);
     const initialX = Math.max(20, Math.min(window.innerWidth - targetWidth - 20, 80));
-    const initialY = Math.max(20, Math.min(window.innerHeight - targetHeight - 20, 65));
-    return { x: initialX, y: initialY };
+    return { x: initialX, y: 65 };
   });
 
-  // Drag and resize tracking refs
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
-  const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
-    mouseX: 0,
-    mouseY: 0,
+  const dragStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number }>({
+    clientX: 0,
+    clientY: 0,
     startX: 0,
     startY: 0,
   });
-  const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startW: number; startH: number }>({
-    mouseX: 0,
-    mouseY: 0,
+  const resizeStartRef = useRef<{ clientX: number; clientY: number; startW: number; startH: number }>({
+    clientX: 0,
+    clientY: 0,
     startW: 0,
     startH: 0,
   });
 
-  // Close on Escape key press
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,56 +90,74 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Window-level mouse listeners for drag & resize
+  // Unified Mouse & Touch listeners for drag and resize
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const currentX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const currentY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
       if (isDraggingRef.current) {
-        const deltaX = e.clientX - dragStartRef.current.mouseX;
-        const deltaY = e.clientY - dragStartRef.current.mouseY;
-        const nextX = Math.max(10, Math.min(window.innerWidth - 150, dragStartRef.current.startX + deltaX));
-        const nextY = Math.max(10, Math.min(window.innerHeight - 80, dragStartRef.current.startY + deltaY));
+        const deltaX = currentX - dragStartRef.current.clientX;
+        const deltaY = currentY - dragStartRef.current.clientY;
+        const nextX = Math.max(4, Math.min(window.innerWidth - 120, dragStartRef.current.startX + deltaX));
+        const nextY = Math.max(4, Math.min(window.innerHeight - 60, dragStartRef.current.startY + deltaY));
         setPosition({ x: nextX, y: nextY });
       }
 
       if (isResizingRef.current) {
-        const deltaW = e.clientX - resizeStartRef.current.mouseX;
-        const deltaH = e.clientY - resizeStartRef.current.mouseY;
-        const nextW = Math.max(340, Math.min(window.innerWidth - 40, resizeStartRef.current.startW + deltaW));
-        const nextH = Math.max(260, Math.min(window.innerHeight - 40, resizeStartRef.current.startH + deltaH));
+        const deltaW = currentX - resizeStartRef.current.clientX;
+        const deltaH = currentY - resizeStartRef.current.clientY;
+        const nextW = Math.max(260, Math.min(window.innerWidth - 12, resizeStartRef.current.startW + deltaW));
+        const nextH = Math.max(220, Math.min(window.innerHeight - 20, resizeStartRef.current.startH + deltaH));
         setSize({ width: nextW, height: nextH });
       }
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
       isDraggingRef.current = false;
       isResizingRef.current = false;
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleEnd);
+    window.addEventListener("touchcancel", handleEnd);
+
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+      window.removeEventListener("touchcancel", handleEnd);
     };
   }, []);
 
-  const handleMouseDownHeader = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return;
+  const startDrag = (clientX: number, clientY: number) => {
     isDraggingRef.current = true;
     dragStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
+      clientX,
+      clientY,
       startX: position.x,
       startY: position.y,
     };
   };
 
-  const handleMouseDownResize = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleMouseDownHeader = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    startDrag(e.clientX, e.clientY);
+  };
+
+  const handleTouchStartHeader = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    startDrag(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const startResize = (clientX: number, clientY: number) => {
     isResizingRef.current = true;
     resizeStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
+      clientX,
+      clientY,
       startW: size.width,
       startH: size.height,
     };
@@ -151,25 +172,25 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
         top: `${position.y}px`,
         width: `${size.width}px`,
         height: `${size.height}px`,
+        maxWidth: "calc(100vw - 12px)",
+        maxHeight: "calc(100dvh - 75px)",
       }}
-      className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 rounded-none shadow-2xl flex flex-col select-none"
+      className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 rounded-none shadow-2xl flex flex-col select-none touch-none"
     >
-      {/* Bluebook Dark Header with 3-Column Centering Grid */}
+      {/* Bluebook Dark Header */}
       <div
         onMouseDown={handleMouseDownHeader}
-        className="h-10 bg-[#1c1c1c] text-white px-3 grid grid-cols-3 items-center cursor-move select-none shrink-0 rounded-none"
+        onTouchStart={handleTouchStartHeader}
+        className="h-10 bg-[#1c1c1c] text-white px-3 grid grid-cols-3 items-center cursor-move select-none shrink-0 rounded-none touch-none"
       >
-        {/* Column 1: Left Title */}
-        <span className="justify-self-start text-[13px] font-sans font-bold tracking-tight text-neutral-100">
+        <span className="justify-self-start text-[12px] sm:text-[13px] font-sans font-bold tracking-tight text-neutral-100">
           Reference
         </span>
 
-        {/* Column 2: Center Grip */}
         <div className="justify-self-center flex items-center text-neutral-200">
           <SixDotGrip className="w-6 h-6" />
         </div>
 
-        {/* Column 3: Right Close Button */}
         <div className="justify-self-end flex items-center">
           <button
             type="button"
@@ -182,8 +203,8 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
         </div>
       </div>
 
-      {/* Reference Body: Centered display for landscape SVG */}
-      <div className="flex-1 w-full h-full overflow-y-auto p-4 flex items-center justify-center bg-white dark:bg-neutral-900">
+      {/* Reference Body */}
+      <div className="flex-1 w-full h-full overflow-y-auto p-2 sm:p-4 flex items-center justify-center bg-white dark:bg-neutral-900">
         {isSatReference ? (
           <img
             src="/content/references/ReferenceEquations.svg"
@@ -193,16 +214,23 @@ export const FormulaSheetModal: React.FC<FormulaSheetModalProps> = ({
             loading="eager"
           />
         ) : sheet ? (
-          <div className="w-full h-full font-serif text-[15px] leading-relaxed">
+          <div className="w-full h-full font-serif text-[14px] sm:text-[15px] leading-relaxed">
             <MarkdownQuestionRenderer content={sheet.content} />
           </div>
         ) : null}
       </div>
 
-      {/* Circular Bottom-Right Resize Handle */}
+      {/* Resize Handle */}
       <div
-        onMouseDown={handleMouseDownResize}
-        className="absolute -bottom-2 -right-2 w-7 h-7 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-full shadow-md cursor-nwse-resize flex items-center justify-center text-neutral-800 hover:text-black dark:text-neutral-200 dark:hover:text-white z-30 transition-transform active:scale-95"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          startResize(e.clientX, e.clientY);
+        }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          startResize(e.touches[0].clientX, e.touches[0].clientY);
+        }}
+        className="absolute -bottom-2 -right-2 w-7 h-7 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-full shadow-md cursor-nwse-resize flex items-center justify-center text-neutral-800 hover:text-black dark:text-neutral-200 dark:hover:text-white z-30 transition-transform active:scale-95 touch-none"
         title="Resize reference sheet"
       >
         <MoveDiagonal className="w-4 h-4 rotate-90" />
