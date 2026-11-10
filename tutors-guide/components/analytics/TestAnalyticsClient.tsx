@@ -11,7 +11,6 @@ import {
 } from "@/types/analytics";
 import UnifiedAnalyticsDashboard from "@/components/analytics/UnifiedAnalyticsDashboard";
 import { QuestionResultCard } from "@/components/analytics/QuestionResultCard";
-import { AdaptiveTrajectoryCard } from "@/components/analytics/AdaptiveTrajectoryCard";
 import {
   BarChart3,
   Search,

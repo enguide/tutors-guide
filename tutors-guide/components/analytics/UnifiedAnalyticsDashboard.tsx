@@ -13,6 +13,7 @@ import {
   Line,
   LineChart,
   Tooltip,
+  ReferenceLine,
 } from "recharts";
 import {
   Card,
@@ -139,6 +140,31 @@ export default function UnifiedAnalyticsDashboard({
       .sort((a, b) => a.responseOrder - b.responseOrder);
   }, [responses, activeSectionId]);
 
+  // Dynamically compute the student's target pacing per question for this section
+  const targetPacingSeconds = React.useMemo(() => {
+    if (!activeSectionResult) return null;
+
+    const questionCount =
+      activeResponses.length || activeSectionResult.totalQuestions || 0;
+    if (questionCount === 0) return null;
+
+    const manifestSection = metadata.sections?.find(
+      (s) => s.id === activeSectionId
+    );
+    const baseTimeLimit =
+      manifestSection?.timeLimit ||
+      (activeSectionResult.section as any)?.timeLimit ||
+      0;
+
+    if (baseTimeLimit <= 0) return null;
+
+    const multiplier =
+      (activeSectionResult as any)?.accommodations?.timeMultiplier ?? 1.0;
+
+    const totalAllotted = Math.round(baseTimeLimit * multiplier);
+    return Math.round(totalAllotted / questionCount);
+  }, [activeSectionResult, activeResponses.length, metadata.sections, activeSectionId]);
+
   const topChartData = React.useMemo(() => {
     return activeResponses.map((r, index) => ({
       question: `${index + 1}`,
@@ -183,7 +209,7 @@ export default function UnifiedAnalyticsDashboard({
   const scoreCard = React.useMemo(() => {
     const category = metadata.category.toUpperCase();
 
-    // 1. Collegiate Academic / Chapter Tests: Pure Percentage
+    // Collegiate Academic / Chapter Tests: Pure Percentage
     if (category === "ACADEMIC" || (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE") {
       const totalEarned = sectionResults.reduce((acc, sr) => acc + (sr.rawScore || 0), 0);
       const totalPossible = sectionResults.reduce((acc, sr) => acc + (sr.totalQuestions || 0), 0);
@@ -405,6 +431,12 @@ export default function UnifiedAnalyticsDashboard({
                 ></span>
                 <span className="text-[10px] sm:text-sm">Incorrect</span>
               </div>
+              {targetPacingSeconds !== null && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-0 border-t-2 border-dashed border-[#2563eb]"></span>
+                  <span className="text-[10px] sm:text-sm">Target Pace</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -555,6 +587,23 @@ export default function UnifiedAnalyticsDashboard({
                         />
                       }
                     />
+
+                    {targetPacingSeconds !== null && (
+                      <ReferenceLine
+                        x={targetPacingSeconds}
+                        stroke="#2563eb"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `Target: ${targetPacingSeconds}s`,
+                          position: "insideTopRight",
+                          fontSize: 10,
+                          fontWeight: "bold",
+                          fill: "#2563eb",
+                        }}
+                      />
+                    )}
+
                     <Bar dataKey="Time" radius={[0, 4, 4, 0]}>
                       {topChartData.map((entry, index) => (
                         <Cell
@@ -609,6 +658,23 @@ export default function UnifiedAnalyticsDashboard({
                         />
                       }
                     />
+
+                    {targetPacingSeconds !== null && (
+                      <ReferenceLine
+                        y={targetPacingSeconds}
+                        stroke="#2563eb"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `Target: ${targetPacingSeconds}s`,
+                          position: "top",
+                          fontSize: 10,
+                          fontWeight: "bold",
+                          fill: "#2563eb",
+                        }}
+                      />
+                    )}
+
                     <Bar dataKey="Time" radius={[4, 4, 0, 0]}>
                       {topChartData.map((entry, index) => (
                         <Cell

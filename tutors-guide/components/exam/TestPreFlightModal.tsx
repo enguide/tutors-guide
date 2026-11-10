@@ -8,40 +8,52 @@ import {
   DEFAULT_ACCOMMODATIONS,
 } from "@/types/accommodations";
 import {
-  getAvailableAccommodationsForCategory,
-  AccommodationDescriptor,
-} from "@/lib/accommodations/registry";
-import {
-  Play,
   Clock,
-  ShieldCheck,
+  ArrowRight,
+  GraduationCap,
   CheckCircle2,
-  Info,
+  Check,
+  Loader2,
+  Layers,
+  HelpCircle,
 } from "lucide-react";
 
 interface TestPreFlightModalProps {
   category: SupportedExamCategory;
   testTitle: string;
-  sectionTitle: string;
-  baseTimeLimitSeconds: number;
+  totalBaseDurationSeconds: number;
+  totalModulesCount: number;
+  totalQuestionsCount?: number;
+  firstSectionTitle?: string;
   initialAccommodations?: Partial<AccommodationSettings>;
   onStartExam: (accommodations: AccommodationSettings) => void;
 }
 
 function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (secs === 0) {
-    return `${mins} min${mins === 1 ? "" : "s"}`;
+  if (!seconds || isNaN(seconds)) return "--";
+  const hours = Math.floor(seconds / 3600);
+  const remainingSecs = seconds % 3600;
+  const mins = Math.floor(remainingSecs / 60);
+
+  if (hours > 0) {
+    return mins > 0 ? `${hours}H ${mins}M` : `${hours}H`;
   }
-  return `${mins}m ${secs}s`;
+  return `${mins} MIN${mins === 1 ? "" : "S"}`;
 }
+
+const TIME_OPTIONS: { label: string; multiplier: 1.0 | 1.5 | 2.0; tag: string; delta: string }[] = [
+  { label: "Standard", multiplier: 1.0, tag: "1.0X", delta: "+0%" },
+  { label: "Extended", multiplier: 1.5, tag: "1.5X", delta: "+50%" },
+  { label: "Double", multiplier: 2.0, tag: "2.0X", delta: "+100%" },
+];
 
 export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
   category,
   testTitle,
-  sectionTitle,
-  baseTimeLimitSeconds,
+  totalBaseDurationSeconds,
+  totalModulesCount,
+  totalQuestionsCount,
+  firstSectionTitle,
   initialAccommodations,
   onStartExam,
 }) => {
@@ -49,151 +61,209 @@ export const TestPreFlightModal: React.FC<TestPreFlightModalProps> = ({
     ...DEFAULT_ACCOMMODATIONS,
     ...(initialAccommodations || {}),
   });
+  const [isInitializing, setIsInitializing] = useState(false);
 
-  const availableAccommodations = useMemo(
-    () => getAvailableAccommodationsForCategory(category),
-    [category]
-  );
+  const baseSeconds = Number(totalBaseDurationSeconds) || 0;
 
-  // Calculate adjusted time based on selected multiplier
-  const effectiveSeconds = Math.round(
-    baseTimeLimitSeconds * settings.timeMultiplier
-  );
+  const effectiveTotalSeconds = useMemo(() => {
+    return Math.round(baseSeconds * settings.timeMultiplier);
+  }, [baseSeconds, settings.timeMultiplier]);
 
-  const isAccommodated =
-    settings.timeMultiplier !== 1.0 ||
-    settings.imageMagnification ||
-    settings.textToSpeech ||
-    settings.colorInversion ||
-    settings.reducedMotion;
+  const addedSeconds = effectiveTotalSeconds - baseSeconds;
 
-  const handleToggle = (key: keyof AccommodationSettings, value: unknown) => {
+  const handleMultiplierChange = (multiplier: 1.0 | 1.5 | 2.0) => {
+    if (isInitializing) return;
     setSettings((prev) => ({
       ...prev,
-      [key]: value,
+      timeMultiplier: multiplier,
     }));
   };
 
+  const handleConfirm = () => {
+    if (isInitializing) return;
+    setIsInitializing(true);
+    onStartExam(settings);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
-      <div className="w-full max-w-xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-sm shadow-2xl p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="flex items-start justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <span className="text-xs font-bold uppercase tracking-wider font-mono text-blue-600 dark:text-blue-400">
-                {category} Pre-Flight Check
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4">
+      <div className="w-full max-w-xl bg-card border border-border p-7 sm:p-8 shadow-sm rounded-none text-foreground animate-in fade-in zoom-in-95 duration-150">
+        
+        {/* Brand & Category Status */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-primary text-primary-foreground">
+              <GraduationCap size={15} />
+            </div>
+            <span className="text-xs font-black tracking-tight uppercase">
+              Tutors Guide
+            </span>
+          </div>
+          <span className="text-[10px] font-mono font-bold tracking-widest text-primary uppercase bg-primary/10 border border-primary/20 px-2 py-0.5">
+            {category} Test Environment
+          </span>
+        </div>
+
+        {/* Exam Title & Scope Context */}
+        <div className="mb-5">
+          <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+            Diagnostic Configuration
+          </span>
+          <h1 className="text-lg font-bold tracking-tight text-foreground uppercase mt-0.5 leading-snug whitespace-nowrap overflow-hidden text-ellipsis">
+            {testTitle}
+          </h1>
+          {firstSectionTitle && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+              <span className="text-primary font-semibold uppercase">Init:</span>
+              <span className="text-foreground truncate uppercase">{firstSectionTitle}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Structure / Scope Badges */}
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <div className="p-2.5 bg-muted/20 border border-border flex items-center gap-2.5">
+            <Layers size={14} className="text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <span className="block text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                Structure
+              </span>
+              <span className="text-xs font-bold font-mono text-foreground uppercase truncate block">
+                {totalModulesCount} {totalModulesCount === 1 ? "Module" : "Modules"}
               </span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              {sectionTitle}
-            </h1>
-            <p className="text-xs text-neutral-500 font-mono mt-0.5">
-              {testTitle}
-            </p>
           </div>
 
-          {/* Time Badge */}
-          <div className="flex flex-col items-end">
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-sm">
-              <Clock className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
-              <span className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                {formatDuration(effectiveSeconds)}
+          <div className="p-2.5 bg-muted/20 border border-border flex items-center gap-2.5">
+            <HelpCircle size={14} className="text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <span className="block text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                Total Questions
+              </span>
+              <span className="text-xs font-bold font-mono text-foreground uppercase truncate block">
+                {totalQuestionsCount ? `${totalQuestionsCount} Items` : "Adaptive"}
               </span>
             </div>
-            {settings.timeMultiplier !== 1.0 && (
-              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-1 font-semibold">
-                {settings.timeMultiplier}x Extended Time
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Info Callout */}
-        <div className="my-4 p-3 bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800 rounded-sm flex items-start gap-2.5">
-          <Info className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed font-sans">
-            Configure testing accommodations for this session. Practice attempts can simulate approved testing accommodations or standard testing conditions.
+        {/* Accommodation Selector */}
+        <div className="space-y-4 mb-6">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Extended Time Accommodation
+              </label>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                Multiplier: {settings.timeMultiplier.toFixed(1)}x
+              </span>
+            </div>
+
+            <div 
+              role="radiogroup" 
+              aria-label="Extended time accommodation options"
+              className="grid grid-cols-3 gap-2"
+            >
+              {TIME_OPTIONS.map((opt) => {
+                const isSelected = settings.timeMultiplier === opt.multiplier;
+                return (
+                  <button
+                    key={opt.multiplier}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    disabled={isInitializing}
+                    onClick={() => handleMultiplierChange(opt.multiplier)}
+                    className={`p-2.5 border text-left transition-colors cursor-pointer rounded-none flex flex-col justify-between focus:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isSelected
+                        ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary"
+                        : "border-input bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1.5">
+                      <span className="text-[10px] font-mono font-bold tracking-wider">
+                        {opt.tag}
+                      </span>
+                      {isSelected ? (
+                        <CheckCircle2 className="w-3 h-3 text-primary shrink-0" />
+                      ) : (
+                        <span className="text-[9px] font-mono text-muted-foreground">
+                          {opt.delta}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold leading-tight uppercase truncate">
+                      {opt.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Computed Exam Duration Bar */}
+          <div className="p-3 bg-muted/40 border border-border flex items-center justify-between">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock size={14} className="shrink-0" />
+              <span className="text-[11px] font-mono uppercase tracking-wider">
+                Total Allowed Time
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {addedSeconds > 0 && (
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5">
+                  +{formatDuration(addedSeconds)}
+                </span>
+              )}
+              <span className="font-mono text-xs font-bold text-foreground tabular-nums">
+                {formatDuration(effectiveTotalSeconds)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Launch Actions */}
+        <div className="space-y-3 pt-1">
+          <button
+            type="button"
+            disabled={isInitializing}
+            onClick={handleConfirm}
+            className="group relative w-full flex items-center justify-between bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold py-2.5 px-3.5 transition-colors cursor-pointer rounded-none uppercase tracking-wider focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isInitializing ? (
+              <span className="flex items-center gap-2 mx-auto">
+                <Loader2 size={14} className="animate-spin" /> Initializing Environment...
+              </span>
+            ) : (
+              <>
+                <span className="tracking-wider uppercase">Begin Examination</span>
+                {/* Morphing Arrow-to-Checkmark */}
+                <span className="flex items-center justify-center transition-transform duration-300 ease-out transform group-hover:translate-x-1">
+                  <span className="relative w-4 h-4 flex items-center justify-center shrink-0">
+                    <ArrowRight
+                      size={14}
+                      strokeWidth={2.25}
+                      className="absolute inset-0 m-auto transition-all duration-300 ease-out transform group-hover:rotate-180 group-hover:scale-50 group-hover:opacity-0"
+                    />
+                    <Check
+                      size={14}
+                      strokeWidth={2.5}
+                      className="absolute inset-0 m-auto transition-all duration-300 ease-out transform -rotate-180 scale-50 opacity-0 group-hover:rotate-0 group-hover:scale-100 group-hover:opacity-100"
+                    />
+                  </span>
+                </span>
+              </>
+            )}
+          </button>
+          
+          <p className="text-[10px] font-mono text-center text-muted-foreground uppercase tracking-widest">
+            {settings.timeMultiplier > 1.0
+              ? `${settings.timeMultiplier}x extended pacing applied across all modules`
+              : "Standard timing profile applied"}
           </p>
         </div>
 
-        {/* Accommodations Options List */}
-        <div className="space-y-3 my-5 max-h-85 overflow-y-auto pr-1">
-          {availableAccommodations.map((descriptor: AccommodationDescriptor) => (
-            <div
-              key={descriptor.key}
-              className="flex items-center justify-between p-3 border border-neutral-200 dark:border-neutral-800 rounded-sm bg-white dark:bg-neutral-900 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
-            >
-              <div className="pr-4">
-                <label
-                  htmlFor={descriptor.key}
-                  className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 block cursor-pointer"
-                >
-                  {descriptor.label}
-                </label>
-                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-normal">
-                  {descriptor.description}
-                </p>
-              </div>
-
-              <div className="shrink-0">
-                {descriptor.type === "boolean" ? (
-                  <input
-                    id={descriptor.key}
-                    type="checkbox"
-                    checked={Boolean(settings[descriptor.key])}
-                    onChange={(e) => handleToggle(descriptor.key, e.target.checked)}
-                    className="h-4 w-4 rounded-xs border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white focus:ring-0 cursor-pointer"
-                  />
-                ) : (
-                  <select
-                    id={descriptor.key}
-                    value={settings.timeMultiplier}
-                    onChange={(e) =>
-                      handleToggle(
-                        descriptor.key,
-                        parseFloat(e.target.value) as 1.0 | 1.5 | 2.0
-                      )
-                    }
-                    className="text-xs font-mono bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-sm px-2.5 py-1 text-neutral-900 dark:text-neutral-100 cursor-pointer focus:outline-none"
-                  >
-                    {descriptor.options?.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Mode Status Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-neutral-200 dark:border-neutral-800">
-          <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-mono">
-            <CheckCircle2
-              className={`w-3.5 h-3.5 ${
-                isAccommodated ? "text-amber-500" : "text-emerald-500"
-              }`}
-            />
-            <span>
-              {isAccommodated
-                ? "Accommodated Simulation Active"
-                : "Standard Exam Conditions"}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onStartExam(settings)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-bold rounded-sm shadow-sm transition-all"
-          >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Begin Section</span>
-          </button>
-        </div>
       </div>
     </div>
   );

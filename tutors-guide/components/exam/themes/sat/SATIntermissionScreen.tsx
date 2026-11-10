@@ -1,17 +1,24 @@
-// components/exam/themes/sat/SATIntermissionScreen.tsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { IntermissionProps } from "@/types/examPresentation";
+import { Loader2 } from "lucide-react";
 
 export const SATIntermissionScreen: React.FC<IntermissionProps> = ({
   formattedTime,
   isMounted,
   onResumeEarly,
 }) => {
+  const [isResuming, setIsResuming] = useState(false);
+
+  const handleResume = () => {
+    if (isResuming) return;
+    setIsResuming(true);
+    onResumeEarly();
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-[#1c1c1c] text-white flex flex-col justify-between p-6 sm:p-10 md:p-14 select-none font-sans overflow-y-auto">
-      
       {/* Main Two-Column Stage */}
       <div className="max-w-6xl w-full mx-auto my-auto grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-14 items-center">
         {/* Left Column: Timer Card & Resume Button */}
@@ -30,10 +37,18 @@ export const SATIntermissionScreen: React.FC<IntermissionProps> = ({
 
           <button
             type="button"
-            onClick={onResumeEarly}
-            className="px-3 py-3 bg-[#FFD100] hover:bg-[#F5C800] text-neutral-950 text-sm font-bold rounded-full shadow-md transition-transform active:scale-95 cursor-pointer"
+            disabled={isResuming}
+            onClick={handleResume}
+            className="px-6 py-3 bg-[#FFD100] hover:bg-[#F5C800] text-neutral-950 text-sm font-bold rounded-full shadow-md transition-transform active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center min-w-40"
           >
-            Resume Testing
+            {isResuming ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                <span>Resuming...</span>
+              </span>
+            ) : (
+              <span>Resume Testing</span>
+            )}
           </button>
         </div>
 
