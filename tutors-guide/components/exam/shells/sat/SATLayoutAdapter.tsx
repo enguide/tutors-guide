@@ -204,7 +204,7 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
       </div>
 
       {/* Official Practice Banner */}
-      <div className="w-full px-3 sm:px-8 flex shrink-0 select-none z-20">
+      <div className="w-full px-3 sm:px-8 flex shrink-0 select-none z-20 bg-white dark:bg-neutral-900">
         <div className="w-full bg-[#1D235F] py-1 sm:py-1.5 rounded-b-xl sm:rounded-b-2xl flex items-center justify-center border-b border-x border-[#151a4a]">
           <span className="text-white text-[10px] sm:text-[12px] font-sans font-bold tracking-[0.08em] uppercase">
             This is a practice test
