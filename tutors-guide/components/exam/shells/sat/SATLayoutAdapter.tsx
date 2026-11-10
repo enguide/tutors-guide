@@ -166,21 +166,23 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-neutral-950 select-none">
-      {/* 1. Header */}
-      <SATHeader
-        sectionTitle={frontmatter.sectionTitle}
-        config={effectiveConfig}
-        secondsRemaining={state.secondsRemaining}
-        isCalculatorOpen={state.isCalculatorOpen}
-        isFormulaSheetOpen={state.isFormulaSheetOpen}
-        isToolsDisabled={isReviewActive}
-        onToggleCalculator={actions.toggleCalculator}
-        onToggleFormulaSheet={actions.openFormulaSheet}
-      />
+    <div className="flex flex-col h-screen h-[100dvh] w-screen overflow-hidden bg-white dark:bg-neutral-950 select-none">
+      {/* 1. Header (shrink-0 guarantees it never gets compressed) */}
+      <div className="shrink-0">
+        <SATHeader
+          sectionTitle={frontmatter.sectionTitle}
+          config={effectiveConfig}
+          secondsRemaining={state.secondsRemaining}
+          isCalculatorOpen={state.isCalculatorOpen}
+          isFormulaSheetOpen={state.isFormulaSheetOpen}
+          isToolsDisabled={isReviewActive}
+          onToggleCalculator={actions.toggleCalculator}
+          onToggleFormulaSheet={actions.openFormulaSheet}
+        />
+      </div>
 
       {/* Official Bluebook Practice Banner with side margin alignment */}
-      <div className="w-full px-6 sm:px-8 flex shrink-0 select-none z-20">
+      <div className="w-full px-4 sm:px-8 flex shrink-0 select-none z-20">
         <div className="w-full bg-[#1D235F] py-1.5 rounded-b-2xl flex items-center justify-center border-b border-x border-[#151a4a]">
           <span className="text-white text-[12px] font-sans font-bold tracking-[0.08em] uppercase">
             This is a practice test
@@ -202,11 +204,11 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
       ) : (
         <main
           ref={mainContainerRef}
-          className="flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/50 relative"
+          className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/50 relative"
         >
           {isSplitView ? (
             <>
-              {/* Left Pane: Stimulus / Reading Passage */}
+              {/* Left Pane: Stimulus / Reading Passage (Desktop) */}
               <div
                 style={{ width: `${splitRatio}%` }}
                 className="hidden md:block h-full overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900 shrink-0"
@@ -229,17 +231,13 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                 </div>
               </div>
 
-              {/* Bluebook Vertical Drag Divider */}
+              {/* Bluebook Vertical Drag Divider (Desktop Only) */}
               <div
                 onMouseDown={handleMouseDownSplit}
-                className="hidden md:flex relative w-[4px] bg-[#969595] dark:bg-neutral-600 hover:bg-[#555555] active:bg-[#333333] cursor-col-resize shrink-0 items-center justify-center transition-colors z-20 group"
+                className="hidden md:flex relative w-1 bg-[#969595] dark:bg-neutral-600 hover:bg-[#555555] active:bg-[#333333] cursor-col-resize shrink-0 items-center justify-center transition-colors z-20 group"
               >
-                {/* Visual expansion hit-area padding */}
                 <div className="absolute inset-y-0 -left-2 -right-2 cursor-col-resize" />
-
-                {/* Black Pill Handle with Center Opposing Arrows */}
                 <div className="w-3.5 h-6 bg-[#1c1c1c] rounded-xs border border-background/30 flex flex-col items-center justify-center gap-0.5 pointer-events-none select-none">
-                  {/* Left / Right arrows rendered as triangles */}
                   <div className="flex items-center justify-center gap-[1.5px]">
                     <span className="w-0 h-0 border-y-[4.5px] border-y-transparent border-r-[3.5px] border-r-white" />
                     <span className="w-0 h-0 border-y-[4.5px] border-y-transparent border-l-[3.5px] border-l-white" />
@@ -247,9 +245,9 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                 </div>
               </div>
 
-              {/* Mobile top stimulus fallback */}
-              <div className="md:hidden flex-1 border-b border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 bg-white dark:bg-neutral-900">
-                <div className="font-serif text-[15.5px] leading-[1.65] text-neutral-900 dark:text-neutral-100">
+              {/* Mobile top stimulus fallback: takes half vertical space and scrolls */}
+              <div className="md:hidden flex-1 min-h-0 border-b border-neutral-300 dark:border-neutral-800 overflow-y-auto p-4 sm:p-6 bg-white dark:bg-neutral-900">
+                <div className="font-serif text-[15px] leading-[1.65] text-neutral-900 dark:text-neutral-100">
                   {activeStimulus && (
                     <MarkdownQuestionRenderer
                       content={activeStimulus}
@@ -264,12 +262,17 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
               </div>
 
               {/* Right Pane: Question Stem & Choices */}
+              {/* On mobile: takes full width (w-full). On desktop (md:): uses calculated splitRatio */}
               <div
                 key={state.activeQuestion.id}
-                style={{ width: `calc(${100 - splitRatio}% - 4px)` }}
-                className="flex-1 md:flex-initial h-full overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900"
+                style={{
+                  width: typeof window !== "undefined" && window.innerWidth >= 768
+                    ? `calc(${100 - splitRatio}% - 4px)`
+                    : undefined,
+                }}
+                className="w-full flex-1 md:flex-initial min-h-0 h-full overflow-y-auto p-4 sm:p-6 md:p-10 bg-white dark:bg-neutral-900"
               >
-                <div className="max-w-xl mx-auto space-y-4">
+                <div className="w-full max-w-xl mx-auto space-y-4">
                   {renderItemActionBar()}
 
                   <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15.5px] leading-[1.65] font-normal">
@@ -304,9 +307,9 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
             /* Single Column (Math) */
             <div
               key={state.activeQuestion.id}
-              className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900"
+              className="flex-1 min-h-0 h-full overflow-y-auto p-4 sm:p-6 md:p-10 bg-white dark:bg-neutral-900"
             >
-              <div className="max-w-2xl mx-auto space-y-6">
+              <div className="w-full max-w-2xl mx-auto space-y-6">
                 {renderItemActionBar()}
 
                 <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15.5px] leading-[1.65] font-normal">
@@ -340,40 +343,42 @@ export const SATLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         </main>
       )}
 
-      {/* 3. Footer */}
-      <SATFooter
-        currentIndex={state.currentIndex}
-        totalQuestions={questions.length}
-        studentName={studentName}
-        syncStatus={state.syncStatus}
-        sectionTitle={frontmatter.sectionTitle}
-        questions={questions}
-        answers={state.answers}
-        isReviewScreen={isReviewActive}
-        onSelectIndex={(idx) => {
-          actions.setCurrentIndex(idx);
-          setIsReviewActive(false);
-        }}
-        onOpenReviewModal={() => setIsReviewActive(true)}
-        onPrev={() => {
-          if (isReviewActive) {
+      {/* 3. Footer (shrink-0 ensures it is pinned permanently at the base) */}
+      <div className="shrink-0">
+        <SATFooter
+          currentIndex={state.currentIndex}
+          totalQuestions={questions.length}
+          studentName={studentName}
+          syncStatus={state.syncStatus}
+          sectionTitle={frontmatter.sectionTitle}
+          questions={questions}
+          answers={state.answers}
+          isReviewScreen={isReviewActive}
+          onSelectIndex={(idx) => {
+            actions.setCurrentIndex(idx);
             setIsReviewActive(false);
-          } else {
-            actions.setCurrentIndex((idx) => Math.max(0, idx - 1));
-          }
-        }}
-        onNext={() => {
-          if (isReviewActive) {
-            actions.submitSection();
-          } else if (state.currentIndex >= questions.length - 1) {
-            setIsReviewActive(true);
-          } else {
-            actions.setCurrentIndex((idx) =>
-              Math.min(questions.length - 1, idx + 1)
-            );
-          }
-        }}
-      />
+          }}
+          onOpenReviewModal={() => setIsReviewActive(true)}
+          onPrev={() => {
+            if (isReviewActive) {
+              setIsReviewActive(false);
+            } else {
+              actions.setCurrentIndex((idx) => Math.max(0, idx - 1));
+            }
+          }}
+          onNext={() => {
+            if (isReviewActive) {
+              actions.submitSection();
+            } else if (state.currentIndex >= questions.length - 1) {
+              setIsReviewActive(true);
+            } else {
+              actions.setCurrentIndex((idx) =>
+                Math.min(questions.length - 1, idx + 1)
+              );
+            }
+          }}
+        />
+      </div>
     </div>
   );
 };
