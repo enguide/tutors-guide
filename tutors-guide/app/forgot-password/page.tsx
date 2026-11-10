@@ -49,11 +49,13 @@ export default function ForgotPasswordPage() {
 
         {submitted ? (
           <div className="space-y-4">
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-              <span className="leading-relaxed">
-                If an account exists for <strong className="font-mono text-foreground">{email}</strong>, a reset link has been dispatched.
-              </span>
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <div className="flex-1 text-center leading-relaxed">
+                <div>If an account exists for</div>
+                <div className="font-mono text-foreground font-semibold">{email},</div>
+                <div>a reset link has been dispatched.</div>
+              </div>
             </div>
             <Link
               href="/login"
