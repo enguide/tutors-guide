@@ -8,114 +8,69 @@ const baseEmailWrapper = (title: string, bodyContent: string) => `
   <title>${title}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    /* Reset & Base */
     body {
       margin: 0;
-      padding: 48px 16px;
-      background-color: #fcfcfc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      color: #171717;
-    }
-    table {
-      border-collapse: collapse;
+      padding: 32px 16px;
+      background-color: #f7f7f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #1a1a1a;
     }
     .wrapper {
       max-width: 520px;
       margin: 0 auto;
       background-color: #ffffff;
       border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      overflow: hidden;
     }
     .header-band {
-      padding: 32px 40px 24px 40px;
+      padding: 28px 36px 20px 36px;
       border-bottom: 1px solid #f0f0f0;
     }
     .brand-name {
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.16em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #171717;
+      color: #111111;
       margin: 0;
     }
-    .brand-sub {
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #737373;
-      margin-top: 4px;
-    }
     .content-area {
-      padding: 40px;
+      padding: 36px;
     }
     .headline {
-      font-size: 19px;
+      font-size: 18px;
       font-weight: 600;
-      letter-spacing: -0.015em;
-      color: #0a0a0a;
-      margin: 0 0 20px 0;
-      line-height: 1.35;
+      color: #111111;
+      margin: 0 0 16px 0;
+      line-height: 1.4;
     }
     .copy {
       font-size: 14px;
-      line-height: 1.7;
-      color: #404040;
-      margin: 0 0 20px 0;
+      line-height: 1.6;
+      color: #444444;
+      margin: 0 0 24px 0;
     }
     .btn-wrap {
-      padding: 8px 0 28px 0;
+      padding: 8px 0 24px 0;
     }
     .btn-primary {
       display: inline-block;
-      background-color: #0a0a0a;
+      background-color: #111111;
       color: #ffffff !important;
       text-decoration: none;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 14px 28px;
-      border-radius: 0px;
-    }
-    .url-fallback-box {
-      border-top: 1px solid #f0f0f0;
-      padding-top: 24px;
-      margin-top: 8px;
-    }
-    .url-meta {
-      font-size: 11px;
-      color: #737373;
-      margin: 0 0 8px 0;
-    }
-    .url-link {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 11px;
-      line-height: 1.5;
-      color: #525252;
-      word-break: break-all;
-      background-color: #f9f9f9;
-      border: 1px solid #eeeeee;
-      padding: 10px 12px;
-      display: block;
+      padding: 12px 24px;
+      border-radius: 4px;
     }
     .footer {
-      padding: 24px 40px 32px 40px;
+      padding: 20px 36px;
       border-top: 1px solid #f0f0f0;
       font-size: 11px;
-      line-height: 1.6;
-      color: #a3a3a3;
-    }
-    .footer-security {
-      margin: 0;
-    }
-    .footer-brand {
-      margin-top: 12px;
-      font-size: 10px;
-      color: #c4c4c4;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      line-height: 1.5;
+      color: #777777;
+      background-color: #fafafa;
     }
   </style>
 </head>
@@ -123,7 +78,6 @@ const baseEmailWrapper = (title: string, bodyContent: string) => `
   <div class="wrapper">
     <div class="header-band">
       <div class="brand-name">The Tutor's Guide</div>
-      <div class="brand-sub">Candidate Portal</div>
     </div>
     
     <div class="content-area">
@@ -131,12 +85,12 @@ const baseEmailWrapper = (title: string, bodyContent: string) => `
     </div>
 
     <div class="footer">
-      <p class="footer-security">
-        This is an automated security transmission. If you did not initiate this request, no action is required; existing credentials remain secure.
+      <p style="margin: 0 0 8px 0;">
+        This email was sent by The Tutor's Guide. If you did not make this request, you can safely disregard this email.
       </p>
-      <div class="footer-brand">
-        Private Academic & Diagnostic Telemetry
-      </div>
+      <p style="margin: 0; color: #999999;">
+        Boulder, CO &bull; support@thetutorsguide.com
+      </p>
     </div>
   </div>
 </body>
@@ -145,50 +99,44 @@ const baseEmailWrapper = (title: string, bodyContent: string) => `
 
 export function getPasswordResetEmail(resetUrl: string) {
   const htmlBody = baseEmailWrapper(
-    "Reset Your Credentials",
+    "Reset Your Password",
     `
-      <h1 class="headline">Set your portal access credentials</h1>
+      <h1 class="headline">Reset your password</h1>
       
       <p class="copy">
-        A security request was initiated to establish or update the access credentials for your workstation account.
+        We received a request to reset your password for The Tutor's Guide. Click the button below to choose a new one:
       </p>
       
       <div class="btn-wrap">
         <a href="${resetUrl}" class="btn-primary" target="_blank" rel="noopener noreferrer">
-          Establish Password &rarr;
+          Reset Password
         </a>
       </div>
 
-      <p class="copy" style="font-size: 12px; color: #737373; margin-bottom: 0;">
-        For account safety, this access link is strictly single-use and expires in <strong>60 minutes</strong>.
+      <p class="copy" style="font-size: 12px; color: #666666; margin-bottom: 0;">
+        This link is valid for 60 minutes. If you didn't ask to reset your password, no changes have been made to your account.
       </p>
-
-      <div class="url-fallback-box">
-        <p class="url-meta">Direct browser URL:</p>
-        <span class="url-link">${resetUrl}</span>
-      </div>
     `
   );
 
   const textBody = `
-THE TUTOR'S GUIDE
-Candidate Portal
+The Tutor's Guide
 
-Set Your Portal Access Credentials
+Reset your password
 
-A security request was initiated to establish or update the access credentials for your workstation account.
+We received a request to reset your password for The Tutor's Guide. Use the link below to choose a new one (valid for 60 minutes):
 
-Visit the secure link below to set your password (valid for 60 minutes):
 ${resetUrl}
 
-If you did not request this update, no action is required; your credentials remain secure.
+If you did not request this change, you can safely ignore this email.
 
-This is an automated transmission from The Tutor's Guide.
+The Tutor's Guide
+support@thetutorsguide.com
   `.trim();
 
   return {
     htmlBody,
     textBody,
-    subject: "Reset your portal access credentials",
+    subject: "Reset your password for The Tutor's Guide",
   };
 }

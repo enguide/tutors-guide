@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/email/client.ts
-import { ServerClient } from "postmark";
+import { ServerClient, Models } from "postmark";
 
 const serverToken = process.env.POSTMARK_SERVER_TOKEN;
 
@@ -17,6 +17,7 @@ export interface SendEmailOptions {
   htmlBody: string;
   textBody: string;
   tag?: string;
+  replyTo?: string;
 }
 
 export async function sendTransactionalEmail({
@@ -25,6 +26,7 @@ export async function sendTransactionalEmail({
   htmlBody,
   textBody,
   tag = "transactional",
+  replyTo = DEFAULT_FROM_EMAIL,
 }: SendEmailOptions): Promise<{ success: boolean; messageId?: string }> {
   if (!postmarkClient) {
     console.warn(
@@ -39,11 +41,14 @@ export async function sendTransactionalEmail({
     const response = await postmarkClient.sendEmail({
       From: DEFAULT_FROM_EMAIL,
       To: to,
+      ReplyTo: replyTo,
       Subject: subject,
       HtmlBody: htmlBody,
       TextBody: textBody,
       Tag: tag,
       TrackOpens: false,
+      TrackLinks: Models.LinkTrackingOptions.None,
+      MessageStream: "outbound",
     });
 
     return { success: true, messageId: response.MessageID };
