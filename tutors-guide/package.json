@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "prisma db seed",
+    "seed:alpha": "tsx prisma/seed-alpha-pair.ts",
     "validate:content": "npx tsx scripts/validate-content.ts",
     "prebuild": "npm run validate:content"
   },

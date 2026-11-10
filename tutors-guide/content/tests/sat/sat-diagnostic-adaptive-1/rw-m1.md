@@ -17,7 +17,36 @@ questions:
     stimulus: |
       During the early 20th century, the advent of new communication technologies, like radio, led many social critics to fear that face-to-face interaction would become ______. Despite this concern, studies of urban life have shown that while the medium of communication has changed, the frequency of personal contact has remained remarkably high.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The context indicates that social critics feared face-to-face interaction would be completely replaced or rendered out of use ('obsolete') by new communication technologies, a fear disproven by urban studies showing persistent personal contact."
+    explanation: |
+      ### Strategic Rule: Find the Contrast, Predict, and Eliminate
+      The Reading and Writing section gives you three wrong choices and one choice the test will accept. Never test each option to see what "sounds right." Find the contrast clue, come up with a plain word for the blank, and use that prediction to eliminate choices that fail to fit the contrast.
+
+      ---
+
+      ### Text Clue Breakdown
+      > During the early 20th century, the advent of new communication technologies, like radio, led many social critics to fear that face-to-face interaction would become **[ ______ ]**. **Despite this concern**, studies of urban life have shown that while the medium of communication has changed, the frequency of personal contact has **[[hl]]remained remarkably high[[/hl]]**.
+
+      | Text Element | Detail & Function |
+      | :--- | :--- |
+      | **The Reality** | Personal contact *remained remarkably high* |
+      | **Contrast Clue** | **Despite this concern** (reverses the reality) |
+      | **The Feared Outcome** | Face-to-face contact would **disappear / die out** |
+
+      ---
+
+      ### The Game Plan
+      1. **Spot the Contrast Word:** Sentence 2 begins with **"Despite this concern,"** signaling that what critics feared did not actually happen.
+      2. **Isolate the Reality:** The reality is that personal contact **"remained remarkably high."**
+      3. **Predict a Plain Word:** Since the critics feared the opposite of persistent contact, they feared interaction would **disappear**, **die out**, or become **outdated**.
+      4. **Eliminate:** Cross out options that don't match this idea of falling out of use.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) routine:** *Opposite Meaning.* If personal contact became regular or routine, critics would not consider it a grave fear disproven by high contact rates.
+      * **(B) obsolete:** **Correct.** Accurately captures the critics' fear that new technology would make in-person contact discarded and out of use.
+      * **(C) sustained:** *Wrong Target.* "Sustained" reflects what *actually happened* in Sentence 2, but the blank asks for the *fear* in Sentence 1 that proved unfounded.
+      * **(D) intricate:** *Wrong Focus.* "Intricate" means complicated or detailed. The passage is debating whether face-to-face contact *survived*, not how complex it was.
     options:
       - id: "A"
         text: "routine"
@@ -27,6 +56,7 @@ questions:
         text: "sustained"
       - id: "D"
         text: "intricate"
+
   - id: "sat-t1-rw1-q2"
     questionNumber: 2
     questionType: "MC"
@@ -40,7 +70,36 @@ questions:
     stimulus: |
       The meteorologist noted that predicting the storm's path proved exceptionally difficult because its movement was highly ______: the swirling system changed direction and speed multiple times in a single day, defying the patterns of typical hurricane models.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The colon introduces an explanation: the system changed direction and speed multiple times, which directly defines an unpredictable or 'erratic' movement."
+    explanation: |
+      ### Strategic Rule: Let the Punctuation Define the Blank
+      When an explanatory colon (`:`) follows a blank, treat it like an equals sign ($=$). The text after the colon gives you the literal definition of the missing word. Extract that definition, make a simple prediction, and eliminate any option that drifts away from it.
+
+      ---
+
+      ### Text Clue Breakdown
+      > The meteorologist noted that **[[hl]]predicting the storm's path proved exceptionally difficult[[/hl]]** because its movement was highly **[ ______ ]**: the swirling system **[[hl]]changed direction and speed multiple times in a single day[[/hl]]**, defying the patterns of typical hurricane models.
+
+      | Structural Anchor | What the Text Demands |
+      | :--- | :--- |
+      | **Colon ( : )** | Everything that follows directly defines the blank |
+      | **Direct Definition** | The storm *shifted course and speed repeatedly* and *defied standard models* |
+      | **Meaning Needed** | **Unpredictable / irregular / erratic** |
+
+      ---
+
+      ### The Game Plan
+      1. **Read Across the Colon:** The clause after the colon explains why forecasting was difficult by describing the storm's exact behavior.
+      2. **Isolate the Direct Clue:** The storm **"changed direction and speed multiple times in a single day"** and **"defied typical models."**
+      3. **Predict a Plain Word:** A storm that constantly shifts course without a clear pattern is **unpredictable** or **inconsistent**.
+      4. **Eliminate:** Discard any choice that suggests order, predictability, or simply pausing and resuming.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) methodical:** *Direct Contradiction.* "Methodical" means systematic, orderly, and disciplined—the opposite of a storm that defies modeling.
+      * **(B) predictable:** *Direct Contradiction.* The first clause explicitly tells you that forecasting the path was "exceptionally difficult."
+      * **(C) intermittent:** *Wrong Concept.* "Intermittent" means starting and stopping at intervals. The storm did not stop and restart; it was constantly moving, just in an irregular, shifting manner.
+      * **(D) erratic:** **Correct.** Directly means irregular, unpredictable, and lacking a fixed course, matching the definition provided after the colon.
     options:
       - id: "A"
         text: "methodical"
@@ -50,6 +109,7 @@ questions:
         text: "intermittent"
       - id: "D"
         text: "erratic"
+
   - id: "sat-t1-rw1-q3"
     questionNumber: 3
     questionType: "MC"
@@ -63,7 +123,37 @@ questions:
     stimulus: |
       Some architectural historians argue that the Gothic Revival movement was characterized not by a mere preference for medieval aesthetics, but by a deliberate ______ of the industrial uniformity of the nineteenth century; whereas factory-made materials prioritized efficiency and repetition, Gothic Revivalists championed handcrafted intricacy and regional distinctiveness.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The text contrasts factory-made efficiency with handcrafted intricacy, showing that the movement actively rejected industrial uniformity, making 'repudiation' the most precise choice."
+    explanation: |
+      ### Strategic Rule: Decode the Parallel Contrast
+      When a sentence pairs a semicolon with a contrast word like *whereas*, the second clause is your decoder ring. Identify the opposing values being compared, figure out how the main subject felt about their opposition, and eliminate any answer that doesn't capture an intentional, active pushback.
+
+      ---
+
+      ### Text Clue Breakdown
+      > Some architectural historians argue that the Gothic Revival movement was characterized not by a mere preference for medieval aesthetics, but by a **deliberate [ ______ ] of the industrial uniformity** of the nineteenth century; **whereas** factory-made materials prioritized [[hl]]efficiency and repetition[[/hl]], Gothic Revivalists championed [[hl]]handcrafted intricacy and regional distinctiveness[[/hl]].
+
+      | Clause Element | Text Evidence |
+      | :--- | :--- |
+      | **Industrial Norms** | *Efficiency & repetitive uniformity* |
+      | **Contrast Conjunction** | **; whereas** (marks a direct conflict) |
+      | **Revivalist Preference** | *Handcrafted intricacy & regional identity* |
+      | **Stance on Uniformity** | **Deliberate rejection / disavowal** |
+
+      ---
+
+      ### The Game Plan
+      1. **Map the Conflict:** The clause after the semicolon sets up a clear battle: *machine repetition* on one side, and *artisan craftsmanship* on the other.
+      2. **Identify the Action:** Because the revivalists actively championed the artisan side against factory uniformity, their stance toward industrialization was an intentional stand *against* it.
+      3. **Predict a Plain Word:** The blank describes what the architects did to industrial uniformity: they executed a **rejection**, **refusal**, or **turning away**.
+      4. **Eliminate:** Rule out choices that imply embracing, restoring, or organizing industrial norms.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) restoration:** *Wrong Object.* The movement wanted to bring back *medieval* craft, but applying "restoration" to "industrial uniformity" means bringing back the modern machine culture they fought against.
+      * **(B) codification:** *Wrong Meaning.* "Codification" means arranging rules or systems into a formal code. The revivalists were resisting standard systems, not writing them down.
+      * **(C) repudiation:** **Correct.** Directly means an active, deliberate rejection or refusal to accept something, perfectly matching the movement's stance against factory uniformity.
+      * **(D) foreshadowing:** *Timeline Flaw.* "Foreshadowing" means hinting at an event that has not happened yet. Industrial uniformity was already happening all around these architects in the nineteenth century.
     options:
       - id: "A"
         text: "restoration"
@@ -73,6 +163,7 @@ questions:
         text: "repudiation"
       - id: "D"
         text: "foreshadowing"
+
   - id: "sat-t1-rw1-q4"
     questionNumber: 4
     questionType: "MC"
@@ -86,7 +177,37 @@ questions:
     stimulus: |
       Because the unique vocalizations of the endangered blue-throated macaw are highly sensitive to ambient noise, researchers have argued that the establishment of acoustic "buffer zones" around nesting sites is ______; such measures provide the necessary silence for the birds to coordinate social behaviors and effectively avoid predators.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The text explains that buffer zones are required to provide necessary silence for the birds' survival, indicating that these measures are absolutely crucial or 'imperative'."
+    explanation: |
+      ### Strategic Rule: Let the Semicolon Explain the Need
+      When an independent clause follows a semicolon, it often justifies the claim made before it. Look directly at *why* the measure is being taken: if the second clause frames an action as required for survival (here, providing "necessary silence"), the missing word simply means **essential**. Use that plain meaning to eliminate choices that describe the action as optional, random, or unusual.
+
+      ---
+
+      ### Text Clue Breakdown
+      > Because the unique vocalizations of the endangered blue-throated macaw are [[hl]]highly sensitive to ambient noise[[/hl]], researchers have argued that the establishment of acoustic "buffer zones" around nesting sites is **[ ______ ]**; such measures **provide the [[hl]]necessary silence[[/hl]]** for the birds to coordinate social behaviors and effectively avoid predators.
+
+      | Clause Element | Text Evidence |
+      | :--- | :--- |
+      | **Vulnerability** | Macaw calls are *highly sensitive to noise* |
+      | **Structural Anchor** | **Semicolon ( ; )** introduces the justification |
+      | **Stated Rationale** | The zones provide *necessary silence* for survival |
+      | **Meaning Needed** | **Essential / vital / required** |
+
+      ---
+
+      ### The Game Plan
+      1. **Read Past the Semicolon:** The second clause gives the rationale for the buffer zones: they supply the silence the birds need to coordinate and evade predators.
+      2. **Isolate the Key Clue:** The text explicitly calls this silence **"necessary."**
+      3. **Predict a Plain Word:** If an intervention provides something strictly necessary for survival, the measure itself is **essential** or **vital**.
+      4. **Eliminate:** Cut any choice that treats the zones as wasteful, random, or merely unusual.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) redundant:** *Direct Contradiction.* "Redundant" means superfluous or unneeded. The text states the silence provided is "necessary."
+      * **(B) arbitrary:** *Logical Contradiction.* "Arbitrary" means based on random choice or impulse. These zones are created for a specific biological purpose.
+      * **(C) imperative:** **Correct.** Means vital or of crucial importance—a direct match for a measure that provides necessary protection.
+      * **(D) anomalous:** *Wrong Quality.* "Anomalous" means irregular or abnormal. The sentence discusses whether the zones are *necessary*, not whether they are unusual.
     options:
       - id: "A"
         text: "redundant"
@@ -111,7 +232,37 @@ questions:
 
       > It was a town of red brick, or of brick that would have been red if the smoke and ashes had allowed it; but, as matters stood, it was a town of unnatural red and black like the painted face of a savage. It was a town of machinery and tall chimneys, out of which interminable serpents of smoke trailed themselves for ever and ever, and never got uncoiled. It had a black canal in it, and a river that ran purple with ill-smelling dye.
     prompt: "Which choice best states the main purpose of the text?"
-    explanation: "The passage uses vivid, sensory descriptions (smoke, ashes, machinery, black canal, purple river) to paint a bleak and negative picture of an industrialized factory town."
+    explanation: |
+      ### Strategic Rule: Match the Scope and Stance
+      On "Main Purpose" questions, pay close attention to both the *action verb* and the *scope* of the claim. Literary descriptive excerpts are almost always doing atmospheric work—establishing setting, mood, or character impression—rather than making a policy argument or analyzing data. Eliminate options that elevate a single descriptive detail into the passage's primary objective.
+
+      ---
+
+      ### Text Clue Breakdown
+      > It was a town of red brick, or of brick that would have been red if the [[hl]]smoke and ashes[[/hl]] had allowed it; but, as matters stood, it was a town of [[hl]]unnatural red and black[[/hl]]... It was a town of machinery and tall chimneys, out of which [[hl]]interminable serpents of smoke[[/hl]] trailed themselves for ever and ever... It had a [[hl]]black canal[[/hl]] in it, and a river that ran purple with [[hl]]ill-smelling dye[[/hl]].
+
+      | Descriptive Layer | Imagery Used by Dickens | Cumulative Impression |
+      | :--- | :--- | :--- |
+      | **Atmosphere / Air** | *Smoke and ashes*, *serpents of smoke* | Oppressive, suffocating |
+      | **Built Environment** | *Unnatural red and black*, *machinery* | Industrial, harsh |
+      | **Waterways** | *Black canal*, *ill-smelling dye* | Polluted, degraded |
+      | **Overall Intent** | **Sensory, negative portrait of Coketown** | **Bleak impression of a factory town** |
+
+      ---
+
+      ### The Game Plan
+      1. **Check the Genre and Tone:** The text is an excerpt from a novel, using dense, evocative sensory imagery (*"unnatural," "interminable serpents of smoke," "black canal," "ill-smelling dye"*).
+      2. **Assess the Overall Effect:** Every sentence reinforces the same underlying feeling: Coketown is an ugly, polluted, and grim industrial setting.
+      3. **Predict the Purpose:** The author wants to **evoke a bleak, grim picture of an industrial town**.
+      4. **Eliminate by Verb and Scope:** Knock out choices that treat this literary description as an explicit argument, a technical analysis, or a narrow detail about houses.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) To argue against the unregulated growth of industrial cities:** *Wrong Verb / Extrapolation.* The author may personally dislike industrialization, but this specific excerpt offers sensory description, not an explicit policy argument against city growth.
+      * **(B) To illustrate the monotonous architecture of the houses in the town:** *Too Narrow / Distorted Focus.* The text mentions chimneys, canals, and rivers, but never analyzes domestic residential architecture or housing styles.
+      * **(C) To paint a vivid and largely negative picture of a factory town:** **Correct.** Directly captures the passage's descriptive focus (vivid sensory imagery) and its bleak, polluted emotional tone.
+      * **(D) To analyze the environmental impact of industrial waste on a waterway:** *Narrow Detail Trap.* The purple river with dye appears only in the final clause as one illustrative detail among many; it is not the focus of a comprehensive analysis.
     options:
       - id: "A"
         text: "To argue against the unregulated growth of industrial cities"
@@ -121,6 +272,7 @@ questions:
         text: "To paint a vivid and largely negative picture of a factory town"
       - id: "D"
         text: "To analyze the environmental impact of industrial waste on a waterway"
+
   - id: "sat-t1-rw1-q6"
     questionNumber: 6
     questionType: "MC"
@@ -134,7 +286,36 @@ questions:
     stimulus: |
       Traditional models of language acquisition suggest that infants learn by associating heard words with objects present in their immediate visual field. However, recent eye-tracking studies have found that infants as young as six months often begin to fixate on objects not currently being named by the accompanying speech. This suggests that the brain is rapidly and continuously tracking all potential semantic candidates, even those outside the immediate focus of attention, significantly complicating the established concept of word-object pairing.
     prompt: "Which choice best states the main purpose of the text?"
-    explanation: "The text contrasts traditional language-learning models with recent eye-tracking data showing that infants track multiple objects, thereby challenging long-held assumptions with new findings."
+    explanation: |
+      ### Strategic Rule: Track the Shift Across the Contrast Pivot
+      Informational passages often follow a classic academic pattern: **Old Consensus $\to$ Contrast Pivot $\to$ New Finding / Complication**. The main purpose of the paragraph is anchored in the *resolution* after the pivot word (e.g., *However*), not the background presented in the opening line. Eliminate choices that summarize only the background or overstate the conclusion.
+
+      ---
+
+      ### Text Clue Breakdown
+      > [[hl]]Traditional models[[/hl]] of language acquisition suggest that infants learn by associating heard words with objects present in their immediate visual field. **However**, [[hl]]recent eye-tracking studies[[/hl]] have found that infants as young as six months often begin to fixate on objects not currently being named... This suggests that the brain is... **[[hl]]significantly complicating the established concept[[/hl]]** of word-object pairing.
+
+      | Passage Movement | Rhetorical Function | Stated Content |
+      | :--- | :--- | :--- |
+      | **Sentence 1** | Old Model (Baseline) | Infants link words only to objects in immediate view |
+      | **Pivot (*However*)** | New Empirical Data | Eye-tracking shows infants look at unnamed objects |
+      | **Final Synthesis** | Theoretical Impact | New data *complicates the established concept* |
+
+      ---
+
+      ### The Game Plan
+      1. **Identify the Passage Structure:** The stimulus opens with the baseline view (*"Traditional models"*), introduces a direct pivot (*"However"*), and presents new experimental evidence.
+      2. **Locate the Main Takeaway:** The final sentence reveals the main point: this new research **"significantly complicates the established concept."**
+      3. **Predict the Purpose:** The author wrote this paragraph to **introduce new research that challenges an established theory of infant learning**.
+      4. **Eliminate Flawed Actions:** Rule out options that dwell only on methodology, describe sequential steps, or make an exaggerated claim about which tool is "superior."
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) To propose a new experimental method for studying infant cognition:** *Wrong Focus.* Eye-tracking is an existing tool used in the referenced studies, not an original method proposed by the author of this text.
+      * **(B) To challenge a long-held theory about language learning with new data:** **Correct.** Directly mirrors the shift from the traditional pairing model to the newer eye-tracking findings that complicate it.
+      * **(C) To detail the steps infants take when acquiring new vocabulary:** *Misidentified Structure.* The text discusses neurological fixation patterns during word processing; it never outlines a sequential step-by-step learning process.
+      * **(D) To argue that eye-tracking technology is the superior method for research:** *Unwarranted Extreme.* The passage uses eye-tracking findings as evidence, but it never compares eye-tracking against other technologies or claims it is "superior."
     options:
       - id: "A"
         text: "To propose a new experimental method for studying infant cognition."
@@ -157,7 +338,36 @@ questions:
     stimulus: |
       While the steam engine revolutionized power generation during the Industrial Revolution, its earliest applications were not in factories, as is commonly assumed. Instead, the first commercially successful steam engines were the Newcomen engines, which were introduced in the early 1700s. These machines were specifically designed and built to pump water out of deep coal mines, which allowed miners to access deeper seams and significantly increased the output of fuel for the burgeoning factory economy.
     prompt: "According to the text, what was the primary purpose of the first commercially successful steam engines?"
-    explanation: "The text explicitly states that these machines 'were specifically designed and built to pump water out of deep coal mines,' making option D correct."
+    explanation: |
+      ### Strategic Rule: Locate the Verbatim Anchor
+      On direct-detail questions ("According to the text..."), the test is not asking for an inference or an indirect consequence. Find the specific noun phrase named in the question prompt (here, *the first commercially successful steam engines*), match its exact grammatical objective in the sentence, and eliminate any option that substitutes downstream secondary effects for the primary function.
+
+      ---
+
+      ### Text Clue Breakdown
+      > While the steam engine revolutionized power generation during the Industrial Revolution, its earliest applications were not in factories... Instead, **the first commercially successful steam engines** were the Newcomen engines... These machines were **[[hl]]specifically designed and built to pump water out of deep coal mines[[/hl]]**, which allowed miners to access deeper seams and significantly increased the output of fuel for the burgeoning factory economy.
+
+      | Question Element | Grounded Passage Evidence |
+      | :--- | :--- |
+      | **Target Subject** | *The first commercially successful steam engines* (Newcomen engines) |
+      | **Explicit Design Purpose** | **"specifically designed and built to pump water out of deep coal mines"** |
+      | **Downstream Result** | Increased fuel output for factory economies |
+
+      ---
+
+      ### The Game Plan
+      1. **Target the Prompt's Key Term:** The question specifically asks for the *primary purpose* of the *first commercially successful steam engines*.
+      2. **Isolate the Direct Sentence:** Sentence 3 states these engines were **"specifically designed and built to pump water out of deep coal mines."**
+      3. **Separate Purpose from Secondary Impact:** Accessing deeper seams and powering factory economies were positive side effects of draining the water, not the functional design purpose of the engine itself.
+      4. **Eliminate Misdirections:** Discard choices that refer to common misconceptions or downstream economic consequences.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) To power the machinery inside textile factories:** *Explicitly Contradicted.* Sentence 1 notes that despite popular assumptions, early steam engines were "not in factories."
+      * **(B) To significantly increase the speed of land transportation:** *Unsupported Extrapolation.* The text never mentions trains, locomotives, or land transport.
+      * **(C) To allow engineers to access new factory designs:** *Distorted Blend.* The stimulus mentions accessing "deeper seams" of coal and fueling a "burgeoning factory economy," but never mentions new architectural or factory designs.
+      * **(D) To pump water out of deep coal mines:** **Correct.** Directly restates the explicit functional purpose given in the text ("specifically designed and built to pump water out of deep coal mines").
     options:
       - id: "A"
         text: "To power the machinery inside textile factories."
@@ -167,6 +377,7 @@ questions:
         text: "To allow engineers to access new factory designs."
       - id: "D"
         text: "To pump water out of deep coal mines."
+
   - id: "sat-t1-rw1-q8"
     questionNumber: 8
     questionType: "MC"
@@ -180,7 +391,36 @@ questions:
     stimulus: |
       The Linnaean taxonomic system organizes the biological world into static, hierarchical ranks based on shared physical traits—a structure that frequently masks the complexities of common descent. Modern cladistics bypasses these rigid tiers in favor of identifying evolutionary groups through synapomorphies, or shared derived characteristics. By prioritizing these specific markers over general morphological similarities, cladistics provides a schema that more accurately reflects the actual topology of evolution.
     prompt: "Which choice best states the main idea of the text?"
-    explanation: "The text explains that modern cladistics replaces the rigid, static categories of traditional Linnaean taxonomy with a focus on shared derived characteristics (synapomorphies) to provide a more accurate map of evolutionary lineages."
+    explanation: |
+      ### Strategic Rule: Synthesize the Thesis Across the Contrast
+      When an informational text compares two systems, the main idea always centers on *why* the newer approach is favored over the traditional one. Identify the limitation of the first model, the core mechanism of the replacement model, and the resulting benefit. Eliminate choices that propose compromise, switch the grammatical task to an infinitive purpose, or invert the causal logic.
+
+      ---
+
+      ### Text Clue Breakdown
+      > The Linnaean taxonomic system organizes the biological world into **static, hierarchical ranks**... that **[[hl]]frequently masks the complexities of common descent[[/hl]]**. Modern cladistics bypasses these rigid tiers in favor of identifying evolutionary groups through **[[hl]]synapomorphies, or shared derived characteristics[[/hl]]**... cladistics provides a schema that **[[hl]]more accurately reflects the actual topology of evolution[[/hl]]**.
+
+      | System | Model Focus & Result |
+      | :--- | :--- |
+      | **Linnaean Taxonomy** | Rigid physical ranks (*masks descent*) |
+      | **Modern Cladistics** | Shared derived traits (*maps topology accurately*) |
+      | **Core Takeaway** | **Cladistics improves accuracy by replacing static tiers** |
+
+      ---
+
+      ### The Game Plan
+      1. **Trace the Comparative Structure:** Sentence 1 points out the flaw in traditional Linnaean ranks (they mask descent). Sentences 2 and 3 explain how cladistics solves this by tracking shared derived traits.
+      2. **Capture the Full Conclusion:** The main takeaway combines both parts: cladistics provides a superior, more accurate evolutionary map *because* it swaps rigid physical ranks for specific derived traits.
+      3. **Predict the Main Idea:** Cladistics offers a more precise representation of evolutionary relationships by abandoning rigid physical tiers in favor of shared lineage traits.
+      4. **Eliminate Distortions:** Eliminate choices suggesting the two models should merge, choices framed as rhetorical arguments rather than informative summaries, or options with reversed causal reasoning.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) Evolutionary history is best understood by combining the hierarchical structure of the Linnaean system with the trait-based analysis of cladistics:** *Unsupported Compromise.* The text states that cladistics "bypasses" the Linnaean tiers; it never advocates integrating or combining the two frameworks.
+      * **(B) To argue that the Linnaean system should be replaced by cladistics because it is less rigid:** *Form & Precision Error.* The prompt asks for the *main idea* (a summary claim), not the *main purpose* (an infinitive action like "To argue"). Furthermore, cladistics is preferred because it more accurately maps evolutionary relationships, not merely because it is less rigid.
+      * **(C) Cladistics offers a more precise map of evolutionary lineages by replacing the rigid categories of traditional taxonomy with a focus on shared ancestral traits:** **Correct.** Accurately summarizes the central comparative thesis: cladistics improves evolutionary accuracy by substituting derived trait markers for static hierarchical tiers.
+      * **(D) The shift toward cladistics was necessitated by the discovery that hierarchical ranks are unable to account for morphological similarities between species:** *Logical Reversal.* The Linnaean system was built *entirely* on morphological (physical) similarities; its failure was that physical similarity often obscured actual evolutionary descent.
     options:
       - id: "A"
         text: "Evolutionary history is best understood by combining the hierarchical structure of the Linnaean system with the trait-based analysis of cladistics."
@@ -203,7 +443,36 @@ questions:
     stimulus: |
       Historians frequently emphasize the role of religious freedom in the founding of the Plymouth Colony in 1620. While true, this focus often overshadows the crucial commercial aspect. The colonists' journey and settlement were financially supported by a group of London merchants who expected a return on their investment in the form of trade goods, like timber and furs. This economic foundation ensured that the colony's ultimate goal was not only spiritual sustenance but also commercial viability, which required aggressive resource exploitation.
     prompt: "Which choice best states the main purpose of the text?"
-    explanation: "The text argues that while religious freedom is often emphasized, the founding of the Plymouth Colony was also heavily driven by commercial and financial motivations, highlighting the role of its merchant backers."
+    explanation: |
+      ### Strategic Rule: Find the Corrective Thesis
+      Passages that open with *"Historians frequently emphasize [X], but..."* follow a classic academic template: the author is pushing back against an incomplete historical consensus. The purpose is not to erase the conventional view entirely, but to restore a forgotten or neglected counterweight. Eliminate answers that swing too far into absolutes or elevate passing examples into the core thesis.
+
+      ---
+
+      ### Text Clue Breakdown
+      > Historians frequently emphasize the role of religious freedom... While true, this focus **[[hl]]often overshadows the crucial commercial aspect[[/hl]]**. The colonists' journey and settlement were financially supported by a group of London merchants... This economic foundation ensured that the colony's ultimate goal was **[[hl]]not only spiritual sustenance but also commercial viability[[/hl]]**...
+
+      | Narrative Stage | Rhetorical Function | Stated Passage Evidence |
+      | :--- | :--- | :--- |
+      | **Conventional View** | Baseline to qualify | Focus on *religious freedom* |
+      | **Author's Correction** | Neglected dimension | Religious focus *overshadows commercial aspect* |
+      | **Balanced Goal** | Final synthesized thesis | *Not only spiritual sustenance but also commercial viability* |
+
+      ---
+
+      ### The Game Plan
+      1. **Spot the Rhetorical Shift:** Sentence 2 qualifies the popular religious narrative by pointing out that it **"often overshadows the crucial commercial aspect."**
+      2. **Identify the Nuance:** The author does not deny religious motivation; the final sentence explicitly pairs **"spiritual sustenance"** with **"commercial viability."**
+      3. **Predict the Purpose:** The author wrote this to **bring attention to the neglected financial and merchant motivations behind the settlement**.
+      4. **Eliminate Extremes and Tangents:** Discard choices that claim trade was the *sole* priority, choices centered only on specific trade goods, or mentions of external colonies.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) To argue that the Plymouth colonists were primarily concerned with trade and profit:** *Unwarranted Extreme.* The passage states the settlement balanced spiritual aims with commercial viability; it never asserts that profit was their *primary* or overriding concern.
+      * **(B) To describe the types of trade goods that were most valuable to the London merchants:** *Narrow Detail Trap.* "Timber and furs" are listed briefly as parenthetical examples of returns on investment, not the main analytical subject of the text.
+      * **(C) To highlight the commercial and economic motivations behind the Plymouth Colony's founding:** **Correct.** Directly captures the author's intent to elevate the financial and merchant-backed aspects that conventional religious narratives overlook.
+      * **(D) To compare the religious principles of the Plymouth colonists with those of the Jamestown settlers:** *Off-Topic Comparison.* Jamestown is never mentioned or implied anywhere in the stimulus.
     options:
       - id: "A"
         text: "To argue that the Plymouth colonists were primarily concerned with trade and profit."
@@ -213,6 +482,7 @@ questions:
         text: "To highlight the commercial and economic motivations behind the Plymouth Colony's founding."
       - id: "D"
         text: "To compare the religious principles of the Plymouth colonists with those of the Jamestown settlers."
+
   - id: "sat-t1-rw1-q10"
     questionNumber: 10
     questionType: "MC"
@@ -226,7 +496,35 @@ questions:
     stimulus: |
       Anne Elliot is the protagonist of *Persuasion*, an 1817 novel by Jane Austen. In the course of the story, the narrator observes that Anne's quiet, reflective nature makes her an excellent judge of character.
     prompt: "Which quotation from *Persuasion* most effectively illustrates this claim?"
-    explanation: "The claim is that Anne's quiet, reflective nature ('staying at home and composure of mind') allows her to judge things accurately ('seeing things as they really were'). Option D directly captures this connection."
+    explanation: |
+      ### Strategic Rule: Require a Two-Part Evidence Bridge
+      On Command of Evidence questions, the prompt always establishes a clear cause-and-effect relationship. Here, the claim links a specific **trait** (*quiet, reflective nature*) directly to an **outcome** (*sound judgment of character*). An answer choice that validates only one half of the equation is a trap. Eliminate any quotation that describes Anne's temperament without connecting it to her ability to evaluate reality accurately.
+
+      ---
+
+      ### Text Clue Breakdown
+      > In the course of the story, the narrator observes that Anne's **[[hl]][Part 1: quiet, reflective nature][[/hl]]** makes her **[[hl]][Part 2: an excellent judge of character][[/hl]]**.
+
+      | Claim Element | Required Condition | Direct Quotation Match (D) |
+      | :--- | :--- | :--- |
+      | **Part 1: Temperament** | Quiet, introspective, calm | *"power of staying at home," "composure of mind," "exemption from restlessness"* |
+      | **Part 2: Resulting Ability** | Accurate perception / judgment | *"advantage of seeing things as they really were"* |
+
+      ---
+
+      ### The Game Plan
+      1. **Deconstruct the Target Claim:** Break the narrator's claim into its two essential parts: (1) Anne's quiet, reflective nature, and (2) how that nature enables accurate, perceptive judgment.
+      2. **Demand Both Criteria:** Do not settle for a quote that merely praises Anne's manners or describes her past. Look for the exact bridge where her calm demeanor produces clear insight.
+      3. **Predict the Content:** The correct quote must demonstrate that her stillness or composure gives her an analytical advantage in perceiving truth.
+      4. **Eliminate Half-Answers:** Eliminate choices that highlight good breeding, sweetness, or prudence without touching on her perceptual clarity.
+
+      ---
+
+      ### Why the Wrong Answers Fail
+      * **(A) "She was only Anne; a quiet, elegant young woman...":** *Half-Match Trap.* This confirms her quiet nature and manners, but fails to show that this demeanor yields superior judgment or insight into others.
+      * **(B) "She had been forced into prudence in her youth...":** *Irrelevant History.* Discusses her personal transition between prudence and romance over time, providing no evidence regarding her capacity to evaluate external character.
+      * **(C) "She had an innate good sense and sweetness of temper...":** *Near-Miss Trait Trap.* "Good sense" and "sweetness of temper" earn her the respect of others, but this remark does not tie an introspective stillness to sharp, perceptive judgment.
+      * **(D) "Her power of staying at home and composure of mind, her total exemption from restlessness, gave her the advantage of seeing things as they really were.":** **Correct.** Seamlessly connects both components: her quiet composure and lack of restlessness (the nature) directly grant her the ability to see reality accurately (the perceptive judgment).
     options:
       - id: "A"
         text: "\"She was only Anne; a quiet, elegant young woman, perfectly well-bred, and naturally graceful.\""

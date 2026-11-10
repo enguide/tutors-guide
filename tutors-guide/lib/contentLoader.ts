@@ -24,6 +24,16 @@ export interface DiscoveredTestItem {
   firstSectionId: string;
 }
 
+export interface DiscoveredCategory {
+  category: string;
+  tests: {
+    testId: string;
+    title: string;
+    category: string;
+    sectionsCount: number;
+  }[];
+}
+
 /**
  * Loads and caches test metadata JSON
  */
@@ -144,6 +154,55 @@ export async function ensureTestInDatabase(metadata: TestMetadata) {
     console.error(`Failed to ensure test ${metadata.id} in database:`, error);
   }
 }
+
+/**
+ * Scans the filesystem content directory and discovers all valid tests
+ * grouped by category for administrative portal inspection.
+ */
+export const discoverAllContent = cache(async function discoverAllContent(): Promise<
+  DiscoveredCategory[]
+> {
+  const results: DiscoveredCategory[] = [];
+
+  try {
+    const categories = await fs.readdir(CONTENT_DIR, { withFileTypes: true });
+
+    for (const catDirent of categories) {
+      if (!catDirent.isDirectory()) continue;
+      const categoryKey = catDirent.name.toUpperCase();
+      const catPath = path.join(CONTENT_DIR, catDirent.name);
+
+      const testDirs = await fs.readdir(catPath, { withFileTypes: true });
+      const tests = [];
+
+      for (const testDirent of testDirs) {
+        if (!testDirent.isDirectory()) continue;
+        const testId = testDirent.name;
+
+        const metadata = await getTestMetadata(catDirent.name, testId);
+        if (metadata) {
+          tests.push({
+            testId: metadata.id || testId,
+            title: metadata.title || testId,
+            category: categoryKey,
+            sectionsCount: metadata.sections?.length || 0,
+          });
+        }
+      }
+
+      if (tests.length > 0) {
+        results.push({
+          category: categoryKey,
+          tests,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Failed to discover content directories:", error);
+  }
+
+  return results;
+});
 
 /**
  * Scans the filesystem content directory and discovers all valid tests

@@ -1,8 +1,11 @@
+// actions/passwordReset.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { sendTransactionalEmail } from "@/lib/email/client";
+import { getPasswordResetEmail } from "@/lib/email/templates";
 
 export async function requestPasswordReset(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -11,7 +14,7 @@ export async function requestPasswordReset(email: string) {
     where: { email: normalizedEmail },
   });
 
-  // Always return success to prevent email enumeration
+  // Always return success to prevent email enumeration attacks
   if (!profile) {
     return { success: true };
   }
@@ -20,7 +23,7 @@ export async function requestPasswordReset(email: string) {
   const token = crypto.randomBytes(32).toString("hex");
   const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
-  // Invalidate previous tokens for this profile
+  // Invalidate any previous unused tokens for this profile
   await prisma.passwordResetToken.deleteMany({
     where: { profileId: profile.id },
   });
@@ -33,13 +36,28 @@ export async function requestPasswordReset(email: string) {
     },
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    "http://localhost:3000";
+
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-  console.log(`\n========================================`);
-  console.log(`[PASSWORD RESET LINK FOR ${normalizedEmail}]`);
-  console.log(resetUrl);
-  console.log(`========================================\n`);
+  // Prepare branded multipart email
+  const { htmlBody, textBody, subject } = getPasswordResetEmail(resetUrl);
+
+  // Asynchronously dispatch through Postmark
+  try {
+    await sendTransactionalEmail({
+      to: normalizedEmail,
+      subject,
+      htmlBody,
+      textBody,
+      tag: "password-reset",
+    });
+  } catch (err) {
+    console.error(`Failed to send password reset email to ${normalizedEmail}:`, err);
+  }
 
   return { success: true };
 }

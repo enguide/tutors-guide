@@ -38,20 +38,20 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The following text is adapted from Maya Angelou's 1986 memoir *All God's Children Need Traveling Shoes*.
+      The following text is adapted from Maya Angelou's 1969 autobiography *I Know Why the Caged Bird Sings*. The author recalls the enduring influence of a neighborhood mentor, Mrs. Bertha Flowers.
 
-      > Once I developed a passion for reading, my nose was glued to a book. On summer afternoons, the neighborhood children could hardly persuade me to leave the front porch steps. I was absorbed and unreachable.
-    prompt: "As used in the text, what does the author most nearly mean by 'my nose was glued to a book'?"
-    explanation: "The text explains that once the author developed a passion for reading, other children could barely persuade her to leave the porch steps, and she describes herself as 'absorbed and unreachable.' Thus, the figurative phrase indicates that she spent almost all of her time reading."
+      > I wouldn't miss Mrs. Flowers, for she had given me her secret word which called forth a djinn who was to serve me all my life: books.
+    prompt: "As used in the text, what does the author's comparison between books and a 'djinn' most nearly suggest?"
+    explanation: "In folklore, a djinn (genie) is a powerful being summoned to grant wishes and provide lasting assistance. By describing books as a 'djinn who was to serve me all my life,' the author metaphorically emphasizes that reading provided her with an enduring source of empowerment and guidance."
     options:
       - id: "A"
-        text: "She struggled to understand difficult texts."
+        text: "Books created confusing illusions that were difficult to separate from reality."
       - id: "B"
-        text: "She spent almost all of her time reading."
+        text: "Books provided a powerful source of lifelong assistance and enrichment."
       - id: "C"
-        text: "She enjoyed showing off her book collection."
+        text: "Books offered a temporary escape that faded quickly once childhood ended."
       - id: "D"
-        text: "She had trouble seeing small print clearly."
+        text: "Books required careful supervision to prevent their misuse."
   - id: "sat-t1-rw2e-q3"
     questionNumber: 3
     questionType: "MC"
@@ -86,9 +86,9 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Master weaver Clara Neztsosie worked alongside architectural preservationists to restore the historical textiles displayed in the historic trading post's permanent collection. Neztsosie’s expertise proved ______ to the initiative: she not only identified the plant-based dye recipes used in the original nineteenth-century tapestries but also hand-wove the exact replacement fibers required for the repairs.
+      Master weaver Clara Sherman worked alongside textile preservationists to document and restore historical weavings held in regional collections. Sherman’s expertise proved ______ to the initiative: she not only identified the traditional natural dye sources used in the original nineteenth-century textiles but also demonstrated the precise hand-spinning techniques required for authentic conservation.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The colon introduces an explanation detailing Neztsosie's involvement: she identified the original natural dye recipes and wove the exact replacement fibers needed. This demonstrates that her participation was essential or indispensable ('essential') to the restoration project."
+    explanation: "The colon introduces an explanation detailing Sherman's indispensable involvement: identifying traditional dye sources and demonstrating required techniques. This indicates her contribution was essential ('essential') to the project."
     options:
       - id: "A"
         text: "peripheral"
@@ -111,7 +111,7 @@ questions:
     stimulus: |
       Before the advent of modern navigational tools, sailors exploring uncharted coastal waters relied heavily on bathymetry—<u>the measurement of the depth of water in oceans, seas, or lakes</u>—to avoid grounding their ships on hidden reefs. Navigators would repeatedly drop weighted ropes overboard to chart safe channels, a slow and labor-intensive process. Today, satellite-based radar systems allow marine cartographers to map ocean depth across thousands of square miles in seconds.
     prompt: "Which choice best describes the function of the underlined portion in the text as a whole?"
-    explanation: "The underlined portion appears in parentheses directly after 'bathymetry' and defines what the term means ('the measurement of the depth of water in oceans, seas, or lakes'), thereby explaining the meaning of a word."
+    explanation: "The underlined portion is set off by em-dashes directly after 'bathymetry' and defines what the term means ('the measurement of the depth of water in oceans, seas, or lakes'), thereby explaining the meaning of a word."
     options:
       - id: "A"
         text: "It describes a disagreement among modern oceanographers."
@@ -155,18 +155,18 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      For over a century, musicologists attributed the composition of the popular folk lullaby "Cradle of the Pines" to composer Arthur Pendelton, who claimed to have written both the melody and lyrics during an 1888 mountain retreat. Recently, however, an archivist uncovered a regional broadsheet printed nearly a year before Pendelton's trip. The paper includes the complete lyrics and musical notation of the song, performed by a local school choir. This finding suggests that Pendelton was likely not the original creator of the song.
-    prompt: "Based on the text, what piece of information about \"Cradle of the Pines\" has recently become uncertain?"
-    explanation: "The text explains that while Pendelton was long believed to have written the lullaby, an earlier broadsheet shows it was already known and performed before he claimed to have composed it, making his authorship doubtful. Therefore, the identity of the person who originally composed the lullaby has become uncertain."
+      For decades, the classic western song "Home on the Range" was commonly attributed to pioneer Dr. Brewster Higley, who penned a poem titled "My Western Home" in Kansas during the 1870s. However, when the song gained nationwide popularity in the 1930s, musicologists and archivists uncovered several earlier variants sung by trail drivers and regional choirs across the American West years before Higley's publication. These findings led researchers to question whether Higley was truly the song's sole original creator or simply an arranger of an existing folk tune.
+    prompt: "Based on the text, what piece of information about \"Home on the Range\" has become uncertain?"
+    explanation: "The text describes how the discovery of earlier regional variants led researchers to doubt whether Higley was the original author of the piece, making the identity of the song's original creator uncertain."
     options:
       - id: "A"
-        text: "The identity of the person who originally composed the lullaby"
+        text: "The identity of the person who originally created the song"
       - id: "B"
-        text: "The date when the broadsheet was first printed"
+        text: "The state in which Dr. Brewster Higley resided during the 1870s"
       - id: "C"
-        text: "The number of instruments required to perform the melody"
+        text: "The instruments that were traditionally used to accompany the song"
       - id: "D"
-        text: "Why the school choir chose to sing the song"
+        text: "Why the song became widely popular during the 1930s"
   - id: "sat-t1-rw2e-q8"
     questionNumber: 8
     questionType: "MC"
@@ -226,7 +226,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Blind cavefish are small, pale fish that live inside completely dark subterranean aquifers. Biologists traditionally assumed that these fish spend their entire lifespans confined to underground pools. However, ecologist Elena Rostova and her team claim that <u>blind cavefish periodically venture into open surface streams to obtain essential food</u>.
+      Blind cavefish are small, pale fish that live inside completely dark subterranean aquifers. Biologists traditionally assumed that these fish spend their entire lifespans confined to underground pools. However, recent ecological studies propose that <u>blind cavefish periodically venture into open surface streams to obtain essential food</u>.
     prompt: "Which finding, if true, would most strongly support the underlined claim?"
     explanation: "The claim states that blind cavefish leave their underground habitat to visit surface streams in order to find food. Finding that freshwater insects native strictly to sunlit surface waters make up a substantial part of the cavefish's diet directly supports this claim by demonstrating that they feed on surface-dwelling prey."
     options:
@@ -437,7 +437,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Many school districts have eliminated traditional letter grades in recent years, but ______ Sociologist Marcus Vance and his colleagues conducted an extensive survey to find out.
+      Many school districts have eliminated traditional letter grades in recent years, but ______ Educational policy researchers conducted an extensive survey across public high schools to find out.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
     explanation: "The second clause coordinated by 'but' forms a direct question inquiring about student outcomes. Direct questions require subject-auxiliary inversion ('do students actually benefit') and must conclude with a question mark ('?'). The following independent clause correctly begins as a new sentence."
     options:
@@ -460,7 +460,7 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      A widely used open-source audio workstation, Audacity allows sound designers like podcast producer Elena Torres ______ intricate soundscapes by layering multiple vocal tracks and ambient field recordings.
+      A widely used open-source audio workstation, Audacity allows sound designers and audio producers ______ intricate soundscapes by layering multiple vocal tracks and ambient field recordings.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
     explanation: "The main verb 'allows' requires an object followed by an infinitive phrase ('allows [someone] to do something') to express the action being enabled. Therefore, the infinitive 'to produce' correctly completes the verb complement structure."
     options:
@@ -620,7 +620,7 @@ questions:
   - id: "sat-t1-rw2e-q27"
     questionNumber: 27
     questionType: "MC"
-    correctAnswer: "A"
+    correctAnswer: "D"
     domain: "Expression of Ideas"
     skill: "Rhetorical Synthesis"
     difficulty: "Easy"
@@ -630,21 +630,20 @@ questions:
     stimulus: |
       While researching a topic, a student has taken the following notes:
 
-      * Covered bridges are timber-truss bridges protected by a roof and enclosed siding to shield the wooden structural elements from weather.
-      * Most covered bridges were constructed during the 19th and early 20th centuries across North America and Europe.
-      * The Kapellbrücke (Chapel Bridge) is a famous wooden covered bridge located in Lucerne, Switzerland.
-      * It was constructed in 1333, making it one of the oldest surviving wooden bridges in Europe.
-      * The Pont de Rohan is a celebrated covered, inhabited bridge in Landerneau, France.
-      * It was originally erected in 1336, dating back to the late Middle Ages.
-    prompt: "The student wants to emphasize a similarity between the ages of the bridges. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
-    explanation: "The goal is to emphasize a similarity in the ages of the two bridges. Option A points out that Kapellbrücke was constructed in the 1330s and that Pont de Rohan similarly dates to that same decade, directly highlighting how both bridges share a near-identical historical age."
+      * Covered bridges feature an overhead roof and enclosed timber siding to protect their trusses from harsh weather.
+      * Most covered bridges across North America and Europe date to the nineteenth and twentieth centuries.
+      * The Kapellbrücke is a covered wooden footbridge in Lucerne, Switzerland, that was built in 1333.
+      * The Pont de Rohan is a covered inhabited bridge in Landerneau, France, that was built in 1336.
+      * The Pont de Rohan carries a roadway lined with multi-story residential homes and shops.
+    prompt: "The student wants to emphasize a similarity between the two bridges by focusing on their ages. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
+    explanation: "The goal is to emphasize a similarity in age between the two bridges. Option D points out that the Kapellbrücke and the Pont de Rohan were constructed in 1333 and 1336, respectively, directly highlighting that both date to the 1330s."
     options:
       - id: "A"
-        text: "The Kapellbrücke was built in 1333; similarly, the Pont de Rohan was erected just three years later, in 1336."
+        text: "While the Kapellbrücke was constructed in 1333, the Pont de Rohan carries a roadway lined with shops and homes."
       - id: "B"
-        text: "Both the Kapellbrücke and the Pont de Rohan are famous covered bridges, the former situated in Switzerland and the latter in France."
+        text: "The Kapellbrücke and the Pont de Rohan are famous covered bridges located in Switzerland and France, respectively."
       - id: "C"
-        text: "The Kapellbrücke and the Pont de Rohan are covered bridges, which are protected by wooden siding and roofs to prevent weathering."
+        text: "Covered bridges like the Kapellbrücke and the Pont de Rohan use roofs and enclosed siding to shield their frames from the weather."
       - id: "D"
-        text: "The Kapellbrücke and the Pont de Rohan are prominent examples of covered bridges, many of which were built in the 19th and 20th centuries."
+        text: "Both the Kapellbrücke and the Pont de Rohan date to the 1330s, having been constructed only three years apart."
 ---

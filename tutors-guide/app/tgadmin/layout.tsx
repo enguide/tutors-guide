@@ -1,11 +1,17 @@
 // app/tgadmin/layout.tsx
 import { ReactNode } from "react";
+import { connection } from "next/server";
 import { requireStaffSession } from "@/lib/guards";
 import Link from "next/link";
-import { Building2, LogOut } from "lucide-react";
+import { Building2, LogOut, BookOpen } from "lucide-react";
 import { signOut } from "@/lib/auth";
+import { Role } from "@prisma/client";
+
+// Opt out of static prerendering for this authenticated layout
+export const instant = false;
 
 export default async function TgAdminLayout({ children }: { children: ReactNode }) {
+  await connection();
   const staff = await requireStaffSession();
 
   return (
@@ -23,6 +29,16 @@ export default async function TgAdminLayout({ children }: { children: ReactNode 
               <Link href="/tgadmin" className="text-foreground hover:text-primary transition-colors">
                 Roster & Telemetry
               </Link>
+
+              {staff.role === Role.ADMIN && (
+                <Link
+                  href="/tgadmin/content-preview"
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <BookOpen size={14} />
+                  <span>Content Preview</span>
+                </Link>
+              )}
             </nav>
           </div>
 

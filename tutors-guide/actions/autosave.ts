@@ -40,6 +40,22 @@ export async function saveSectionCheckpoint(payload: CheckpointPayload) {
   }
 
   try {
+    // Guard: Prevent recreating a checkpoint if the section is already finalized
+    const existingResult = await prisma.result.findUnique({
+      where: {
+        testId_profileId_sectionId: {
+          testId: payload.testId,
+          profileId,
+          sectionId: payload.sectionId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (existingResult) {
+      return { success: false, error: "Section already submitted; checkpoint rejected." };
+    }
+
     const clientDate = payload.clientUpdatedAt
       ? new Date(payload.clientUpdatedAt)
       : new Date();

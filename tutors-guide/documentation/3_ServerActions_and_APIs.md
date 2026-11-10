@@ -1,6 +1,6 @@
 # Technical Documentation: Server Actions & API Handlers
 
-This section covers the operational business logic layer of the application, encompassing API route handlers (REST, Server-Sent Events, webhooks) and Next.js Server Actions handling exam execution, optical handwritten FRQ capture, licensing, staff observability, and identity management.
+This section covers the operational business logic layer of the application, encompassing API route handlers (REST, Server-Sent Events, webhooks) and Next.js Server Actions handling exam execution, in-flight state persistence, optical handwritten FRQ capture, licensing, staff observability, and identity management.
 
 ---
 
@@ -9,46 +9,80 @@ This section covers the operational business logic layer of the application, enc
 ### `app/api/auth/[...nextauth]/route.ts`
 
 * **Purpose & Scope:** NextAuth catch-all authentication endpoint delegating incoming HTTP requests to NextAuth's core handler pipeline for login, logout, OAuth/credential flows, and session validation.
+
+
 * **Exports:**
 * `GET`, `POST`: NextAuth request handlers.
 
 
+
+
 * **Parameters / Props:** Standard `NextRequest` context managed internally by NextAuth.
+
+
 * **Return Value / Emitted State:** Standard NextAuth HTTP response payloads (session cookies, redirects, JSON tokens).
+
+
 * **Dependencies & Imports:**
 * Internal: `handlers` from `@/lib/auth`.
 
 
+
+
 * **Key Logic & Edge Cases:** Serves as the central auth gateway. Handlers process JWT creation, session refreshes, and credential verification defined inside `auth.ts`.
+
+
 
 ---
 
 ### `app/api/capture/[token]/events/route.ts`
 
 * **Purpose & Scope:** Server-Sent Events (SSE) endpoint establishing a persistent HTTP stream with the desktop exam runner. It notifies the desktop client in real time when handwritten FRQ sheets are uploaded, cropped, or audited via a mobile device.
+
+
 * **Exports:**
 * `GET(req: NextRequest, { params }: { params: Promise<{ token: string }> })`
+
+
 
 
 * **Parameters / Props:**
 * Dynamic Route Parameter: `token` (`string`) — Unique mobile capture session token.
 
 
+
+
 * **Return Value / Emitted State:** A long-lived `Response` holding a `ReadableStream` (`text/event-stream`), emitting:
 * Heartbeat comment pings (`: ping\n\n`) every 15 seconds.
+
+
 * Event `STATUS_CHANGE`: Emits submission metadata, status, question ID, page number, full sheet image URL, and sub-crop objects.
+
+
 * Event `ERROR`: Emits when the session token is expired or invalid.
+
+
 
 
 * **Dependencies & Imports:**
 * `NextRequest`, `connection` from `next/server`.
+
+
 * `prisma` from `@/lib/prisma`.
+
+
 
 
 * **Key Logic & Edge Cases:**
 * **Dynamic Runtime Execution:** Invokes `await connection()` to opt in to dynamic runtime execution under Next.js dynamic I/O models.
+
+
 * **State Snapshot Diffing:** Maintains a snapshot hash (`${sub.status}_${sub.crops.length}`) per submission inside an in-memory `Map`. It only pushes updates to the client when a status changes or new crops are produced, minimizing polling noise.
+
+
 * **Client Abort & Cleanup:** Listens to `req.signal.addEventListener("abort")` to clear the 1500ms database polling interval and 15s keep-alive ping interval, closing the stream without memory leaks.
+
+
 
 
 
@@ -57,40 +91,78 @@ This section covers the operational business logic layer of the application, enc
 ### `app/api/checkout/route.ts`
 
 * **Purpose & Scope:** Stripe checkout session creation endpoint supporting individual self-enrollment (B2C) and multi-seat institutional license pool purchases (B2B).
+
+
 * **Exports:**
 * `POST(req: NextRequest)`
+
+
 
 
 * **Parameters / Props:**
 * JSON Body:
 * `tier` (`string`): Target key matching `PRICING_TIERS` (defaults to `"SAT"`).
+
+
 * `isB2B` (`boolean`): Flags institutional purchase with multiple seat allocations.
+
+
 * `seats` (`string` | `number`): Number of seats purchased (defaults to `1` for B2C).
+
+
 * `email` (`string`): Purchaser's email address (falls back to active session email).
+
+
 * `orgName` (`string`, optional): Organization/franchise name for B2B accounts.
+
+
 * `firstName`, `lastName` (`string`, optional): Customer identity attributes.
+
+
 * `password` (`string`, optional): Unauthenticated registrant password (pre-hashed if provided).
+
+
 
 
 
 
 * **Return Value / Emitted State:**
 * Success: `NextResponse.json({ clientSecret: session.client_secret })`.
+
+
 * Failure: `400 Bad Request` or `500 Internal Server Error` with JSON error details.
+
+
 
 
 * **Dependencies & Imports:**
 * `Stripe` from `stripe`.
+
+
 * `NextRequest`, `NextResponse` from `next/server`.
+
+
 * `auth` from `@/lib/auth`.
+
+
 * `PRICING_TIERS` from `@/config/pricing`.
+
+
 * `bcrypt` from `bcryptjs`.
+
+
 
 
 * **Key Logic & Edge Cases:**
 * **Unauthenticated Buyer Registration:** If an unauthenticated user buys directly from the storefront, their password is validated ($\ge 8$ chars) and hashed (`bcrypt.hash(..., 10)`) upfront, then embedded into Stripe checkout session metadata for post-payment account creation.
+
+
 * **Embedded UI Mode:** Configures Stripe checkout in `ui_mode: "embedded"`, returning a client secret to render an in-page checkout modal without external redirects.
+
+
 * **Metadata Passthrough:** Stores seat limit, tier key, B2B flag, categories JSON, and hashed credentials into Stripe metadata to guarantee atomic fulfillment in the webhook.
+
+
 
 
 
@@ -99,28 +171,54 @@ This section covers the operational business logic layer of the application, enc
 ### `app/api/tgadmin/export-csv/route.ts`
 
 * **Purpose & Scope:** Administrative and tutor CSV data export endpoint. Generates downloadable cohort diagnostic roster summaries with student demographics, exam categories, completed dates, percentiles, and composite scores.
+
+
 * **Exports:**
 * `GET()`
 
 
+
+
 * **Parameters / Props:** Authenticated session headers/cookies.
+
+
 * **Return Value / Emitted State:** Downloadable `text/csv; charset=utf-8` response with `Content-Disposition: attachment; filename="cohort_diagnostic_roster_<DATE>.csv"`.
+
+
 * **Dependencies & Imports:**
 * `NextResponse` from `next/server`.
+
+
 * `auth` from `@/lib/auth`.
+
+
 * `prisma` from `@/lib/prisma`.
+
+
 * `Role`, `LinkStatus` from `@prisma/client`.
+
+
 
 
 * **Key Logic & Edge Cases:**
 * **Role-Based Tenant Scoping:**
 * `ORG_ADMIN` / Staff with `orgId`: Restricted to students belonging to their specific organization.
+
+
 * `ADMIN` (Super Admin): Exports students across the entire platform or the primary organization.
+
+
 * `TUTOR` (Independent): Restricts data export strictly to students linked via active `TutorStudentLink` records (`status: ACTIVE`).
+
+
 * **Hybrid Tutors:** Tutors belonging to an organization receive a deduplicated union of their org roster and their direct private mentorship students.
 
 
+
+
 * **CSV Sanitization:** Wraps student names and test titles in escaped quotes, replacing internal quotation marks (`""`) to prevent CSV injection or broken layout parsing.
+
+
 
 
 
@@ -129,27 +227,55 @@ This section covers the operational business logic layer of the application, enc
 ### `app/api/webhooks/stripe/route.ts`
 
 * **Purpose & Scope:** Asynchronous fulfillment engine for Stripe payment events. Listens for `checkout.session.completed` events to provision user profiles, create organization entities, allocate license pools, and activate student seats.
+
+
 * **Exports:**
 * `POST(req: NextRequest)`
 
 
+
+
 * **Parameters / Props:** Raw request body and `stripe-signature` header.
+
+
 * **Return Value / Emitted State:** `NextResponse.json({ received: true })` or error status on signature failure.
+
+
 * **Dependencies & Imports:**
 * `Stripe` from `stripe`.
+
+
 * `prisma` from `@/lib/prisma`.
+
+
 * `Role`, `ClassYear`, `Category`, `EnrollmentStatus` from `@prisma/client`.
+
+
 * `bcrypt` from `bcryptjs`, `crypto` from `crypto`.
+
+
 
 
 * **Key Logic & Edge Cases:**
 * **Signature Verification:** Enforces cryptographic validation against `process.env.STRIPE_WEBHOOK_SECRET`.
+
+
 * **Idempotency Guard:** Checks whether a `LicensePool` with the specified `stripeSessionId` already exists before execution to prevent double-provisioning on webhook retries.
+
+
 * **Transactional Provisioning (`prisma.$transaction`):**
 * Resolves or creates the purchaser `Profile`. If no password was provided, generates a cryptographically secure random hash.
+
+
 * **B2B Branch:** Creates an `Organization`, links the profile as `ORG_ADMIN`, creates a multi-seat `LicensePool`, and generates an institutional join code (`ORG-XXXX`).
+
+
 * **B2C Branch:** Creates a 1-seat `LicensePool` bound to the purchaser and creates an immediately active `Enrollment` record.
+
+
 * Sets license pool validity for exactly 1 year (`oneYearExpiry`).
+
+
 
 
 
@@ -158,6 +284,59 @@ This section covers the operational business logic layer of the application, enc
 ---
 
 ## 2. Server Actions (`actions/`)
+
+### `actions/autosave.ts`
+
+* **Purpose & Scope:** Handles high-frequency asynchronous autosaving for active student test sessions, persisting in-flight question answer selections and periodic section checkpoint snapshots (clock, question index, navigation path).
+
+
+* **Exports:**
+* `saveSectionCheckpoint(payload: CheckpointPayload): Promise<{ success: boolean; error?: string }>`
+
+
+* `autosaveResponse(payload: AutosavePayload): Promise<{ success: boolean; error?: string }>`
+
+
+
+
+* **Parameters / Props:**
+* `CheckpointPayload`: `testId`, `sectionId`, `timeRemainingSeconds`, `lastQuestionIndex`, `navigationHistory`, `accommodations`, `clientUpdatedAt`.
+
+
+* `AutosavePayload`: `testId`, `sectionId`, `questionId`, `sectionOrder`, `responseOrder`, `responseType`, `selectedOptionId`, `frqUserAnswer`, `correctAnswerKey`, `timeSpentOnResponse`, `usedCalculator`.
+
+
+
+
+* **Return Value / Emitted State:** Standard status indicators (`{ success: true }` or `{ success: false, error: string }`).
+
+
+* **Dependencies & Imports:**
+* `auth` from `@/lib/auth`.
+
+
+* `prisma` from `@/lib/prisma`.
+
+
+* `evaluateAnswer` from `@/lib/scoring/mathEvaluator`.
+
+
+
+
+* **Key Logic & Edge Cases:**
+* **Checkpoint Finalization Guard:** `saveSectionCheckpoint` executes a lightweight, index-only lookup against `prisma.result.findUnique({ where: { testId_profileId_sectionId } })`. If an immutable result already exists, the save is aborted immediately, preventing delayed debounces or offline retry queues from resurrecting deleted checkpoints.
+
+
+* **Lean Response Upsertion:** `autosaveResponse` writes directly via `prisma.response.upsert` without pre-checking test status, eliminating read-before-write query duplication during active student testing.
+
+
+* **Monotonic Dwell Time Preservation:** Dwell times are verified against existing responses to ensure monotonic increments across delayed or out-of-order network requests.
+
+
+
+
+
+---
 
 ### `actions/breakActions.ts`
 
@@ -263,7 +442,10 @@ This section covers the operational business logic layer of the application, enc
 * **Dwell Time Derivation:** Computes per-question dwell times (`timeSpentOnResponse`) strictly from intervals between sequential navigation timestamps (`deriveTimeSpentFromNavigationHistory`), accounting for accommodation time multipliers.
 
 
-* **Checkpoint Eviction:** Atomically deletes the active draft row in `SectionCheckpoint` upon successful score creation.
+* **Batched Transaction Pipeline (`prisma.$transaction([...])`):** To support high-volume concurrent cohorts without connection pool exhaustion, question `Response` upserts, immutable `Result` creation, and `SectionCheckpoint` eviction are aggregated into an array of deferred Prisma promises and committed in a single atomic database round-trip (sub-10ms connection hold time).
+
+
+* **Checkpoint Eviction & Cleanup:** Deletes the active in-flight row in `SectionCheckpoint` directly within the completion batch pipeline, preventing orphaned drafts if student attempts reload.
 
 
 * **Adaptive Branching & Composite Score Synthesis:** Evaluates `evaluateNextExamRoute` to determine whether to route to an easy/hard second module or trigger a break. If all stages are finished, invokes `synthesizeExamComposite` and upserts the student's `TestSummary`.

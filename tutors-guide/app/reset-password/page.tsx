@@ -72,13 +72,13 @@ function ResetPasswordForm() {
 
       <div className="mb-6">
         <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-          Credential Management
+          Account Management
         </span>
         <h1 className="text-xl font-bold tracking-tight text-foreground uppercase mt-0.5">
           New Password
         </h1>
         <p className="text-xs text-muted-foreground mt-1">
-          Establish a secure password for your candidate account.
+          Create a new, secure password for your account.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ function ResetPasswordForm() {
               </span>
             ) : (
               <>
-                <span className="tracking-wider uppercase">Update Credentials</span>
+                <span className="tracking-wider uppercase">Update Password</span>
                 <ArrowRight size={14} />
               </>
             )}

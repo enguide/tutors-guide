@@ -166,122 +166,139 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       questions.length
     );
 
-    // 5. Finalize all response records
+    // 5. Pre-calculate response scores and payloads in memory
     let numCorrect = 0;
     let totalEarnedRawScore = 0;
 
-    await Promise.all(
-      questions.map(async (q, idx) => {
-        const student = clientAnswers[q.id];
-        let isCorrect = false;
+    const preparedResponses = questions.map((q, idx) => {
+      const student = clientAnswers[q.id];
+      let isCorrect = false;
 
-        const isHandwrittenFrq =
-          q.questionType === "FRQ_HANDWRITTEN" || frqScoreMap.has(q.id);
+      const isHandwrittenFrq =
+        q.questionType === "FRQ_HANDWRITTEN" || frqScoreMap.has(q.id);
 
-        if (isHandwrittenFrq && frqScoreMap.has(q.id)) {
-          const frqData = frqScoreMap.get(q.id)!;
-          // Full question credit if student earns maximum possible points across all parts
-          isCorrect = frqData.earned >= frqData.possible && frqData.possible > 0;
-          totalEarnedRawScore += frqData.earned;
-          if (isCorrect) numCorrect++;
-        } else {
-          const standardType = q.questionType === "MC" ? "MC" : "FR";
-          isCorrect = evaluateAnswer(
-            standardType,
-            q.questionType === "MC" ? student?.selectedOptionId : student?.frqUserAnswer,
-            q.correctAnswer
-          );
-          if (isCorrect) {
-            numCorrect++;
-            totalEarnedRawScore += 1;
-          }
+      if (isHandwrittenFrq && frqScoreMap.has(q.id)) {
+        const frqData = frqScoreMap.get(q.id)!;
+        isCorrect = frqData.earned >= frqData.possible && frqData.possible > 0;
+        totalEarnedRawScore += frqData.earned;
+        if (isCorrect) numCorrect++;
+      } else {
+        const standardType = q.questionType === "MC" ? "MC" : "FR";
+        isCorrect = evaluateAnswer(
+          standardType,
+          q.questionType === "MC" ? student?.selectedOptionId : student?.frqUserAnswer,
+          q.correctAnswer
+        );
+        if (isCorrect) {
+          numCorrect++;
+          totalEarnedRawScore += 1;
         }
+      }
 
-        const frqData = frqScoreMap.get(q.id);
-        const aggregatedTranscription =
-          frqData && frqData.transcriptions.length > 0
-            ? frqData.transcriptions.join(" | ")
-            : null;
+      const frqData = frqScoreMap.get(q.id);
+      const aggregatedTranscription =
+        frqData && frqData.transcriptions.length > 0
+          ? frqData.transcriptions.join(" | ")
+          : null;
 
-        const resolvedFrqAnswer =
-          aggregatedTranscription ?? student?.frqUserAnswer ?? null;
+      const resolvedFrqAnswer =
+        aggregatedTranscription ?? student?.frqUserAnswer ?? null;
 
-        const resolvedResponseType: QuestionType = isHandwrittenFrq
-          ? QuestionType.FRQ_HANDWRITTEN
-          : (q.questionType as unknown as QuestionType);
+      const resolvedResponseType: QuestionType = isHandwrittenFrq
+        ? QuestionType.FRQ_HANDWRITTEN
+        : (q.questionType as unknown as QuestionType);
 
-        const normalizedCorrectAnswerKey = String(q.correctAnswer ?? "").trim();
-        const finalTimeSpent = computedDwellTimes[idx] ?? 0;
+      const normalizedCorrectAnswerKey = String(q.correctAnswer ?? "").trim();
+      const finalTimeSpent = computedDwellTimes[idx] ?? 0;
 
-        return prisma.response.upsert({
+      return {
+        questionId: q.id,
+        responseOrder: q.questionNumber,
+        responseType: resolvedResponseType,
+        selectedOptionId: student?.selectedOptionId ?? null,
+        frqUserAnswer: resolvedFrqAnswer,
+        correctAnswerKey: normalizedCorrectAnswerKey,
+        isCorrect,
+        timeSpentOnResponse: finalTimeSpent,
+        usedCalculator: student?.usedCalculator ?? false,
+        changedAnswer: student?.changedAnswer ?? false,
+      };
+    });
+
+    // 6. Calculate section-level scaled score via the Scoring Engine
+    const roundedRawScore = Math.round(totalEarnedRawScore);
+    const scaledScore = calculateSectionScaledScore(sectionId, roundedRawScore, metadata);
+    const totalQuestions = questions.length;
+
+    // 7. Atomic batched transaction pipeline
+    // Dispatches Result creation, Checkpoint deletion, and all Response upserts
+    // in a single network round-trip to minimize connection hold duration under load.
+    const transactionBatch: Prisma.PrismaPromise<unknown>[] = [
+      prisma.result.create({
+        data: {
+          profileId,
+          testId,
+          sectionId,
+          testTitle,
+          numCorrect,
+          totalQuestions,
+          rawScore: roundedRawScore,
+          scaledScore,
+          timeRemainingSeconds,
+          navigationHistory: navigationHistory as unknown as Prisma.InputJsonValue,
+          accommodations: accommodations
+            ? (accommodations as unknown as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
+        },
+      }),
+
+      prisma.sectionCheckpoint.deleteMany({
+        where: {
+          profileId,
+          testId,
+          sectionId,
+        },
+      }),
+
+      ...preparedResponses.map((res) =>
+        prisma.response.upsert({
           where: {
             profileId_questionId: {
               profileId,
-              questionId: q.id,
+              questionId: res.questionId,
             },
           },
           create: {
             profileId,
             testId,
             sectionId,
-            questionId: q.id,
+            questionId: res.questionId,
             sectionOrder,
-            responseOrder: q.questionNumber,
-            responseType: resolvedResponseType,
-            selectedOptionId: student?.selectedOptionId ?? null,
-            frqUserAnswer: resolvedFrqAnswer,
-            correctAnswerKey: normalizedCorrectAnswerKey,
-            isCorrect,
-            timeSpentOnResponse: finalTimeSpent,
-            usedCalculator: student?.usedCalculator ?? false,
-            changedAnswer: student?.changedAnswer ?? false,
+            responseOrder: res.responseOrder,
+            responseType: res.responseType,
+            selectedOptionId: res.selectedOptionId,
+            frqUserAnswer: res.frqUserAnswer,
+            correctAnswerKey: res.correctAnswerKey,
+            isCorrect: res.isCorrect,
+            timeSpentOnResponse: res.timeSpentOnResponse,
+            usedCalculator: res.usedCalculator,
+            changedAnswer: res.changedAnswer,
           },
           update: {
-            responseType: resolvedResponseType,
-            selectedOptionId: student?.selectedOptionId ?? null,
-            frqUserAnswer: resolvedFrqAnswer,
-            correctAnswerKey: normalizedCorrectAnswerKey,
-            isCorrect,
-            timeSpentOnResponse: finalTimeSpent,
-            usedCalculator: student?.usedCalculator ?? undefined,
-            changedAnswer: student?.changedAnswer ?? undefined,
+            responseType: res.responseType,
+            selectedOptionId: res.selectedOptionId,
+            frqUserAnswer: res.frqUserAnswer,
+            correctAnswerKey: res.correctAnswerKey,
+            isCorrect: res.isCorrect,
+            timeSpentOnResponse: res.timeSpentOnResponse,
+            usedCalculator: res.usedCalculator || undefined,
+            changedAnswer: res.changedAnswer || undefined,
           },
-        });
-      })
-    );
+        })
+      ),
+    ];
 
-    // 6. Calculate section-level scaled score via the Scoring Engine
-    const roundedRawScore = Math.round(totalEarnedRawScore);
-    const scaledScore = calculateSectionScaledScore(sectionId, roundedRawScore, metadata);
-
-    // 7a. Persist the immutable Result row with scaledScore
-    const totalQuestions = questions.length;
-    await prisma.result.create({
-      data: {
-        profileId,
-        testId,
-        sectionId,
-        testTitle,
-        numCorrect,
-        totalQuestions,
-        rawScore: roundedRawScore,
-        scaledScore,
-        timeRemainingSeconds,
-        navigationHistory: navigationHistory as unknown as Prisma.InputJsonValue,
-        accommodations: accommodations
-          ? (accommodations as unknown as Prisma.InputJsonValue)
-          : Prisma.JsonNull,
-      },
-    });
-
-    // 7b. Clean up in-flight SectionCheckpoint (draft has completed)
-    await prisma.sectionCheckpoint.deleteMany({
-      where: {
-        profileId,
-        testId,
-        sectionId,
-      },
-    });
+    await prisma.$transaction(transactionBatch);
 
     // 8. Resolve next exam route (linear or adaptive branching)
     const submittedResults = await prisma.result.findMany({

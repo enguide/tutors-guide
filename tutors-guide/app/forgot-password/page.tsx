@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
             Reset Password
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Dispatch a secure token link to re-establish your credentials.
+            Send a secure token link to reset your password..
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
-                Candidate Account Email
+                Member Email Account
               </label>
               <input
                 type="email"
