@@ -233,7 +233,7 @@ questions:
     containsChart: false
     containsDiagram: false
     prompt: |
-      Which expression is equivalent to $\dfrac{3}{c} + \dfrac{c}{6}$, where $c \neq 0$?
+      Which expression is equivalent to $\dfrac{3}{c} + \dfrac{c}{6}$, where $c > 0$?
     explanation: |
       To add the rational expressions, find a common denominator of $6c$:
       $$\dfrac{3(6)}{6c} + \dfrac{c(c)}{6c} = \dfrac{18 + c^2}{6c}$$
