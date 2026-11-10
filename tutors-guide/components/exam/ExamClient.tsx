@@ -39,6 +39,8 @@ interface ExamClientProps {
   studentName?: string;
   serverCheckpoint?: ExtendedServerCheckpointData | null;
   serverResponses?: ServerResponseRecord[];
+  isExamAttemptStarted?: boolean;
+  serverAccommodations?: AccommodationSettings | null;
 }
 
 const emptySubscribe = () => () => {};
@@ -52,6 +54,8 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   studentName,
   serverCheckpoint,
   serverResponses = [],
+  isExamAttemptStarted = false,
+  serverAccommodations = null,
 }) => {
   const router = useRouter();
 
@@ -68,27 +72,12 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const examCat = (category.toUpperCase() || metadata.category) as SupportedExamCategory;
 
   const theme = resolveExamTheme(category);
-
   const accommodationsKey = `attempt_accommodations_${testId}`;
 
-  // Evaluate if an active or prior attempt exists on the server or on another device
-  const hasServerProgress = useMemo(() => {
-    if (!serverCheckpoint) {
-      return serverResponses.length > 0;
-    }
-    const hasReducedTime = serverCheckpoint.timeRemainingSeconds < frontmatter.timeLimit;
-    const hasNavHistory =
-      Array.isArray(serverCheckpoint.navigationHistory) &&
-      serverCheckpoint.navigationHistory.length > 1;
-    const hasResponses = serverResponses.length > 0;
-
-    return hasReducedTime || hasNavHistory || hasResponses;
-  }, [serverCheckpoint, serverResponses, frontmatter.timeLimit]);
-
+  // Accommodations hierarchy: Database record -> LocalStorage -> Default Fallback
   const [accommodations, setAccommodations] = useState<AccommodationSettings>(() => {
-    if (serverCheckpoint?.accommodations) {
-      return serverCheckpoint.accommodations;
-    }
+    if (serverAccommodations) return serverAccommodations;
+    if (serverCheckpoint?.accommodations) return serverCheckpoint.accommodations;
     if (typeof window === "undefined") return DEFAULT_ACCOMMODATIONS;
     try {
       const stored = localStorage.getItem(accommodationsKey);
@@ -98,23 +87,22 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   });
 
-  // Cross-device safeguard: Never open preflight if progress already exists on the server
-const shouldOpenPreFlight = useMemo(() => {
-  if (hasServerProgress || serverCheckpoint?.accommodations) return false;
-  if (typeof window === "undefined") return true;
-  return !Boolean(localStorage.getItem(accommodationsKey));
-}, [hasServerProgress, serverCheckpoint?.accommodations, accommodationsKey]);
+  // SINGLE SOURCE OF TRUTH:
+  // If the server confirmed the exam attempt is already started, preflight NEVER opens.
+  // Otherwise, it checks if local storage has it, falling back to opening on section 1.
+  const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(() => {
+    if (isExamAttemptStarted) return false;
+    if (typeof window === "undefined") return true;
+    return !Boolean(localStorage.getItem(accommodationsKey));
+  });
 
-const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(shouldOpenPreFlight);
-
-// Section timing remains completely dormant while preflight modal is displayed
-const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
-  // If preflight is required, remain dormant until confirmed
-  if (shouldOpenPreFlight) return false;
-  
-  // If preflight was already completed on an earlier section, respect the theme's autostart behavior
-  return Boolean(theme.autoStartSection);
-});
+  // Section timing remains completely dormant if the preflight modal is displayed
+  const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
+    if (isExamAttemptStarted) {
+      return Boolean(theme.autoStartSection);
+    }
+    return false;
+  });
 
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,17 +155,12 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
     serverResponses,
   });
 
-  // Comprehensive resumption check across server state, in-memory state, and local buffers
-  const isResuming = useMemo(() => {
-    if (hasServerProgress) return true;
-
+  // Direct check if THIS SPECIFIC SECTION is being resumed mid-way
+  const isResumingThisSection = useMemo(() => {
     if (serverCheckpoint && serverCheckpoint.timeRemainingSeconds < effectiveTimeLimitSeconds) {
       return true;
     }
     if (serverResponses.length > 0) {
-      return true;
-    }
-    if (Object.keys(answers).length > 0 || navigationHistory.length > 1) {
       return true;
     }
     if (typeof window !== "undefined") {
@@ -185,27 +168,14 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
         const stored = localStorage.getItem(`test_progress_${testId}_${frontmatter.sectionId}`);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (
-            (parsed.secondsRemaining && parsed.secondsRemaining < effectiveTimeLimitSeconds) ||
-            (parsed.answers && Object.keys(parsed.answers).length > 0) ||
-            (parsed.navigationHistory && parsed.navigationHistory.length > 1)
-          ) {
+          if (parsed.secondsRemaining && parsed.secondsRemaining < effectiveTimeLimitSeconds) {
             return true;
           }
         }
       } catch {}
     }
     return false;
-  }, [
-    hasServerProgress,
-    serverCheckpoint,
-    serverResponses,
-    answers,
-    navigationHistory,
-    testId,
-    frontmatter.sectionId,
-    effectiveTimeLimitSeconds,
-  ]);
+  }, [serverCheckpoint, serverResponses, testId, frontmatter.sectionId, effectiveTimeLimitSeconds]);
 
   // Trap accidental browser back buttons, tab close, and page reloads during active exam testing
   useExamNavigationLock({
@@ -223,14 +193,13 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
 
     const newEffectiveSeconds = Math.round(frontmatter.timeLimit * selected.timeMultiplier);
 
-    // Guard: Only reset the clock if this attempt has not already started on any machine
-    if (!isResuming) {
+    // Only reset time limit if starting fresh in section 1
+    if (!isResumingThisSection) {
       resetTimeLimit(newEffectiveSeconds);
     }
 
     setIsPreFlightOpen(false);
 
-    // If this test category autostarts (e.g. SAT Bluebook), immediately begin testing
     if (theme.autoStartSection) {
       setIsSectionStarted(true);
     }
@@ -322,7 +291,6 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
     const sections = metadata.sections || [];
 
     if (metadata.isAdaptive || metadata.stages?.length) {
-      // Group sections by order index to avoid duplicate counts across branching tiers
       const uniqueOrders = new Map<number, number>();
       for (const s of sections) {
         if (!uniqueOrders.has(s.order)) {
@@ -333,14 +301,12 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
       const calculatedTime = Array.from(uniqueOrders.values()).reduce((sum, val) => sum + val, 0);
 
       return {
-        // Standard SAT adaptive path evaluates to 8040s (134m = 2h 14m)
         totalDuration: calculatedTime > 0 ? calculatedTime : 8040,
         totalModules: uniqueOrders.size || 4,
         totalQuestions: examCat === "SAT" ? 98 : undefined,
       };
     }
 
-    // Standard linear exam fallback
     const calculatedTime = sections.reduce((sum, s) => sum + (s.timeLimit || 0), 0);
     return {
       totalDuration: calculatedTime > 0 ? calculatedTime : frontmatter.timeLimit,
@@ -351,13 +317,13 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
 
   if (!isMounted) {
     return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
-        <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 flex items-center justify-between">
+      <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-background">
+        <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 flex items-center justify-between shrink-0">
           <div className="h-4 w-48 bg-neutral-200 dark:border-neutral-800 rounded animate-pulse" />
           <div className="h-6 w-20 bg-neutral-100 dark:bg-neutral-800 rounded-full animate-pulse" />
         </header>
         <main className="flex-1 bg-neutral-50 dark:bg-neutral-950" />
-        <footer className="h-16 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900" />
+        <footer className="h-16 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shrink-0" />
       </div>
     );
   }
@@ -374,7 +340,7 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
     );
   }
 
-  // 1. Preflight modal takes precedence; timer and checkpoints remain completely dormant
+  // 1. Preflight modal ONLY displayed at the very start of the entire test attempt
   if (isPreFlightOpen) {
     return (
       <TestPreFlightModal
@@ -399,9 +365,9 @@ const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
         testTitle={metadata.title}
         sectionTitle={frontmatter.sectionTitle}
         questionCount={questions.length}
-        timeLimitSeconds={isResuming ? secondsRemaining : effectiveTimeLimitSeconds}
+        timeLimitSeconds={isResumingThisSection ? secondsRemaining : effectiveTimeLimitSeconds}
         config={effectiveConfig}
-        isResuming={isResuming}
+        isResuming={isResumingThisSection}
         onBeginSection={handleBeginSection}
       />
     );

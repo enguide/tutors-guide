@@ -56,8 +56,7 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     notFound();
   }
 
-  // 3. Granular Entitlement Verification (supports string-based tokens and wildcard prefixes)
-  // e.g., "ACADEMIC:DIFF_EQ", "AP:CALC", or category-wide fallback "SAT"
+  // 3. Granular Entitlement Verification
   const userEntitlements: string[] = session.user.entitlements || [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requiredEntitlement: string = (metadata as any).entitlement || examCat;
@@ -85,7 +84,6 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
   });
 
   if (alreadySubmitted) {
-    // Forward student to resume coordinator to find their active module or results
     redirect(`/tests/${category}/${testId}`);
   }
 
@@ -105,8 +103,14 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     }
   );
 
-  // 7. Fetch in-flight checkpoint and previous autosaved responses for cross-device resumption
-  const [checkpointRecord, existingResponses] = await Promise.all([
+  // 7. Authoritative Server Check: Has this student started ANY section of this test?
+  const [
+    checkpointRecord, 
+    existingResponses, 
+    anyCompletedSection, 
+    anyPriorCheckpoint
+  ] = await Promise.all([
+    // Checkpoint for THIS specific section
     prisma.sectionCheckpoint.findUnique({
       where: {
         profileId_testId_sectionId: {
@@ -116,6 +120,7 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
         },
       },
     }),
+    // Prior saved responses for THIS specific section
     prisma.response.findMany({
       where: {
         profileId: session.user.id,
@@ -131,7 +136,37 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
         changedAnswer: true,
       },
     }),
+    // Did the student complete any earlier section of this test?
+    prisma.result.findFirst({
+      where: {
+        testId,
+        profileId: session.user.id,
+      },
+      select: {
+        accommodations: true,
+      },
+    }),
+    // Does the student have ANY checkpoint for this test across all sections?
+    prisma.sectionCheckpoint.findFirst({
+      where: {
+        testId,
+        profileId: session.user.id,
+      },
+      select: {
+        accommodations: true,
+      },
+    }),
   ]);
+
+  // If the student has any submitted section OR any checkpoint anywhere in this test, the exam has started.
+  const isExamAttemptStarted = Boolean(anyCompletedSection || anyPriorCheckpoint || checkpointRecord);
+
+  // Resolve accommodations from earlier sections in PostgreSQL if switching devices
+  const resolvedAccommodations: AccommodationSettings | null =
+    (checkpointRecord?.accommodations as unknown as AccommodationSettings) ||
+    (anyPriorCheckpoint?.accommodations as unknown as AccommodationSettings) ||
+    (anyCompletedSection?.accommodations as unknown as AccommodationSettings) ||
+    null;
 
   const formattedCheckpoint: ExtendedServerCheckpointData | null = checkpointRecord
     ? {
@@ -140,9 +175,7 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
         navigationHistory: Array.isArray(checkpointRecord.navigationHistory)
           ? (checkpointRecord.navigationHistory as unknown as NavigationHistoryEntry[])
           : null,
-        accommodations: checkpointRecord.accommodations
-          ? (checkpointRecord.accommodations as unknown as AccommodationSettings)
-          : null,
+        accommodations: resolvedAccommodations,
         clientUpdatedAt: checkpointRecord.clientUpdatedAt.toISOString(),
       }
     : null;
@@ -157,6 +190,8 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
       studentName={studentName}
       serverCheckpoint={formattedCheckpoint}
       serverResponses={existingResponses}
+      isExamAttemptStarted={isExamAttemptStarted}
+      serverAccommodations={resolvedAccommodations}
     />
   );
 }
