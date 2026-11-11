@@ -400,7 +400,7 @@ questions:
     correctAnswer: "4"
     domain: "Passport to Advanced Math"
     skill: "Quadratic Equations"
-    difficulty: "Medium"
+    difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -516,7 +516,7 @@ questions:
     correctAnswer: "C"
     domain: "Problem Solving and Data Analysis"
     skill: "Rates"
-    difficulty: "Medium"
+    difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -553,7 +553,7 @@ questions:
     correctAnswer: "B"
     domain: "Geometry and Trigonometry"
     skill: "Circles"
-    difficulty: "Medium"
+    difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -582,7 +582,7 @@ questions:
     correctAnswer: "2"
     domain: "Passport to Advanced Math"
     skill: "Quadratic Equations"
-    difficulty: "Medium"
+    difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false

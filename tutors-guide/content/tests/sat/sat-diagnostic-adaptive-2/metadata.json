@@ -1,0 +1,140 @@
+{
+  "id": "sat-diagnostic-adaptive-2",
+  "title": "Digital SAT Diagnostic Practice 2 (Adaptive)",
+  "category": "SAT",
+  "entitlement": "SAT",
+  "description": "Full-length 2-stage computer-adaptive diagnostic exam matching official College Board timing and module lengths.",
+  "assetBasePath": "/content/tests/sat/sat-diagnostic-adaptive-2/assets",
+  "isAdaptive": true,
+  "config": {
+    "hasCrossOutMode": true,
+    "allowBacktracking": true,
+    "allowSectionReview": true
+  },
+  "scoring": {
+    "scaleType": "SAT_ADAPTIVE"
+  },
+  "stages": [
+    {
+      "stageIndex": 1,
+      "sectionId": "sat-t2-rw1",
+      "routing": {
+        "threshold": 15,
+        "onPass": "sat-t2-rw2h",
+        "onFail": "sat-t2-rw2e"
+      }
+    },
+    {
+      "stageIndex": 2,
+      "sectionId": "sat-t2-m1",
+      "routing": {
+        "threshold": 13,
+        "onPass": "sat-t2-m2h",
+        "onFail": "sat-t2-m2e"
+      }
+    }
+  ],
+  "sections": [
+    {
+      "id": "sat-t2-rw1",
+      "file": "rw-m1.md",
+      "order": 1,
+      "title": "Reading & Writing - M1",
+      "timeLimit": 1920,
+      "hasIntermissionAfter": false,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-t2-rw2h",
+      "file": "rw-m2-hard.md",
+      "order": 2,
+      "title": "Reading & Writing - M2H",
+      "timeLimit": 1920,
+      "hasIntermissionAfter": true,
+      "intermissionDuration": 600,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-t2-rw2e",
+      "file": "rw-m2-easy.md",
+      "order": 2,
+      "title": "Reading & Writing - M2S",
+      "timeLimit": 1920,
+      "hasIntermissionAfter": true,
+      "intermissionDuration": 600,
+      "config": {
+        "layout": "split-passage",
+        "calculator": "none",
+        "hasFormulaSheet": false,
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-t2-m1",
+      "file": "math-m1.md",
+      "order": 3,
+      "title": "Mathematics - M1",
+      "timeLimit": 2100,
+      "hasIntermissionAfter": false,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "sat-standard",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-t2-m2h",
+      "file": "math-m2-hard.md",
+      "order": 4,
+      "title": "Mathematics - M2H",
+      "timeLimit": 2100,
+      "hasIntermissionAfter": false,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "sat-standard",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    },
+    {
+      "id": "sat-t2-m2e",
+      "file": "math-m2-easy.md",
+      "order": 4,
+      "title": "Mathematics - M2S",
+      "timeLimit": 2100,
+      "hasIntermissionAfter": false,
+      "config": {
+        "layout": "single-column",
+        "calculator": "desmos-graphing",
+        "hasFormulaSheet": true,
+        "formulaSheetId": "sat-standard",
+        "hasCrossOutMode": true,
+        "allowBacktracking": true,
+        "allowSectionReview": true
+      }
+    }
+  ]
+}
