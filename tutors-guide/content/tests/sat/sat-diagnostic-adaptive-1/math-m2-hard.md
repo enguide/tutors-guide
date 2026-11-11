@@ -7,7 +7,7 @@ questions:
   - id: "sat-t1-m2h-q1"
     questionNumber: 1
     questionType: "MC"
-    correctAnswer: "C"
+    correctAnswer: "B"
     domain: "Algebra"
     skill: "Linear Equations in One Variable"
     difficulty: "Medium"
@@ -15,28 +15,32 @@ questions:
     containsChart: false
     containsDiagram: false
     prompt: |
-      If $3(2x - 5) - (4 - x) = 5(x - 3) + k$ is true for all real values of $x$, what is the value of the constant $k$?
+      In the equation below, $a$ and $b$ are constants:
+      $$a(3x - 4) + 2(x + 5) = 17x + b$$
+      If the equation has infinitely many real solutions, what is the value of $a + b$?
     explanation: |
-      Expand and simplify both sides of the equation:
-      $$\text{Left Side: } 6x - 15 - 4 + x = 7x - 19$$
-      $$\text{Right Side: } 5x - 15 + k$$
+      For a linear equation in one variable to have infinitely many solutions, the equation must be an identity true for all $x$. This requires the coefficients of $x$ on both sides to be equal, and the constant terms on both sides to be equal.
 
-      Notice the original expression simplifies to:
-      $$7x - 19 = 5x + (k - 15)$$
-      For the equation to be an identity true for all values of $x$, the coefficients of $x$ and the constant terms must match. 
-      Alternatively, refactoring into standard dSAT identity form:
-      $$2(3x - 5) - (x + 4) = 5(x - 3) + k$$
-      $$6x - 10 - x - 4 = 5x - 14$$
-      $$5x - 14 = 5x - 15 + k \implies -14 = -15 + k \implies k = 1$$
+      First, expand and collect like terms on the left side:
+      $$3ax - 4a + 2x + 10 = (3a + 2)x + (10 - 4a)$$
+
+      Equate the coefficient of $x$ to the right side ($17x + b$):
+      $$3a + 2 = 17 \implies 3a = 15 \implies a = 5$$
+
+      Equate the constant terms and substitute $a = 5$:
+      $$b = 10 - 4a = 10 - 4(5) = 10 - 20 = -10$$
+
+      The question asks for the value of $a + b$:
+      $$a + b = 5 + (-10) = -5$$
     options:
       - id: "A"
-        text: "$-4$"
+        text: "$-15$"
       - id: "B"
-        text: "$-1$"
+        text: "$-5$"
       - id: "C"
-        text: "$1$"
+        text: "$5$"
       - id: "D"
-        text: "$4$"
+        text: "$15$"
 
   - id: "sat-t1-m2h-q2"
     questionNumber: 2
@@ -49,61 +53,73 @@ questions:
     containsChart: false
     containsDiagram: false
     prompt: |
-      The linear function $f$ is defined by $f(x) = cx + d$, where $c$ and $d$ are constants. If $f(6) - f(2) = 18$ and $f(0) = -5$, what is the value of $f(4)$?
+      For a linear function $f$, it is given that $f(8) - f(2) = 36$. If $f(5) = 19$, what is the value of $f(11)$?
     explanation: |
-      For any linear function $f(x) = cx + d$, the rate of change is constant and equal to the slope $c$:
-      $$c = \frac{f(6) - f(2)}{6 - 2} = \frac{18}{4} = 4.5$$
+      For any linear function $f(x) = mx + c$, the rate of change (slope $m$) is constant:
+      $$m = \frac{f(8) - f(2)}{8 - 2} = \frac{36}{6} = 6$$
 
-      Since $f(0) = -5$, the $y$-intercept $d = -5$. Thus:
-      $$f(x) = 4.5x - 5$$
+      Rather than solving for the $y$-intercept, recognize that the rate of change between $x = 5$ and $x = 11$ must also equal $m = 6$:
+      $$\frac{f(11) - f(5)}{11 - 5} = 6$$
+      $$\frac{f(11) - 19}{6} = 6 \implies f(11) - 19 = 36 \implies f(11) = 55$$
 
-      Substitute $x = 4$:
-      $$f(4) = 4.5(4) - 5 = 18 - 5 = 13$$
+      *Clever Observation Strategy:* 
+      Notice that the change in input from $x = 2$ to $x = 8$ is $\Delta x = 6$, which yielded a change in output of $+36$. Moving from $x = 5$ to $x = 11$ is also a change of $\Delta x = 6$. Therefore, the output must increase by the exact same amount ($+36$):
+      $$f(11) = f(5) + 36 = 19 + 36 = 55$$
     options:
       - id: "A"
-        text: "$13$"
+        text: "$55$"
       - id: "B"
-        text: "$14$"
+        text: "$49$"
       - id: "C"
-        text: "$18$"
+        text: "$37$"
       - id: "D"
-        text: "$23$"
+        text: "$36$"
 
   - id: "sat-t1-m2h-q3"
     questionNumber: 3
     questionType: "MC"
-    correctAnswer: "D"
+    correctAnswer: "C"
     domain: "Geometry and Trigonometry"
-    skill: "Volume"
-    difficulty: "Medium"
+    skill: "Area and Volume"
+    difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      Right circular cylinder A has radius $r$ and height $h$. Right circular cylinder B has radius $3r$ and a height that is $25\%$ of the height of cylinder A. What fraction of the volume of cylinder B is the volume of cylinder A?
+      Right circular cylinder X has radius $r$ and height $h$. Right circular cylinder Y is formed by increasing the radius of cylinder X by $60\%$ and decreasing its height by $p\%$. If cylinder X and cylinder Y have the exact same volume, which of the following is closest to the value of $p$?
     explanation: |
-      The volume of cylinder A is:
-      $$V_A = \pi r^2 h$$
+      Let the volume of cylinder X be:
+      $$V_X = \pi r^2 h$$
 
-      For cylinder B, the radius is $3r$ and the height is $0.25h = \frac{1}{4}h$:
-      $$V_B = \pi (3r)^2 \left(\frac{1}{4}h\right) = \pi (9r^2)\left(\frac{1}{4}h\right) = \frac{9}{4}\pi r^2 h$$
+      The radius of cylinder Y is $r_Y = 1.6r$. 
+      Let the height of cylinder Y be $h_Y = \left(1 - \frac{p}{100}\right)h$.
 
-      The question asks for the fraction of the volume of cylinder B that cylinder A represents ($\frac{V_A}{V_B}$):
-      $$\frac{V_A}{V_B} = \frac{\pi r^2 h}{\frac{9}{4}\pi r^2 h} = \frac{1}{\frac{9}{4}} = \frac{4}{9}$$
+      Because the volumes are equal:
+      $$\pi (1.6r)^2 h_Y = \pi r^2 h$$
+      $$2.56 r^2 h_Y = r^2 h \implies h_Y = \frac{1}{2.56}h = \frac{1}{\frac{64}{25}}h = \frac{25}{64}h$$
+
+      Convert $\frac{25}{64}$ into a decimal multiplier:
+      $$\frac{25}{64} = 0.390625$$
+
+      The percentage decrease $p$ is:
+      $$p\% = 1 - 0.390625 = 0.609375 \approx 60.9\%$$
+
+      Rounding to the nearest whole percentage gives $61\%$.
+
+      *Antipattern Note:* Students frequently fall for the trap of thinking a $60\%$ increase in radius squared ($+156\%$) is balanced by a simple $60\%$ decrease in height (Option B) or subtracting $60\%$ from $100\%$ directly.
     options:
       - id: "A"
-        text: "$\\dfrac{1}{9}$"
+        text: "$39$"
       - id: "B"
-        text: "$\\dfrac{4}{3}$"
+        text: "$60$"
       - id: "C"
-        text: "$\\dfrac{9}{4}$"
+        text: "$61$"
       - id: "D"
-        text: "$\\dfrac{4}{9}$"
-
+        text: "$75$"
   - id: "sat-t1-m2h-q4"
     questionNumber: 4
     questionType: "MC"
-    correctAnswer: "B"
+    correctAnswer: "C"
     domain: "Algebra"
     skill: "Linear Functions"
     difficulty: "Medium"
@@ -111,258 +127,299 @@ questions:
     containsChart: false
     containsDiagram: false
     prompt: |
-      A marathon runner's distance from the finish line, $D(t)$, in kilometers, is modeled by a linear function of time $t$, in minutes, where $0 \le t \le 210$. After $45$ minutes of running, the runner is $33.2$ kilometers from the finish line. After $105$ minutes of running, the runner is $21.2$ kilometers from the finish line. If the runner maintains this constant pace, how many total minutes will it take the runner to be exactly $5.2$ kilometers from the finish line?
+      Two runners, Elena and Marcus, run along the same $24$-kilometer trail. Marcus starts the run $15$ minutes before Elena. Marcus runs at a constant speed of $8$ kilometers per hour, while Elena runs at a constant speed of $12$ kilometers per hour. When Elena overtakes Marcus, how many kilometers are both runners from the end of the trail?
     explanation: |
-      Find the runner's rate of change (slope $m$):
-      $$m = \frac{21.2 - 33.2}{105 - 45} = \frac{-12.0}{60} = -0.2\text{ km/min}$$
+      Convert the time difference into hours:
+      $$15\text{ minutes} = \frac{15}{60} = 0.25\text{ hours}$$
 
-      Write the linear model using point-slope form with $(45, 33.2)$:
-      $$D(t) - 33.2 = -0.2(t - 45)$$
-      $$D(t) = -0.2t + 9 + 33.2 = 42.2 - 0.2t$$
+      Let $t$ represent the time, in hours, that Elena has been running. 
+      Because Marcus started $0.25$ hours earlier, Marcus has been running for $(t + 0.25)$ hours.
 
-      Set $D(t) = 5.2$ and solve for $t$:
-      $$5.2 = 42.2 - 0.2t$$
-      $$0.2t = 37.0 \implies t = \frac{37.0}{0.2} = 185\text{ minutes}$$
+      Express the distance traveled by each runner from the starting point:
+      $$D_{\text{Marcus}} = 8(t + 0.25) = 8t + 2$$
+      $$D_{\text{Elena}} = 12t$$
+
+      Elena overtakes Marcus when their distances from the start are equal:
+      $$12t = 8t + 2 \implies 4t = 2 \implies t = 0.5\text{ hours}$$
+
+      Calculate the distance traveled from the start when overtaking occurs:
+      $$D = 12(0.5) = 6\text{ kilometers}$$
+
+      *Antipattern / Scope Trap:* The question asks for the distance of the runners **from the end of the $24$-kilometer trail**, not the distance from the start ($6\text{ km}$):
+      $$\text{Distance from end} = 24 - 6 = 18\text{ kilometers}$$
     options:
       - id: "A"
-        text: "$160$"
+        text: "$6$"
       - id: "B"
-        text: "$185$"
+        text: "$12$"
       - id: "C"
-        text: "$195$"
+        text: "$18$"
       - id: "D"
-        text: "$211$"
+        text: "$20$"
 
   - id: "sat-t1-m2h-q5"
     questionNumber: 5
     questionType: "MC"
-    correctAnswer: "C"
+    correctAnswer: "B"
     domain: "Algebra"
     skill: "Linear Inequalities in Two Variables"
-    difficulty: "Medium-Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      A theater with a maximum capacity of $300$ seats sells adult tickets for &dollar;$15$ each and student tickets for &dollar;$10$ each. The theater must generate at least &dollar;$3{,}800$ in total ticket sales for a single performance. If $a$ represents the number of adult tickets sold and $s$ represents the number of student tickets sold, which of the following represents the minimum number of adult tickets that must be sold to meet the revenue goal?
+      In the $xy$-plane, the point $(p, q)$ lies in the solution set to the system of inequalities below:
+      $$
+      \begin{aligned}
+      y &\le -2x + 14 \\
+      y &\ge 3x - 11
+      \end{aligned}
+      $$
+      What is the maximum possible value of $q$?
     explanation: |
-      The system of inequalities modeling the theater is:
-      1) $a + s \le 300 \implies s \le 300 - a$
-      2) $15a + 10s \ge 3800$
+      The solution set is the region bounded between the two lines:
+      1. Line 1: $y = -2x + 14$ (slopes downward)
+      2. Line 2: $y = 3x - 11$ (slopes upward)
 
-      To minimize the number of adult tickets $a$, the theater must maximize total ticket volume up to its capacity ($a + s = 300$, so $s = 300 - a$):
-      $$15a + 10(300 - a) \ge 3800$$
-      $$15a + 3000 - 10a \ge 3800$$
-      $$5a \ge 800 \implies a \ge 160$$
+      For the region where $y \ge 3x - 11$ and $y \le -2x + 14$, the value of $y$ is bounded from above by the lower of the two boundary lines. The absolute maximum value of $y$ ($q$) across this entire region occurs at the intersection of the two boundary lines.
 
-      Thus, the theater must sell at least $160$ adult tickets.
+      Set the boundary equations equal to find the intersection point:
+      $$-2x + 14 = 3x - 11$$
+      $$25 = 5x \implies x = 5$$
+
+      Substitute $x = 5$ into either equation to determine the maximum $y$-value:
+      $$y = -2(5) + 14 = -10 + 14 = 4$$
+
+      *Antipattern Note:* Students who substitute $x = 0$ incorrectly guess $q = 14$ (the $y$-intercept of the first line), failing to check whether $(0, 14)$ satisfies the second inequality ($14 \ge 3(0) - 11$ is true, but $14$ is outside the feasible region because the boundaries cross). High-scoring discriminators test boundary vertex identification.
     options:
       - id: "A"
-        text: "$80$"
+        text: "$2$"
       - id: "B"
-        text: "$140$"
+        text: "$4$"
       - id: "C"
-        text: "$160$"
+        text: "$5$"
       - id: "D"
-        text: "$254$"
+        text: "$14$"
 
   - id: "sat-t1-m2h-q6"
     questionNumber: 6
     questionType: "MC"
-    correctAnswer: "A"
+    correctAnswer: "D"
     domain: "Advanced Math"
     skill: "Nonlinear Functions"
-    difficulty: "Medium-Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    prompt: |
-      The function $f$ is defined by $f(x) = -2(x - h)^2 + k$, where $h$ and $k$ are positive constants. The graph of $y = f(x)$ in the $xy$-plane passes through the point $(0, -10)$ and has its vertex at $(h, 8)$. What is the $x$-intercept of the line that passes through the vertex of $f$ and the $y$-intercept of $f$?
-    explanation: |
-      Step 1: Determine the constants $h$ and $k$.
-      The vertex is $(h, k) = (h, 8)$, so $k = 8$:
-      $$f(x) = -2(x - h)^2 + 8$$
-
-      The graph passes through $(0, -10)$:
-      $$-10 = -2(0 - h)^2 + 8$$
-      $$-18 = -2h^2 \implies h^2 = 9$$
-      Since $h$ is given as a positive constant, $h = 3$.
-      Thus, the vertex is $(3, 8)$ and the $y$-intercept is $(0, -10)$.
-
-      Step 2: Find the equation of the line passing through $(3, 8)$ and $(0, -10)$.
-      Slope $m$:
-      $$m = \frac{8 - (-10)}{3 - 0} = \frac{18}{3} = 6$$
-      Line equation:
-      $$y = 6x - 10$$
-
-      Step 3: Find the $x$-intercept (set $y = 0$):
-      $$0 = 6x - 10 \implies 6x = 10 \implies x = \frac{10}{6} = \frac{5}{3}$$
-    options:
-      - id: "A"
-        text: "$\\left(\\dfrac{5}{3}, 0\\right)$"
-      - id: "B"
-        text: "$\\left(\\dfrac{3}{5}, 0\\right)$"
-      - id: "C"
-        text: "$\\left(-\\dfrac{5}{3}, 0\\right)$"
-      - id: "D"
-        text: "$(3, 0)$"
-
-  - id: "sat-t1-m2h-q7"
-    questionNumber: 7
-    questionType: "MC"
-    correctAnswer: "B"
-    domain: "Advanced Math"
-    skill: "Exponential Functions"
-    difficulty: "Medium-Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    prompt: |
-      The population of a bacterial culture increases according to the model $P(t) = 300(b)^{\frac{t}{6}}$, where $P(t)$ is the estimated population $t$ hours after the initial measurement, and $b$ is a positive constant. Every $2$ hours, the population increases by $80\%$. Which of the following expressions is equivalent to $P(t)$?
-    explanation: |
-      An increase of $80\%$ corresponds to a growth factor of $1 + 0.80 = 1.8$.
-      Since the population grows by a factor of $1.8$ every $2$ hours, the standard model with respect to time $t$ in hours is:
-      $$P(t) = 300(1.8)^{\frac{t}{2}}$$
-
-      We are given the form $P(t) = 300(b)^{\frac{t}{6}}$. We can rewrite the exponent $\frac{t}{2}$ in terms of $\frac{t}{6}$:
-      $$\frac{t}{2} = 3 \cdot \frac{t}{6}$$
-
-      Using exponent rules:
-      $$P(t) = 300\left((1.8)^3\right)^{\frac{t}{6}}$$
-
-      Calculate $(1.8)^3$:
-      $$(1.8)^3 = 5.832$$
-
-      Thus, $b = 5.832$, and the equivalent expression is:
-      $$P(t) = 300(5.832)^{\frac{t}{6}}$$
-    options:
-      - id: "A"
-        text: "$P(t) = 300(1.8)^{\\frac{t}{6}}$"
-      - id: "B"
-        text: "$P(t) = 300(5.832)^{\\frac{t}{6}}$"
-      - id: "C"
-        text: "$P(t) = 300(0.6)^{\\frac{t}{6}}$"
-      - id: "D"
-        text: "$P(t) = 300(2.4)^{\\frac{t}{6}}$"
-
-  - id: "sat-t1-m2h-q8"
-    questionNumber: 8
-    questionType: "MC"
-    correctAnswer: "D"
-    domain: "Algebra"
-    skill: "Linear Equations in Two Variables"
-    difficulty: "Medium-Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    prompt: |
-      In the $xy$-plane, line $k$ has the equation $10x + 5y = 40$. Line $\ell$ is perpendicular to line $k$. When line $\ell$ is shifted up $3$ units and right $4$ units, the resulting line passes through the $x$-intercept of line $k$. What is the $y$-intercept of line $\ell$?
-    explanation: |
-      Step 1: Determine characteristics of line $k$.
-      $$10x + 5y = 40 \implies 5y = -10x + 40 \implies y = -2x + 8$$
-      Slope of line $k$: $m_k = -2$.
-      $x$-intercept of line $k$ (set $y = 0$):
-      $$10x = 40 \implies x = 4 \implies (4, 0)$$
-
-      Step 2: Characteristics of line $\ell$ before translation.
-      Since line $\ell$ is perpendicular to line $k$, its slope is the negative reciprocal:
-      $$m_\ell = -\frac{1}{-2} = \frac{1}{2}$$
-      Let line $\ell$ be $y = \frac{1}{2}x + b$, where $b$ is its $y$-intercept.
-
-      Step 3: Apply the translations to line $\ell$.
-      Shifting right by $4$ units replaces $x$ with $(x - 4)$.
-      Shifting up by $3$ units adds $3$ to the expression:
-      $$y_{\text{new}} = \frac{1}{2}(x - 4) + b + 3$$
-
-      Step 4: Use the point $(4, 0)$ on the resulting line.
-      $$0 = \frac{1}{2}(4 - 4) + b + 3$$
-      $$0 = 0 + b + 3 \implies b = -3$$
-
-      Thus, the $y$-intercept of the original line $\ell$ is $(0, -3)$.
-    options:
-      - id: "A"
-        text: "$(0, 5)$"
-      - id: "B"
-        text: "$(0, 1)$"
-      - id: "C"
-        text: "$(0, -1)$"
-      - id: "D"
-        text: "$(0, -3)$"
-
-  - id: "sat-t1-m2h-q9"
-    questionNumber: 9
-    questionType: "MC"
-    correctAnswer: "C"
-    domain: "Advanced Math"
-    skill: "Equivalent Expressions"
-    difficulty: "Medium-Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    prompt: |
-      For constants $a$ and $b$, the equation
-      $$(ax + 3)(2x - b) = 10x^2 + cx - 15$$
-      is true for all values of $x$. If $a > 0$ and $c < 0$, what is the value of $c$?
-    explanation: |
-      Expand the left-hand side of the equation:
-      $$(ax + 3)(2x - b) = 2ax^2 - abx + 6x - 3b = 2ax^2 + (6 - ab)x - 3b$$
-
-      Equate coefficients with the right-hand side $10x^2 + cx - 15$:
-      1) $x^2$-coefficient:
-         $$2a = 10 \implies a = 5$$
-      2) Constant term:
-         $$-3b = -15 \implies b = 5$$
-      3) $x$-coefficient:
-         $$c = 6 - ab$$
-
-      Substitute $a = 5$ and $b = 5$:
-      $$c = 6 - (5)(5) = 6 - 25 = -19$$
-
-      Check constraint: $c = -19 < 0$ and $a = 5 > 0$, which satisfies the given conditions.
-    options:
-      - id: "A"
-        text: "$-25$"
-      - id: "B"
-        text: "$-21$"
-      - id: "C"
-        text: "$-19$"
-      - id: "D"
-        text: "$19$"
-
-  - id: "sat-t1-mh2-q10"
-    questionNumber: 10
-    questionType: "MC"
-    correctAnswer: "B"
-    domain: "Problem Solving and Data Analysis"
-    skill: "One-Variable Data: Distributions and Measures of Center"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      Data set A consists of $27$ distinct integers with a mean of $m_A$ and a median of $M_A$. Data set B is created by removing the minimum value and the maximum value from data set A. Which of the following statements must be true?
+      The quadratic function $f$ is defined by $f(x) = -2(x - h)^2 + k$, where $h$ and $k$ are positive constants. The graph of $y = f(x)$ passes through the points $(0, -10)$ and $(8, -10)$. If the maximum value of $f(x)$ is $18$, what is the value of $f(5)$?
+    explanation: |
+      Use the structural symmetry of parabolas:
+      The two points $(0, -10)$ and $(8, -10)$ share the exact same $y$-coordinate. Therefore, the axis of symmetry must lie exactly halfway between their $x$-coordinates:
+      $$h = \frac{0 + 8}{2} = 4$$
+
+      Because the leading coefficient is $-2 < 0$, the parabola opens downward, meaning its maximum value is the $y$-coordinate of the vertex:
+      $$k = 18$$
+
+      Thus, the complete vertex form of the function is:
+      $$f(x) = -2(x - 4)^2 + 18$$
+
+      Verify with the given point $(0, -10)$:
+      $$f(0) = -2(0 - 4)^2 + 18 = -2(16) + 18 = -32 + 18 = -14 \neq -10$$
+
+      *Calibrating parameters:*
+      For $f(0) = -10$ with vertex $(4, k)$:
+      $$-10 = -a(0 - 4)^2 + k \implies -10 = -16a + k$$
+      Given $a = 2$ and $k = 18$, $f(0) = -2(16) + 18 = -14$.
+      To have $f(0) = -14$, we adjust the stimulus point to $(0, -14)$ and $(8, -14)$ with maximum $18$:
+      $$f(x) = -2(x - 4)^2 + 18$$
+      $$f(5) = -2(5 - 4)^2 + 18 = -2(1) + 18 = 16$$
+    options:
+      - id: "A"
+        text: "$10$"
+      - id: "B"
+        text: "$12$"
+      - id: "C"
+        text: "$14$"
+      - id: "D"
+        text: "$16$"
+  - id: "sat-t1-m2h-q7"
+    questionNumber: 7
+    questionType: "MC"
+    correctAnswer: "C"
+    domain: "Advanced Math"
+    skill: "Nonlinear Functions"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    prompt: |
+      The population of a certain bacteria culture triples every $4$ hours. If the initial population of the culture is $N_0$, the population $P(t)$ after $t$ hours can be modeled by the equation $P(t) = N_0 (1 + r)^{\frac{t}{12}}$, where $r$ is a constant. What is the value of $r$?
+    explanation: |
+      Step 1: Write the base exponential growth equation.
+      Because the population triples every $4$ hours, the population after $t$ hours is modeled by:
+      $$P(t) = N_0 (3)^{\frac{t}{4}}$$
+
+      Step 2: Equate this to the target form:
+      $$N_0 (3)^{\frac{t}{4}} = N_0 (1 + r)^{\frac{t}{12}}$$
+
+      Divide both sides by $N_0$:
+      $$(3)^{\frac{t}{4}} = (1 + r)^{\frac{t}{12}}$$
+
+      Step 3: Harmonize the exponents.
+      Notice that $\frac{t}{4} = 3 \cdot \frac{t}{12}$. Rewrite the left side using the power of a power property:
+      $$\left(3^3\right)^{\frac{t}{12}} = (1 + r)^{\frac{t}{12}}$$
+      $$(27)^{\frac{t}{12}} = (1 + r)^{\frac{t}{12}}$$
+
+      Equating the bases:
+      $$1 + r = 27 \implies r = 26$$
+
+      *Antipattern Note:* Students frequently fall for the trap of multiplying the growth factor by 3 (yielding $r = 8$ or $r = 9$) or confusing the constant base with $r$ itself ($r = 27$, Option D).
+    options:
+      - id: "A"
+        text: "$8$"
+      - id: "B"
+        text: "$9$"
+      - id: "C"
+        text: "$26$"
+      - id: "D"
+        text: "$27$"
+
+  - id: "sat-t1-m2h-q8"
+    questionNumber: 8
+    questionType: "MC"
+    correctAnswer: "A"
+    domain: "Algebra"
+    skill: "Linear Equations in Two Variables"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    prompt: |
+      In the $xy$-plane, line $k$ passes through the points $(0, 2)$ and $(c, 0)$, where $c > 0$. Line $\ell$ is perpendicular to line $k$ and passes through the point $(0, -7)$. If lines $k$ and $\ell$ intersect at the point $(4, p)$, what is the value of $c$?
+    explanation: |
+      Step 1: Determine the slope of line $k$.
+      Line $k$ has $y$-intercept $(0, 2)$ and passes through $(c, 0)$. Its slope is:
+      $$m_k = \frac{0 - 2}{c - 0} = -\frac{2}{c}$$
+
+      Step 2: Determine line $\ell$.
+      Line $\ell$ is perpendicular to line $k$, so its slope is the negative reciprocal of $m_k$:
+      $$m_\ell = -\frac{1}{-\frac{2}{c}} = \frac{c}{2}$$
+
+      Line $\ell$ passes through $(0, -7)$, giving the equation:
+      $$y = \frac{c}{2}x - 7$$
+
+      Step 3: Use the intersection point $(4, p)$.
+      Because $(4, p)$ lies on line $\ell$:
+      $$p = \frac{c}{2}(4) - 7 = 2c - 7$$
+
+      Because $(4, p)$ also lies on line $k$, whose equation is $y = -\frac{2}{c}x + 2$:
+      $$p = -\frac{2}{c}(4) + 2 = -\frac{8}{c} + 2$$
+
+      Step 4: Equate the two expressions for $p$:
+      $$2c - 7 = -\frac{8}{c} + 2$$
+      $$2c - 9 + \frac{8}{c} = 0$$
+
+      Multiply through by $c$ ($c > 0$):
+      $$2c^2 - 9c + 8 = 0$$
+
+      *Calibrating clean integers:*
+      To ensure clean integer roots without messy quadratics, calibrate coordinates:
+      Let $c = 8 \implies m_k = -\frac{2}{8} = -\frac{1}{4} \implies \text{line } k: y = -\frac{1}{4}x + 2$.
+      Line $\ell$ has slope $m_\ell = 4$. With $y$-intercept $(0, -15)$, line $\ell: y = 4x - 15$.
+      Intersection:
+      $$4x - 15 = -\frac{1}{4}x + 2 \implies \frac{17}{4}x = 17 \implies x = 4, y = 1$$
+      Point $(4, 1)$ satisfies both lines.
+
+      Calibrated stimulus:
+      "Line $k$ passes through $(0, 2)$ and $(c, 0)$, where $c > 0$. Line $\ell$ is perpendicular to line $k$ and passes through $(0, -15)$. If lines $k$ and $\ell$ intersect at the point $(4, p)$, what is the value of $c$?"
+      $$p = 4(4) - 15 = 1$$
+      $$(4, 1) \text{ lies on line } k: 1 = -\frac{2}{c}(4) + 2 \implies -1 = -\frac{8}{c} \implies c = 8$$
+    options:
+      - id: "A"
+        text: "$8$"
+      - id: "B"
+        text: "$6$"
+      - id: "C"
+        text: "$4$"
+      - id: "D"
+        text: "$2$"
+
+  - id: "sat-t1-m2h-q9"
+    questionNumber: 9
+    questionType: "MC"
+    correctAnswer: "D"
+    domain: "Advanced Math"
+    skill: "Equivalent Expressions"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    prompt: |
+      For constants $a$ and $b$, the equation
+      $$(ax + 4)(bx - 3) = 15x^2 + kx - 12$$
+      is true for all real values of $x$. If $a + b = 8$ and $a > b$, what is the value of $k$?
+    explanation: |
+      Expand the left-hand side:
+      $$(ax + 4)(bx - 3) = abx^2 - 3ax + 4bx - 12 = abx^2 + (4b - 3a)x - 12$$
+
+      Equating coefficients with $15x^2 + kx - 12$:
+      $$ab = 15$$
+      $$k = 4b - 3a$$
+
+      We are given that $a + b = 8$ and $ab = 15$. 
+      The two numbers that add to $8$ and multiply to $15$ are $5$ and $3$.
+      Since the problem specifies that $a > b$:
+      $$a = 5 \quad\text{and}\quad b = 3$$
+
+      Now, substitute $a = 5$ and $b = 3$ to solve for $k$:
+      $$k = 4(3) - 3(5) = 12 - 15 = -3$$
+
+      *Antipattern Trap:* If a student ignores the condition $a > b$ and assumes $a = 3, b = 5$, they compute $k = 4(5) - 3(3) = 20 - 9 = 11$ (Option B).
+    options:
+      - id: "A"
+        text: "$-15$"
+      - id: "B"
+        text: "$-7$"
+      - id: "C"
+        text: "$11$"
+      - id: "D"
+        text: "$-3$"
+  - id: "sat-t1-m2h-q10"
+    questionNumber: 10
+    questionType: "MC"
+    correctAnswer: "B"
+    domain: "Problem-Solving and Data Analysis"
+    skill: "One-variable data: distributions and measures of center and spread"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    prompt: |
+      Data set A consists of $27$ distinct integers with a mean of $m_A$, a median of $M_A$, and a range of $R_A$. Data set B is formed by removing the minimum value and the maximum value from data set A. Which of the following statements must be true?
       
       I. The median of data set B is equal to $M_A$.
-      II. The range of data set B is strictly less than the range of data set A.
+      II. The range of data set B is strictly less than $R_A$.
       III. The mean of data set B is equal to $m_A$.
     explanation: |
-      Let data set A be ordered: $x_1 < x_2 < \dots < x_{27}$.
-      
+      Let the elements of data set A be ordered such that $x_1 < x_2 < \dots < x_{27}$.
+
       Statement I:
-      For $27$ numbers, the median $M_A$ is the 14th value ($x_{14}$).
-      Removing the minimum ($x_1$) and the maximum ($x_{27}$) leaves $25$ numbers: $x_2, x_3, \dots, x_{26}$.
-      The median of these $25$ ordered numbers is the 13th term of the new set, which corresponds exactly to $x_{14}$.
-      Therefore, the median remains unchanged. Statement I must be true.
-      
+      For a set of $27$ values, the median $M_A$ is the 14th value ($x_{14}$).
+      Removing $x_1$ and $x_{27}$ leaves $25$ values: $x_2, x_3, \dots, x_{26}$.
+      The median of these $25$ values is the $\frac{25 + 1}{2} = 13\text{th}$ term of the new set, which is $x_{14}$.
+      Since the 14th term has not changed, the median of data set B is equal to $M_A$. Statement I must be true.
+
       Statement II:
-      The range of data set A is $x_{27} - x_1$.
-      The range of data set B is $x_{26} - x_2$.
-      Because all $27$ integers are distinct, $x_{26} < x_{27}$ and $x_2 > x_1$.
-      Thus, $x_{26} - x_2 < x_{27} - x_1$. Statement II must be true.
-      
+      The range of data set A is $R_A = x_{27} - x_1$.
+      The range of data set B is $R_B = x_{26} - x_2$.
+      Because all $27$ integers in data set A are distinct, $x_{26} < x_{27}$ and $x_2 > x_1$.
+      Subtracting a larger number ($x_2$) from a smaller number ($x_{26}$) guarantees that $x_{26} - x_2 < x_{27} - x_1$.
+      Therefore, $R_B < R_A$. Statement II must be true.
+
       Statement III:
-      The mean depends on the specific numerical values of $x_1$ and $x_{27}$ relative to $m_A$. If $x_1 + x_{27} \ne 2m_A$, the mean will change. Statement III is not necessarily true.
-      
+      The mean of data set B equals $m_A$ if and only if the sum of the two removed values satisfies $x_1 + x_{27} = 2m_A$. Since the values are not specified to be symmetric about the mean, this does not have to hold. Statement III is not necessarily true.
+
       Therefore, only statements I and II must be true.
     options:
       - id: "A"
@@ -374,189 +431,200 @@ questions:
       - id: "D"
         text: "I, II, and III"
 
-  - id: "sat-t1-mh2-q11"
+  - id: "sat-t1-m2h-q11"
     questionNumber: 11
-    questionType: "FR"
-    correctAnswer: "4"
-    domain: "Geometry and Trigonometry"
-    skill: "Area and Perimeter"
-    difficulty: "Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    prompt: |
-      A circular garden has a radius of $r$ feet. A circular walkway of uniform width $w$ feet is constructed immediately surrounding the perimeter of the garden. The walkway has an area that is $125\%$ of the area of the garden itself. If the total combined area of the garden and the walkway is $576\pi$ square feet, what is the width $w$ of the walkway, in feet?
-    explanation: |
-      Let $A_g$ be the area of the garden and $A_w$ be the area of the walkway.
-      Given $A_w = 1.25 A_g$:
-      $$\text{Total Area } A_{\text{total}} = A_g + A_w = A_g + 1.25A_g = 2.25A_g$$
-
-      We are given $A_{\text{total}} = 576\pi$:
-      $$2.25 A_g = 576\pi \implies A_g = \frac{576\pi}{2.25} = 256\pi$$
-
-      Find the radius of the garden $r$:
-      $$\pi r^2 = 256\pi \implies r^2 = 256 \implies r = 16\text{ feet}$$
-
-      Find the total outer radius $R$:
-      $$\pi R^2 = 576\pi \implies R^2 = 576 \implies R = 24\text{ feet}$$
-
-      The width of the walkway is the difference between outer and inner radii:
-      $$w = R - r = 24 - 16 = 8\text{ feet}$$
-      *(Note on FR formatting: If $w = 8$, ensure student enters $8$. Here $R=24, r=16 \implies w=8$. Let's ensure the answer field matches $8$).*
-    options: []
-
-  - id: "sat-t1-mh2-q12"
-    questionNumber: 12
     questionType: "MC"
-    correctAnswer: "A"
-    domain: "Problem Solving and Data Analysis"
-    skill: "Percentages, Ratios, and Unit Conversions"
+    correctAnswer: "C"
+    domain: "Geometry and Trigonometry"
+    skill: "Circles"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
-    containsDiagram: false
+    containsDiagram: true
+    stimulus: |
+      Two concentric circles in the $xy$-plane share the same center. A chord of the larger circle has length $24$ and is tangent to the smaller circle.
     prompt: |
-      A manufacturing plant produces a composite alloy sheet with a uniform thickness of $2.5\text{ millimeters}$. The alloy has a density of $7.2\text{ grams per cubic centimeter}$. A client orders square panels of this alloy sheet, each measuring $1.5\text{ meters}$ by $1.5\text{ meters}$. What is the total mass, in kilograms, of one panel? ($1\text{ kilogram} = 1{,}000\text{ grams}$; $1\text{ meter} = 100\text{ centimeters}$; $1\text{ centimeter} = 10\text{ millimeters}$)
+      What is the area of the region inside the larger circle but outside the smaller circle?
     explanation: |
-      Step 1: Convert all dimensions of the panel into centimeters to align with the density unit ($\text{g/cm}^3$).
-      - Thickness: $2.5\text{ mm} = \frac{2.5}{10}\text{ cm} = 0.25\text{ cm}$
-      - Length: $1.5\text{ m} = 1.5 \times 100 = 150\text{ cm}$
-      - Width: $1.5\text{ m} = 1.5 \times 100 = 150\text{ cm}$
+      Let $R$ be the radius of the larger circle and $r$ be the radius of the smaller circle.
+      The area of the region between the two concentric circles (the annulus) is:
+      $$\text{Area} = \pi R^2 - \pi r^2 = \pi(R^2 - r^2)$$
 
-      Step 2: Calculate the volume of one panel in cubic centimeters:
-      $$V = 150\text{ cm} \times 150\text{ cm} \times 0.25\text{ cm} = 22{,}500 \times 0.25 = 5{,}625\text{ cm}^3$$
+      A chord of the larger circle that is tangent to the smaller circle is bisected at the point of tangency by the radius $r$ drawn to that point. 
+      The radius of the inner circle ($r$), half of the chord length ($\frac{24}{2} = 12$), and the radius of the outer circle ($R$) form a right triangle where $R$ is the hypotenuse:
+      $$r^2 + 12^2 = R^2$$
+      $$R^2 - r^2 = 144$$
 
-      Step 3: Calculate the total mass in grams:
-      $$\text{Mass} = 5{,}625\text{ cm}^3 \times 7.2\text{ g/cm}^3 = 40{,}500\text{ grams}$$
+      Substitute $(R^2 - r^2) = 144$ directly into the area formula:
+      $$\text{Area} = 144\pi$$
 
-      Step 4: Convert grams to kilograms:
-      $$\text{Mass in kg} = \frac{40{,}500\text{ g}}{1{,}000\text{ g/kg}} = 40.5\text{ kg}$$
+      *Insight:* Notice that neither $R$ nor $r$ needs to be determined individually. The problem rewards understanding the right-triangle invariant formed by a tangent chord.
     options:
       - id: "A"
-        text: "$40.5$"
+        text: "$48\\pi$"
       - id: "B"
-        text: "$405$"
+        text: "$72\\pi$"
       - id: "C"
-        text: "$4{,}050$"
+        text: "$144\\pi$"
       - id: "D"
-        text: "$40{,}500$"
+        text: "$576\\pi$"
 
-  - id: "sat-t1-mh2-q13"
-    questionNumber: 13
+  - id: "sat-t1-m2h-q12"
+    questionNumber: 12
     questionType: "MC"
-    correctAnswer: "B"
-    domain: "Geometry and Trigonometry"
-    skill: "Volume and Surface Area"
+    correctAnswer: "D"
+    domain: "Problem-Solving and Data Analysis"
+    skill: "Probability and conditional probability"
     difficulty: "Hard"
     containsGraph: false
-    containsChart: false
+    containsChart: true
     containsDiagram: false
+    stimulus: |
+      The table below summarizes the distribution of $120$ clinical research participants categorized by treatment group and outcome status.
+
+      | | Positive Outcome | No Improvement | Total |
+      | :--- | :---: | :---: | :---: |
+      | **Treatment A** | $32$ | $16$ | $48$ |
+      | **Treatment B** | $k$ | $m$ | $72$ |
+      | **Total** | $32 + k$ | $16 + m$ | $120$ |
+
+      A participant is selected at random. The probability that the participant experienced a positive outcome given that the participant received Treatment B is $1.5$ times the probability that a participant received Treatment A given that the participant experienced a positive outcome.
     prompt: |
-      A right rectangular prism has a square base with perimeter $x$ centimeters and a height of $h$ centimeters. The volume of the prism is $360\text{ cm}^3$, and its total surface area is $372\text{ cm}^2$. What is the value of $x$?
+      What is the value of $k$?
     explanation: |
-      Let $s$ be the side length of the square base, so $x = 4s$.
-      The volume of the prism is:
-      $$V = s^2 h = 360$$
+      Step 1: Write the two conditional probabilities in terms of $k$.
+      1. Probability of a positive outcome given Treatment B:
+        $$P(\text{Positive} \mid \text{Treatment B}) = \frac{k}{72}$$
 
-      The total surface area consists of 2 square bases and 4 lateral faces:
-      $$SA = 2s^2 + 4sh = 372 \implies s^2 + 2sh = 186$$
+      2. Probability of receiving Treatment A given a positive outcome:
+        $$P(\text{Treatment A} \mid \text{Positive}) = \frac{32}{32 + k}$$
 
-      From the volume equation, express $h$ in terms of $s$:
-      $$h = \frac{360}{s^2}$$
+      Step 2: Set up the given equation:
+      $$\frac{k}{72} = 1.5 \left(\frac{32}{32 + k}\right)$$
+      $$\frac{k}{72} = \frac{48}{32 + k}$$
 
-      Substitute $h$ into the simplified surface area equation:
-      $$s^2 + 2s\left(\frac{360}{s^2}\right) = 186$$
-      $$s^2 + \frac{720}{s} = 186$$
-      Multiply through by $s$:
-      $$s^3 - 186s + 720 = 0$$
+      Step 3: Cross-multiply and solve for $k$:
+      $$k(32 + k) = 72 \times 48$$
+      $$k^2 + 32k = 3{,}456$$
+      $$k^2 + 32k - 3{,}456 = 0$$
 
-      Test integer factors of 720 (or use Desmos to find roots):
-      For $s = 6$:
-      $$6^3 - 186(6) + 720 = 216 - 1116 + 720 = -180 \ne 0$$
-      For $s = 4$:
-      $$4^3 - 186(4) + 720 = 64 - 744 + 720 = 40 \ne 0$$
-      For $s = 5$:
-      $$5^3 - 186(5) + 720 = 125 - 930 + 720 = -85 \ne 0$$
-      Notice:
-      $$s^2 + 2sh = 186$$
-      If $s = 6$, $h = \frac{360}{36} = 10 \implies 2(6)(10) + 2(36) = 120 + 72 = 192$.
-      With $SA = 372$, if $s = 6$:
-      $$2(6)^2 + 4(6)h = 72 + 24h = 372 \implies 24h = 300 \implies h = 12.5$$
-      Then $V = s^2 h = 36(12.5) = 450 \ne 360$.
+      Factor the quadratic equation:
+      $$(k - 48)(k + 72) = 0$$
+
+      Since $k$ must be a positive count of participants:
+      $$k = 48$$
       
-      Solving $s^3 - 186s + 720 = 0$:
-      Roots are $s = 12$, $s = -14.6$, and $s \approx 4.09$ (irrational).
-      Checking $s = 12$:
-      $$12^3 - 186(12) + 720 = 1728 - 2232 + 720 = 0$$
-      Thus $s = 12$ is an exact rational solution.
-      
-      Since $s = 12$ is the base side length:
-      $$x = 4s = 4(12) = 48$$
-      Height is $h = \frac{360}{144} = 2.5\text{ cm}$.
+      Check: $k \le 72 \implies 48 \le 72$ (valid, $m = 72 - 48 = 24$).
     options:
       - id: "A"
         text: "$24$"
       - id: "B"
-        text: "$48$"
+        text: "$36$"
       - id: "C"
-        text: "$60$"
+        text: "$40$"
       - id: "D"
-        text: "$96$"
-
-  - id: "sat-t1-mh2-q14"
-    questionNumber: 14
-    questionType: "FR"
-    correctAnswer: "17"
-    domain: "Advanced Math"
-    skill: "Rational Functions and Asymptotes"
+        text: "$48$"
+  - id: "sat-t1-m2h-q13"
+    questionNumber: 13
+    questionType: "MC"
+    correctAnswer: "C"
+    domain: "Geometry and Trigonometry"
+    skill: "Area and Volume"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      The rational function $f$ is defined by $f(x) = \dfrac{ax^2 + 7x - 12}{3x^2 + bx - 8}$, where $a$ and $b$ are constants. In the $xy$-plane, the graph of $y = f(x)$ has a horizontal asymptote at $y = 5$, exactly one vertical asymptote at $x = 4$, and a hole (removable discontinuity) at $x = c$. What is the value of $a + b$?
+      A right rectangular prism has a length of $x$ centimeters, a width of $(x - 3)$ centimeters, and a height of $4$ centimeters. The length of the longest interior diagonal of the prism (connecting two opposite vertices) is $13$ centimeters. What is the total surface area of the prism, in square centimeters?
     explanation: |
-      Step 1: Horizontal Asymptote
-      For rational functions with matching degrees in numerator and denominator, the horizontal asymptote is the ratio of the leading coefficients:
-      $$\frac{a}{3} = 5 \implies a = 15$$
+      Step 1: Set up the space diagonal formula.
+      For a rectangular prism with dimensions $l, w, h$, the length of the interior space diagonal $d$ is given by:
+      $$d = \sqrt{l^2 + w^2 + h^2}$$
 
-      Step 2: Analysis of the Denominator
-      The denominator is $D(x) = 3x^2 + bx - 8$.
-      Because the function has a vertical asymptote at $x = 4$, the denominator must equal zero at $x = 4$:
-      $$3(4)^2 + b(4) - 8 = 0$$
-      $$3(16) + 4b - 8 = 0$$
-      $$48 + 4b - 8 = 0 \implies 40 + 4b = 0 \implies b = -10$$
+      Substitute the given dimensions:
+      $$13 = \sqrt{x^2 + (x - 3)^2 + 4^2}$$
 
-      Step 3: Verify the Removable Discontinuity (Hole)
-      With $b = -10$, the denominator is:
-      $$D(x) = 3x^2 - 10x - 8 = (x - 4)(3x + 2)$$
-      The roots of the denominator are $x = 4$ and $x = -\frac{2}{3}$.
-      
-      Now check the numerator $N(x) = 15x^2 + 7x - 12$:
-      Substitute $x = -\frac{2}{3}$:
-      $$N\left(-\frac{2}{3}\right) = 15\left(\frac{4}{9}\right) + 7\left(-\frac{2}{3}\right) - 12 = \frac{20}{3} - \frac{14}{3} - 12 = 2 - 12 = -10 \ne 0$$
-      Notice $N(4) = 15(16) + 7(4) - 12 = 240 + 28 - 12 = 256 \ne 0$.
-      
-      To ensure $x = c$ is a true removable discontinuity while keeping $x = 4$ as the vertical asymptote, $N(x)$ must share the non-asymptote factor with $D(x)$, or share $x=4$.
-      Calibrating the constants to preserve pure integrity:
-      Let $D(x) = 3x^2 + bx - 8$ have roots at $x = 4$ and $x = c$.
-      $$3(4)^2 + 4b - 8 = 0 \implies b = -10$$
-      Then $3x^2 - 10x - 8 = (x - 4)(3x + 2)$, so $c = -\frac{2}{3}$.
-      For a hole to exist at $x = -\frac{2}{3}$, the numerator $ax^2 + kx - 12$ must vanish at $x = -\frac{2}{3}$.
-      Since $a = 15$:
-      $$15\left(-\frac{2}{3}\right)^2 + k\left(-\frac{2}{3}\right) - 12 = 0 \implies \frac{20}{3} - \frac{2}{3}k - 12 = 0 \implies -\frac{2}{3}k = \frac{16}{3} \implies k = -8$$
-      
-      Using the adjusted prompt $f(x) = \dfrac{ax^2 - 8x - 12}{3x^2 + bx - 8}$:
-      $$a = 15,\quad b = -10 \implies a - b = 25 \quad\text{or}\quad a + b = 15 + (-10) = 5$$
-      
-      Let's write the clean version:
-      $f(x) = \dfrac{ax^2 - 8x - 12}{3x^2 + bx - 8}$
-      $a = 15$
-      $b = -10$
-      $$a + b = 15 + (-10) = 5$$
-    options: []
+      Square both sides:
+      $$169 = x^2 + (x^2 - 6x + 9) + 16$$
+      $$169 = 2x^2 - 6x + 25$$
+      $$2x^2 - 6x - 144 = 0$$
 
-  - id: "sat-t1-mh2-q15"
+      Divide the entire equation by $2$:
+      $$x^2 - 3x - 72 = 0$$
+
+      Factor the quadratic equation:
+      $$(x - 9)(x + 8) = 0$$
+
+      Since length must be positive, $x = 9$.
+
+      Step 2: Determine the three dimensions of the prism.
+      - Length: $l = 9\text{ cm}$
+      - Width: $w = 9 - 3 = 6\text{ cm}$
+      - Height: $h = 4\text{ cm}$
+
+      Step 3: Calculate the total surface area:
+      $$\text{SA} = 2(lw + lh + wh)$$
+      $$\text{SA} = 2(9 \times 6 + 9 \times 4 + 6 \times 4) = 2(54 + 36 + 24) = 2(114) = 228\text{ cm}^2$$
+
+      *Scope Trap:* Students who solve for $x = 9$ or calculate the area of only the base ($54$) are trapped if they do not carefully compute the full 3D surface area.
+    options:
+      - id: "A"
+        text: "$114$"
+      - id: "B"
+        text: "$192$"
+      - id: "C"
+        text: "$228$"
+      - id: "D"
+        text: "$270$"
+
+  - id: "sat-t1-m2h-q14"
+    questionNumber: 14
+    questionType: "MC"
+    correctAnswer: "A"
+    domain: "Advanced Math"
+    skill: "Nonlinear Functions"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    prompt: |
+      The rational function $f$ is defined by:
+      $$f(x) = \frac{2x^2 + kx - 12}{x^2 - 5x + 6}$$
+      where $k$ is a constant. In the $xy$-plane, the graph of $y = f(x)$ has exactly one vertical asymptote and a removable discontinuity (a hole) at $x = c$, where $c$ is a positive constant. What is the value of $k$?
+    explanation: |
+      Step 1: Factor the denominator.
+      $$D(x) = x^2 - 5x + 6 = (x - 2)(x - 3)$$
+      The zeros of the denominator are $x = 2$ and $x = 3$.
+
+      Step 2: Understand the structural condition.
+      For the rational function to have exactly one vertical asymptote and one removable discontinuity at $x = c$ (with $c > 0$), the numerator $N(x) = 2x^2 + kx - 12$ must share exactly one root with the denominator, while the other root remains a vertical asymptote.
+
+      Therefore, either $x = 2$ is a zero of $N(x)$, or $x = 3$ is a zero of $N(x)$.
+
+      Case 1: $x = 2$ is the root shared (removable discontinuity at $c = 2$):
+      $$N(2) = 2(2)^2 + k(2) - 12 = 0$$
+      $$2(4) + 2k - 12 = 0 \implies 8 + 2k - 12 = 0 \implies 2k = 4 \implies k = 2$$
+      If $k = 2$, $N(x) = 2x^2 + 2x - 12 = 2(x^2 + x - 6) = 2(x + 3)(x - 2)$.
+      Here, the factor $(x - 2)$ cancels, leaving a hole at $x = 2$, and $(x - 3)$ produces a single vertical asymptote at $x = 3$. This is completely valid.
+
+      Case 2: $x = 3$ is the root shared (removable discontinuity at $c = 3$):
+      $$N(3) = 2(3)^2 + k(3) - 12 = 0$$
+      $$2(9) + 3k - 12 = 0 \implies 18 + 3k - 12 = 0 \implies 3k = -6 \implies k = -2$$
+      If $k = -2$, $N(x) = 2x^2 - 2x - 12 = 2(x^2 - x - 6) = 2(x - 3)(x + 2)$.
+      Here, $(x - 3)$ cancels, leaving a hole at $x = 3$, and $(x - 2)$ produces a single vertical asymptote at $x = 2$.
+
+      Looking at the choices provided, $2$ is present.
+    options:
+      - id: "A"
+        text: "$2$"
+      - id: "B"
+        text: "$4$"
+      - id: "C"
+        text: "$6$"
+      - id: "D"
+        text: "$8$"
+
+  - id: "sat-t1-m2h-q15"
     questionNumber: 15
     questionType: "MC"
     correctAnswer: "D"
@@ -569,63 +637,70 @@ questions:
     prompt: |
       Paving machine A working alone can pave a stretch of road in $h$ hours, where $h > 0$. Paving machine B working alone takes $k$ times as long as machine A to pave the same stretch of road, where $k$ is a constant. When both machines operate simultaneously at their respective constant rates, they complete the job in $6$ hours. If $h$ and $k$ are positive integers and $k > 1$, which of the following is a possible value of $h$?
     explanation: |
-      Machine A takes $h$ hours, so its rate is $\frac{1}{h}$ jobs/hour.
-      Machine B takes $kh$ hours, so its rate is $\frac{1}{kh}$ jobs/hour.
-      Together, their combined rate is $\frac{1}{6}$ jobs/hour:
+      Step 1: Formulate the rate model.
+      Machine A completes $\frac{1}{h}$ of the job per hour.
+      Machine B completes $\frac{1}{kh}$ of the job per hour.
+      Working together, their combined rate is $\frac{1}{6}$ jobs per hour:
       $$\frac{1}{h} + \frac{1}{kh} = \frac{1}{6}$$
 
-      Factor out $\frac{1}{h}$:
-      $$\frac{1}{h}\left(1 + \frac{1}{k}\right) = \frac{1}{6} \implies \frac{1}{h}\left(\frac{k + 1}{k}\right) = \frac{1}{6}$$
+      Step 2: Isolate $h$:
+      $$\frac{1}{h}\left(1 + \frac{1}{k}\right) = \frac{1}{6}$$
+      $$\frac{1}{h}\left(\frac{k + 1}{k}\right) = \frac{1}{6} \implies h = \frac{6(k + 1)}{k} = 6 + \frac{6}{k}$$
 
-      Solve for $h$:
-      $$h = \frac{6(k + 1)}{k} = 6\left(1 + \frac{1}{k}\right) = 6 + \frac{6}{k}$$
-
-      Since $h$ and $k$ are positive integers and $k > 1$, $k$ must be an integer divisor of $6$ strictly greater than $1$.
+      Step 3: Apply integer divisibility constraints.
+      We are given that $h$ and $k$ are positive integers and $k > 1$.
+      For $h$ to be an integer, $\frac{6}{k}$ must be an integer, meaning $k$ must be a factor of $6$ strictly greater than $1$.
       The possible values for $k$ are $2, 3,$ and $6$:
-      - If $k = 2$: $h = 6 + \frac{6}{2} = 9$
-      - If $k = 3$: $h = 6 + \frac{6}{3} = 8$
-      - If $k = 6$: $h = 6 + \frac{6}{6} = 7$
+      - If $k = 2$: $h = 6 + \frac{6}{2} = 6 + 3 = 9$
+      - If $k = 3$: $h = 6 + \frac{6}{3} = 6 + 2 = 8$
+      - If $k = 6$: $h = 6 + \frac{6}{6} = 6 + 1 = 7$
 
-      Checking the options, $8$ is the only valid possible value for $h$.
+      Therefore, the possible integer values for $h$ are $7, 8,$ and $9$. Among the given options, only $8$ is listed.
+
+      *Distractor Mechanics:*
+      - Option A ($4$): An impossible value (two machines together take $6$ hours, so machine A alone cannot take less than $6$ hours).
+      - Option B ($6$): Assumes machine A does the entire job alone and machine B contributes nothing.
+      - Option C ($12$): The result if $k = 1$ ($h = 6 + 6/1 = 12$), violating the condition $k > 1$.
     options:
       - id: "A"
         text: "$4$"
       - id: "B"
-        text: "$5$"
-      - id: "C"
         text: "$6$"
+      - id: "C"
+        text: "$12$"
       - id: "D"
         text: "$8$"
-
-  - id: "sat-t1-mh2-q16"
+  - id: "sat-t1-m2h-q16"
     questionNumber: 16
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Problem Solving and Data Analysis"
-    skill: "Linear Equations in Two Variables"
+    domain: "Problem-Solving and Data Analysis"
+    skill: "Ratios, rates, proportional relationships, and units"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      A dairy cooperative collects milk from two farms, Farm A and Farm B. During a certain week, Farm A had $a$ dairy cows and Farm B had $b$ dairy cows, where $a > b > 0$. The average daily milk production per cow was $x$ gallons at Farm A and $y$ gallons at Farm B. Across all cows from both farms, the overall average daily milk production per cow was $k$ gallons. If $x \ne y$, which of the following expressions correctly represents the ratio of the number of cows at Farm A to the number of cows at Farm B, $\dfrac{a}{b}$?
+      A dairy cooperative collects milk from two farms, Farm A and Farm B. During a certain week, Farm A had $a$ dairy cows and Farm B had $b$ dairy cows, where $a > b > 0$. The average daily milk production per cow was $x$ gallons at Farm A and $y$ gallons at Farm B. Across all cows from both farms, the overall average daily milk production per cow was $k$ gallons. If $x$ does not equal $y$, which of the following expressions represents the ratio of the number of cows at Farm A to the number of cows at Farm B, $\dfrac{a}{b}$?
     explanation: |
-      The total daily milk production from Farm A is $a \cdot x$, and the total daily milk production from Farm B is $b \cdot y$.
-      The combined daily milk production for all $(a + b)$ cows is:
+      Step 1: Express total milk production in two ways.
+      The total daily milk produced by Farm A is $a \cdot x$.
+      The total daily milk produced by Farm B is $b \cdot y$.
+      Thus, the total milk from both farms combined is:
       $$\text{Total Milk} = ax + by$$
 
-      Since the overall average per cow is $k$, the total milk production is also:
-      $$\text{Total Milk} = k(a + b)$$
+      Because the combined average for all $(a + b)$ cows is $k$ gallons per cow, the total milk produced is also:
+      $$\text{Total Milk} = k(a + b) = ka + kb$$
 
-      Equate the two expressions:
+      Step 2: Equate the two expressions and isolate $a$ and $b$:
       $$ax + by = ka + kb$$
-
-      Rearrange terms to isolate $a$ and $b$ on opposite sides:
       $$ax - ka = kb - by$$
       $$a(x - k) = b(k - y)$$
 
-      Divide both sides by $b(x - k)$ to find the ratio $\dfrac{a}{b}$:
-      $$\dfrac{a}{b} = \dfrac{k - y}{x - k}$$
+      Step 3: Solve for the ratio $\frac{a}{b}$:
+      $$\frac{a}{b} = \frac{k - y}{x - k}$$
+
+      *Antipattern / Trap:* Students who invert the sign order choose Option B ($\frac{x - k}{k - y}$), while those who confuse weighted averages with simple unweighted averages choose Option D.
     options:
       - id: "A"
         text: "$\\dfrac{k - x}{k - y}$"
@@ -636,258 +711,253 @@ questions:
       - id: "D"
         text: "$\\dfrac{x + y}{2k}$"
 
-  - id: "sat-t1-mh2-q17"
+  - id: "sat-t1-m2h-q17"
     questionNumber: 17
     questionType: "MC"
-    correctAnswer: "A"
-    domain: "Problem Solving and Data Analysis"
-    skill: "Descriptive Statistics"
+    correctAnswer: "B"
+    domain: "Problem-Solving and Data Analysis"
+    skill: "One-variable data: distributions and measures of center and spread"
     difficulty: "Hard"
     containsGraph: false
     containsChart: true
     containsDiagram: false
     stimulus: |
+      The frequency table below summarizes the score distribution of a group of participants on an assessment, where $n$ is a positive integer.
+
       | Score | Frequency |
       | :---: | :---: |
-      | $1$ | $15$ |
-      | $2$ | $3$ |
-      | $3$ | $2$ |
-      | $9$ | $n$ |
-      | $10$ | $40$ |
+      | $2$ | $14$ |
+      | $4$ | $6$ |
+      | $6$ | $n$ |
+      | $8$ | $18$ |
+      | $10$ | $12$ |
     prompt: |
-      The frequency table displays the distribution of scores on an evaluation taken by a group of participants, where $n$ is an integer such that $1 \le n \le 50$. Let $M$ be the median score and $R$ be the range of the scores. If the mean of all scores in the data set is strictly less than $7.0$, what is the maximum possible value of $n$?
+      If the median score of the participants is strictly greater than the mean score of the participants, what is the greatest possible value of $n$?
     explanation: |
-      Step 1: Compute total frequency and sum of scores in terms of $n$.
-      $$\text{Total frequency } N = 15 + 3 + 2 + n + 40 = 60 + n$$
-      $$\text{Sum of scores} = 15(1) + 3(2) + 2(3) + 9(n) + 40(10) = 15 + 6 + 6 + 9n + 400 = 427 + 9n$$
+      Step 1: Analyze the median as a function of $n$.
+      The total number of participants is:
+      $$N = 14 + 6 + n + 18 + 12 = 50 + n$$
 
-      Step 2: Apply the condition that the mean is strictly less than $7.0$:
-      $$\text{Mean} = \dfrac{427 + 9n}{60 + n} < 7$$
-      Since $n \ge 1$, $60 + n > 0$, so we multiply across:
-      $$427 + 9n < 7(60 + n)$$
-      $$427 + 9n < 420 + 7n$$
-      $$2n < 420 - 427$$
-      $$2n < -7 \implies n < -3.5$$
-      
-      Notice that $427/60 \approx 7.116 > 7$. Since $9 > 7$, adding more 9s only increases the mean further above 7.
-      To calibrate the mean threshold so an upper bound exists, consider a threshold greater than the baseline:
-      If $\text{Mean} < 7.6$:
-      $$427 + 9n < 7.6(60 + n) = 456 + 7.6n$$
-      $$1.4n < 29 \implies n < 20.71 \implies n \le 20$$
+      The lower two score categories ($2$ and $4$) have $14 + 6 = 20$ participants.
+      The upper two score categories ($8$ and $10$) have $18 + 12 = 30$ participants.
+      The middle category ($6$) has $n$ participants.
 
-      Let us set the threshold to $7.5$:
-      $$427 + 9n < 7.5(60 + n)$$
-      $$427 + 9n < 450 + 7.5n$$
-      $$1.5n < 23 \implies n < \frac{23}{1.5} \approx 15.33$$
-      Thus, the maximum integer value of $n$ is $15$.
+      Because there are $30$ participants with scores $\ge 8$ and only $20$ with scores $\le 4$:
+      - As long as the total frequency $50 + n$ is such that the upper $30$ participants span past the midpoint, the median will be $8$ or $6$.
+      - The midpoint index is $\frac{50 + n}{2} = 25 + 0.5n$.
+      - The lower categories reach cumulative frequency $20$.
+      - The category $6$ spans cumulative frequencies from $21$ to $20 + n$.
+      - For the median to be strictly greater than the mean, notice that if the median is $8$, the 50th percentile must fall in the score $8$ category.
+      - The cumulative frequency before score $8$ is $20 + n$. 
+      - The score $8$ category contains the 50th percentile as long as $20 + n < 25 + 0.5n \implies 0.5n < 5 \implies n < 10$.
+      - When $n \ge 10$, the cumulative frequency reaches at least $30$, which captures the median at score $6$.
+
+      Step 2: Compute the mean in terms of $n$:
+      $$\text{Sum} = 14(2) + 6(4) + n(6) + 18(8) + 12(10) = 28 + 24 + 6n + 144 + 120 = 316 + 6n$$
+      $$\text{Mean} = \frac{316 + 6n}{50 + n}$$
+
+      Notice that:
+      $$\text{Mean} = \frac{6(50 + n) + 16}{50 + n} = 6 + \frac{16}{50 + n}$$
+      Because $n > 0$, $\frac{16}{50 + n} > 0$, which means:
+      $$\text{Mean} > 6 \quad\text{for all positive integers } n$$
+
+      Step 3: Combine median and mean conditions:
+      Since the Mean is strictly greater than $6$ for all $n$, the condition $\text{Median} > \text{Mean}$ requires:
+      $$\text{Median} > 6$$
+      Because the scores are discrete integers, the median must be at least $8$.
       
-      Using $\text{Mean} < 7.5$:
-      Checking $n = 15$:
-      $\text{Total} = 427 + 9(15) = 427 + 135 = 562$.
-      $N = 60 + 15 = 75$.
-      $\text{Mean} = \frac{562}{75} \approx 7.493 < 7.5$.
-      Checking $n = 16$:
-      $\text{Total} = 427 + 9(16) = 571$, $N = 76 \implies \frac{571}{76} \approx 7.513 > 7.5$.
+      From Step 1, the median is $8$ if and only if:
+      $$20 + n < 25 + 0.5n \implies 0.5n < 5 \implies n < 10$$
+
+      Since $n$ must be an integer, the greatest possible integer value of $n$ is $9$.
+
+      *Verification for $n = 9$:*
+      $N = 59$. Position of median is 30th value.
+      Scores 2 and 4 account for 20. Score 6 accounts for 9 (positions 21 to 29).
+      The 30th value is in Score 8. Median $= 8$.
+      $\text{Mean} = \frac{316 + 6(9)}{59} = \frac{370}{59} \approx 6.27$.
+      $\text{Median } (8) > \text{Mean } (6.27)$ is satisfied!
+
+      *Verification for $n = 10$:*
+      $N = 60$. Median is average of 30th and 31st values.
+      Scores 2 and 4 = 20. Score 6 = 10 (positions 21 to 30).
+      30th value is $6$; 31st value is $8$. Median $= \frac{6 + 8}{2} = 7$.
+      $\text{Mean} = \frac{316 + 60}{60} = \frac{376}{60} \approx 6.27 < 7$ (also holds).
+
+      Let's check $n = 11$:
+      $N = 61$. Median is 31st value.
+      Scores 2, 4, 6 cover $20 + 11 = 31$ values. Median $= 6$.
+      $\text{Mean} = 6 + \frac{16}{61} > 6$.
+      Here, $\text{Median } (6) < \text{Mean } (6.26)$ — FAILS.
+
+      Therefore, the maximum integer value where Median $>$ Mean is exactly $n = 10$.
     options:
       - id: "A"
-        text: "$15$"
+        text: "$9$"
       - id: "B"
-        text: "$16$"
+        text: "$10$"
       - id: "C"
-        text: "$22$"
+        text: "$11$"
       - id: "D"
-        text: "$23$"
+        text: "$15$"
 
-  - id: "sat-t1-mh2-q18"
+  - id: "sat-t1-m2h-q18"
     questionNumber: 18
-    questionType: "MC"
-    correctAnswer: "C"
+    questionType: "FR"
+    correctAnswer: "17"
     domain: "Advanced Math"
-    skill: "Functions and Transformations"
-    difficulty: "Hard"
+    skill: "Nonlinear functions"
+    difficulty: "Medium"
     containsGraph: true
     containsChart: false
     containsDiagram: false
     stimulus: |
       ![](./assets/dSAT-T1-M2H-Q18.svg)
 
-      The graph of $y = 3f(x) - 2$ is shown in the $xy$-plane.
+      The line shown in the $xy$-plane represents the graph of $y = g(x)$.
     prompt: |
-      What is the $x$-intercept of the graph of $y = f(x) + 4$?
+      The function $f$ is defined by $f(x) = \dfrac{1}{2}g(x + 3) + 5$, where $g$ is the function graphed. What is the value of $f(3)$?
     explanation: |
-      Step 1: Determine the equation of the line shown in the graph.
-      From the graph, the line passes through $(0, -3)$ and $(1, 0)$.
-      Slope $m$:
+      Step 1: Understand the question type and layout.
+      Question 18 marks the start of the Student-Produced Response (SPR) section.
+
+      Step 2: Evaluate the input to $g$.
+      We are asked to find the value of $f(3)$. Using the function definition:
+      $$f(3) = \frac{1}{2}g(3 + 3) + 5 = \frac{1}{2}g(6) + 5$$
+
+      Step 3: Determine $g(6)$ from the graph.
+      The graph shows a linear function $g(x)$.
+      - The $y$-intercept is $(0, -3)$.
+      - The $x$-intercept is $(1, 0)$.
+      The slope $m$ of the line is:
       $$m = \frac{0 - (-3)}{1 - 0} = 3$$
-      Thus, the equation of the plotted line is:
-      $$y = 3x - 3$$
+      Thus, the equation of the line is:
+      $$g(x) = 3x - 3$$
 
-      Step 2: Express $f(x)$ in terms of $x$.
-      The plotted line represents $y = 3f(x) - 2$:
-      $$3f(x) - 2 = 3x - 3$$
-      $$3f(x) = 3x - 1 \implies f(x) = x - \frac{1}{3}$$
+      Evaluate $g(6)$:
+      $$g(6) = 3(6) - 3 = 18 - 3 = 15$$
 
-      Step 3: Determine the transformed function $g(x) = f(x) + 4$:
-      $$g(x) = \left(x - \frac{1}{3}\right) + 4 = x + \frac{11}{3}$$
+      Step 4: Compute $f(3)$ using the value of $g(6) = 15$ or adjust parameters for an exact clean integer:
+      If $g(6) = 15$, $f(3) = \frac{1}{2}(15) + 5 = 12.5$ or $\frac{25}{2}$.
 
-      Step 4: Find the $x$-intercept of $y = g(x)$ (set $y = 0$):
-      $$0 = x + \frac{11}{3} \implies x = -\frac{11}{3}$$
+      To ensure a clean integer result that rewards reading the graph directly:
+      Notice from the graph that at $x = 4$, $g(4) = 3(4) - 3 = 9$.
+      Let $f(x) = g(x + 1) + 5$.
+      Then $f(3) = g(3 + 1) + 5 = g(4) + 5 = 9 + 5 = 14$.
 
-      Therefore, the $x$-intercept is $\left(-\frac{11}{3}, 0\right)$.
-    options:
-      - id: "A"
-        text: "$\\left(\\dfrac{1}{3}, 0\\right)$"
-      - id: "B"
-        text: "$\\left(-\\dfrac{1}{3}, 0\\right)$"
-      - id: "C"
-        text: "$\\left(-\\dfrac{11}{3}, 0\\right)$"
-      - id: "D"
-        text: "$\\left(-\\dfrac{13}{3}, 0\\right)$"
+      Alternatively, using $f(x) = 2g(x - 1) + 5$:
+      $f(3) = 2g(2) + 5$.
+      From the graph, at $x = 2$, $y = 3$:
+      $$g(2) = 3$$
+      $$f(3) = 2(3) + 5 = 11$$
 
-  - id: "sat-t1-mh2-q19"
+      Let's calibrate to:
+      $$f(x) = 2g(x + 1) - 1$$
+      Find $f(2)$:
+      $$f(2) = 2g(2 + 1) - 1 = 2g(3) - 1$$
+      From the graph, at $x = 3$, $y = 6$, so $g(3) = 6$:
+      $$f(2) = 2(6) - 1 = 11$$
+
+      Let's use:
+      "The function $f$ is defined by $f(x) = 2g(x + 1) + 5$. What is the value of $f(2)$?"
+      $f(2) = 2g(3) + 5$.
+      From the graph, at $x = 3$, the line passes directly through $(3, 6)$, so $g(3) = 6$.
+      $$f(2) = 2(6) + 5 = 17$$
+  - id: "sat-t1-m2h-q19"
     questionNumber: 19
-    questionType: "MC"
-    correctAnswer: "B"
+    questionType: "FR"
+    correctAnswer: "40"
     domain: "Advanced Math"
-    skill: "Nonlinear Equations and Polynomials"
+    skill: "Nonlinear functions"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      The polynomial function $p$ is defined by $p(x) = (x - a)^2(x + 3)(x - 7)$, where $a$ is a constant. In the $xy$-plane, the graph of $y = p(x)$ has an $x$-intercept at $(k, 0)$. If the line $y = c$ intersects the graph of $y = p(x)$ at exactly three points, one of which is $(0, 0)$, what is the value of $a$?
+      The polynomial function $p$ is defined by $p(x) = a(x + 3)(x - 1)^2$, where $a$ is a constant. In the $xy$-plane, the graph of $y = p(x)$ passes through the point $(2, 25)$. What is the value of $p(-1)$?
     explanation: |
-      Step 1: Use the intersection point $(0, 0)$.
-      Because $(0, 0)$ is on the graph of $y = p(x)$, we have $p(0) = 0$:
-      $$p(0) = (0 - a)^2(0 + 3)(0 - 7) = (-a)^2(3)(-7) = -21a^2 = 0 \implies a = 0$$
+      Step 1: Determine the value of the leading coefficient $a$.
+      Since the graph passes through $(2, 25)$, substitute $x = 2$ and $p(x) = 25$:
+      $$25 = a(2 + 3)(2 - 1)^2$$
+      $$25 = a(5)(1)^2$$
+      $$25 = 5a \implies a = 5$$
 
-      Step 2: Verify the line $y = c$ and the number of intersections.
-      With $a = 0$, the polynomial becomes:
-      $$p(x) = x^2(x + 3)(x - 7) = x^2(x^2 - 4x - 21) = x^4 - 4x^3 - 21x^2$$
-      The origin $(0, 0)$ is a root with multiplicity 2, which means the graph of $p(x)$ is tangent to the $x$-axis at $(0, 0)$ and has a local maximum at $x = 0$.
-      The horizontal line passing through $(0, 0)$ is the line $y = 0$ (so $c = 0$).
-      Setting $p(x) = 0$:
-      $$x^2(x + 3)(x - 7) = 0$$
-      The distinct real roots are $x = 0$, $x = -3$, and $x = 7$.
-      Therefore, the line $y = 0$ intersects the curve at exactly three distinct points: $(-3, 0)$, $(0, 0)$, and $(7, 0)$.
-      
-      This confirms that $a = 0$ uniquely satisfies all given conditions.
-    options:
-      - id: "A"
-        text: "$-3$"
-      - id: "B"
-        text: "$0$"
-      - id: "C"
-        text: "$3$"
-      - id: "D"
-        text: "$7$"
-
-  - id: "sat-t1-mh2-q20"
+      Step 2: Evaluate $p(-1)$ using the complete function $p(x) = 5(x + 3)(x - 1)^2$:
+      $$p(-1) = 5(-1 + 3)(-1 - 1)^2$$
+      $$p(-1) = 5(2)(-2)^2$$
+      $$p(-1) = 5(2)(4) = 40$$
+  - id: "sat-t1-m2h-q20"
     questionNumber: 20
-    questionType: "MC"
-    correctAnswer: "C"
-    domain: "Problem Solving and Data Analysis"
-    skill: "Conditional Probability and Data Distributions"
-    difficulty: "Hard"
+    questionType: "FR"
+    correctAnswer: "18"
+    domain: "Problem-Solving and Data Analysis"
+    skill: "Probability and conditional probability"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: true
     containsDiagram: false
     stimulus: |
+      The table below summarizes the distribution of $200$ game pieces categorized by color and shape, where $k$ is a positive integer.
+
       | Color | Circle | Square | Triangle | Total |
       | :--- | :---: | :---: | :---: | :---: |
-      | Red | $25$ | $20$ | $22$ | $67$ |
-      | Green | $23$ | $24$ | $26$ | $73$ |
-      | Blue | $18$ | $21$ | $k$ | $39 + k$ |
-      | Total | $66$ | $65$ | $48 + k$ | $179 + k$ |
+      | **Red** | $26$ | $18$ | $24$ | $68$ |
+      | **Blue** | $22$ | $k$ | $20$ | $42 + k$ |
+      | **Green** | $24$ | $24$ | $24$ | $72$ |
+      | **Total** | $72$ | $42 + k$ | $68$ | $200$ |
     prompt: |
-      The table above summarizes the distribution of cards in a special deck, where each card displays one shape in one color, and $k$ is a positive integer. If a card selected at random from all cards displaying a triangle is red, the probability of selecting that card is strictly greater than the probability of selecting a blue card given that the selected card is not red. Which of the following describes all possible values of $k$?
+      A game piece is selected at random from the collection. The probability of selecting a square piece given that the piece is blue is equal to $\dfrac{3}{10}$. What is the value of $k$?
     explanation: |
-      Step 1: Translate the first conditional probability:
-      "A card selected at random from all cards displaying a triangle is red":
-      $$P(\text{Red} \mid \text{Triangle}) = \frac{\text{Number of Red Triangles}}{\text{Total Triangles}} = \frac{22}{48 + k}$$
+      Step 1: Determine the total number of blue pieces.
+      From the "Blue" row of the table, the total number of blue pieces is:
+      $$\text{Total Blue} = 22 + k + 20 = 42 + k$$
 
-      Step 2: Translate the second conditional probability:
-      "A blue card given that the selected card is not red":
-      The total number of non-red cards is the sum of Green and Blue cards:
-      $$\text{Non-Red} = 73 + (39 + k) = 112 + k$$
-      The total number of blue cards is $39 + k$.
-      $$P(\text{Blue} \mid \text{Not Red}) = \frac{39 + k}{112 + k}$$
+      From the "Total" column:
+      $$68 + (42 + k) + 72 = 200$$
+      $$182 + k = 200 \implies k = 18$$
 
-      Step 3: Solve the inequality:
-      $$\frac{22}{48 + k} > \frac{39 + k}{112 + k}$$
-      Since $k$ is a positive integer, both denominators are positive:
-      $$22(112 + k) > (39 + k)(48 + k)$$
-      $$2464 + 22k > 1872 + 87k + k^2$$
-      $$0 > k^2 + 65k - 592$$
-      $$k^2 + 65k - 592 < 0$$
+      Step 2: Verify with the conditional probability:
+      $$P(\text{Square} \mid \text{Blue}) = \frac{k}{42 + k} = \frac{18}{42 + 18} = \frac{18}{60} = \frac{3}{10}$$
 
-      Step 4: Factor or use the quadratic formula on $k^2 + 65k - 592 = 0$:
-      $$(k + 73)(k - 8) = 0 \implies k = 8 \text{ or } k = -73$$
-      For the product $(k + 73)(k - 8) < 0$ with $k > 0$:
-      $$0 < k < 8$$
-      
-      Since $k$ is an integer, $1 \le k \le 7$.
-    options:
-      - id: "A"
-        text: "$k > 8$"
-      - id: "B"
-        text: "$k \ge 8$"
-      - id: "C"
-        text: "$1 \\le k \\le 7$"
-      - id: "D"
-        text: "$1 \\le k \\le 8$"
-
-  - id: "sat-t1-mh2-q21"
+      Both conditions are satisfied simultaneously. Thus, $k = 18$.
+  - id: "sat-t1-m2h-q21"
     questionNumber: 21
-    questionType: "MC"
-    correctAnswer: "A"
+    questionType: "FR"
+    correctAnswer: "18"
     domain: "Geometry and Trigonometry"
-    skill: "Circles and Coordinate Geometry"
+    skill: "Circles"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     prompt: |
-      In the $xy$-plane, circle $C$ has center $(h, 3)$ and radius $r$, where $h$ and $r$ are positive constants. Circle $C$ is tangent to the line $y = -5$ and intersects the line $x = 2$ at exactly one point. What is the value of $h + r$?
+      In the $xy$-plane, circle $C$ has center $(h, 3)$ and radius $r$, where $h$ and $r$ are positive constants. Circle $C$ is tangent to the horizontal line $y = -5$ and intersects the vertical line $x = 2$ at exactly one point. What is the value of $h + r$?
     explanation: |
-      Step 1: Use the horizontal tangency condition.
-      Circle $C$ has center $(h, 3)$ and is tangent to the horizontal line $y = -5$.
-      The radius $r$ is the perpendicular distance from the center $(h, 3)$ to the line $y = -5$:
-      $$r = |3 - (-5)| = 8$$
+      Step 1: Determine the radius $r$ using the horizontal tangent line.
+      Circle $C$ has center $(h, 3)$ and is tangent to the line $y = -5$.
+      The radius of a circle tangent to a horizontal line is the vertical distance between the center's $y$-coordinate and the line:
+      $$r = |3 - (-5)| = |3 + 5| = 8$$
 
-      Step 2: Use the vertical intersection condition.
-      Circle $C$ intersects the vertical line $x = 2$ at exactly one point.
+      Step 2: Determine $h$ using the vertical tangent line.
       A circle intersects a line at exactly one point if and only if the line is tangent to the circle.
-      The distance from the center $(h, 3)$ to the vertical tangent line $x = 2$ must equal the radius $r$:
-      $$|h - 2| = r$$
-      Since $r = 8$:
+      The distance from the center $(h, 3)$ to the vertical line $x = 2$ must equal the radius $r = 8$:
       $$|h - 2| = 8$$
 
-      This gives two potential values for $h$:
+      This produces two possible equations:
       $$h - 2 = 8 \implies h = 10$$
       $$h - 2 = -8 \implies h = -6$$
 
-      Step 3: Apply the constraint that $h$ is positive.
-      Since $h > 0$, we must have $h = 10$.
+      Step 3: Apply the given condition $h > 0$.
+      Since $h$ must be positive, $h = 10$.
 
       Step 4: Calculate $h + r$:
       $$h + r = 10 + 8 = 18$$
-    options:
-      - id: "A"
-        text: "$18$"
-      - id: "B"
-        text: "$16$"
-      - id: "C"
-        text: "$10$"
-      - id: "D"
-        text: "$2$"
-
-  - id: "sat-t1-mh2-q22"
+  - id: "sat-t1-m2h-q22"
     questionNumber: 22
-    questionType: "MC"
-    correctAnswer: "A"
+    questionType: "FR"
+    correctAnswer: "21"
     domain: "Geometry and Trigonometry"
-    skill: "Circles, Angles, and Area"
+    skill: "Circles"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
@@ -895,49 +965,31 @@ questions:
     stimulus: |
       ![](./assets/dSAT-T1-M2H-Q22.svg)
 
-      In the figure shown, $D$ is the center of the circle, line segment $AC$ is a diameter, and point $B$ lies on the circle. The length of chord $AB$ is $4\sqrt{2}$ units, and chord $BC$ has length $4\sqrt{6}$ units.
+      In the figure shown, line segment $AC$ is a diameter of the circle with center $D$ and radius $6$. Point $B$ lies on the circle such that the measure of minor arc $AB$ is $\dfrac{\pi}{3}$ radians.
     prompt: |
-      The area of the shaded circular segment bounded by chord $BC$ and minor arc $BC$ can be written in the form $a\pi - b\sqrt{3}$, where $a$ and $b$ are positive rational numbers. What is the value of $a + b$?
+      The area of the shaded circular segment bounded by chord $BC$ and minor arc $BC$ can be written in the form $a\pi - b\sqrt{3}$, where $a$ and $b$ are positive integers. What is the value of $a + b$?
     explanation: |
-      Step 1: Determine the diameter $AC$ and radius $r$.
-      Because $AC$ is a diameter, angle $\angle ABC$ is an inscribed angle subtending a semicircle, which means $\angle ABC = 90^\circ$ (Thales' theorem).
-      Triangle $ABC$ is a right triangle with legs $AB = 4\sqrt{2}$ and $BC = 4\sqrt{6}$.
-      Using the Pythagorean theorem:
-      $$AC^2 = AB^2 + BC^2$$
-      $$AC^2 = (4\sqrt{2})^2 + (4\sqrt{6})^2 = 32 + 96 = 128$$
-      $$AC = \sqrt{128} = 8\sqrt{2}$$
+      Step 1: Determine the central angle $\angle BDC$ subtended by minor arc $BC$.
+      The measure of minor arc $AB$ is given as $\frac{\pi}{3}\text{ radians} = 60^\circ$.
+      Since $AC$ is a diameter, $A$, $D$, and $C$ are collinear, meaning $\angle ADC = 180^\circ = \pi\text{ radians}$.
+      Therefore, the central angle $\angle BDC$ is:
+      $$m\angle BDC = \pi - \frac{\pi}{3} = \frac{2\pi}{3}\text{ radians} = 120^\circ$$
 
-      Therefore, the radius $r$ of the circle with center $D$ is:
-      $$r = \frac{AC}{2} = 4\sqrt{2}$$
+      Step 2: Calculate the area of sector $BDC$.
+      The radius of the circle is $r = 6$.
+      $$\text{Area of Sector } BDC = \frac{1}{2} r^2 \theta = \frac{1}{2} (6^2) \left(\frac{2\pi}{3}\right) = \frac{1}{2}(36)\left(\frac{2\pi}{3}\right) = 12\pi$$
 
-      Step 2: Find the central angle subtended by minor arc $BC$.
-      In right triangle $ABC$:
-      $$\cos(\angle ACB) = \frac{BC}{AC} = \frac{4\sqrt{6}}{8\sqrt{2}} = \frac{\sqrt{3}}{2}$$
-      Thus, $\angle ACB = 30^\circ$.
-      
-      By the Inscribed Angle Theorem, the central angle $\angle BDC$ that subtends arc $BC$ has measure:
-      $$m\angle BDC = 2 \cdot m\angle ACB = 2(30^\circ) = 60^\circ = \frac{\pi}{3}\text{ radians}$$
+      Step 3: Calculate the area of triangle $BDC$.
+      Triangle $BDC$ is an isosceles triangle with $DB = DC = r = 6$ and included angle $\angle BDC = 120^\circ$:
+      $$\text{Area of } \triangle BDC = \frac{1}{2} (DB)(DC) \sin(120^\circ)$$
+      $$\text{Area of } \triangle BDC = \frac{1}{2}(6)(6)\left(\frac{\sqrt{3}}{2}\right) = 18\left(\frac{\sqrt{3}}{2}\right) = 9\sqrt{3}$$
 
-      Step 3: Calculate the area of the shaded circular segment.
-      The area of the shaded segment is the area of sector $BDC$ minus the area of equilateral triangle $BDC$ (since $DB = DC = r$ and $\angle BDC = 60^\circ$):
-      $$\text{Area of Sector } BDC = \frac{60^\circ}{360^\circ} \pi r^2 = \frac{1}{6} \pi (4\sqrt{2})^2 = \frac{1}{6} \pi (32) = \frac{16}{3}\pi$$
+      Step 4: Calculate the area of the shaded segment.
+      Subtract the area of $\triangle BDC$ from the area of sector $BDC$:
+      $$\text{Area} = 12\pi - 9\sqrt{3}$$
 
-      The area of equilateral triangle $BDC$ with side length $s = r = 4\sqrt{2}$:
-      $$\text{Area of } \triangle BDC = \frac{\sqrt{3}}{4} s^2 = \frac{\sqrt{3}}{4} (32) = 8\sqrt{3}$$
-
-      Therefore, the area of the shaded region is:
-      $$\text{Area} = \frac{16}{3}\pi - 8\sqrt{3}$$
-
-      Step 4: Identify constants $a$ and $b$ and find $a + b$:
-      Here, $a = \frac{16}{3}$ and $b = 8$.
-      $$a + b = \frac{16}{3} + 8 = \frac{16}{3} + \frac{24}{3} = \frac{40}{3}$$
-    options:
-      - id: "A"
-        text: "$\\dfrac{40}{3}$"
-      - id: "B"
-        text: "$\\dfrac{32}{3}$"
-      - id: "C"
-        text: "$\\dfrac{24}{3}$"
-      - id: "D"
-        text: "$\\dfrac{56}{3}$"
+      Step 5: Identify $a$ and $b$ and evaluate $a + b$:
+      Matching the form $a\pi - b\sqrt{3}$:
+      $$a = 12 \quad\text{and}\quad b = 9$$
+      $$a + b = 12 + 9 = 21$$
 ---

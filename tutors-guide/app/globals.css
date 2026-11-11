@@ -139,6 +139,31 @@
 }
 
 /* ==========================================================================
+   Global KaTeX Font & Alignment Protection (SAT, AP, ACT)
+   ========================================================================== */
+
+/* 1. Ensure KaTeX elements always use KaTeX fonts regardless of parent font-serif/prose */
+.katex,
+.katex * {
+  font-family: KaTeX_Main, "Times New Roman", serif;
+}
+
+/* 2. Preserve zero-width containers for compound glyphs like \neq */
+.katex .rlap {
+  width: 0 !important;
+  position: relative;
+}
+
+.katex .rlap > .inner {
+  position: inherit;
+}
+
+.katex .thinbox {
+  display: inline-block;
+  width: 0 !important;
+}
+
+/* ==========================================================================
    KaTeX Typography & Exam Math Tuning
    ========================================================================== */
 

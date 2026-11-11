@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Filter
 } from "lucide-react";
+import { QuestionExplanationEngine } from "../analytics/QuestionExplanationEngine";
 
 interface SectionBundle {
   meta: SectionManifest;
@@ -390,16 +391,20 @@ export function ContentPreviewViewer({ metadata, sections }: ContentPreviewViewe
                   </button>
 
                   {isExplanationOpen && (
-                    <div className="p-6 bg-amber-50/20 dark:bg-amber-950/5 text-sm text-amber-950 dark:text-amber-200 leading-relaxed border-t border-amber-100/50 dark:border-amber-900/30">
+                    <div className="p-6 bg-slate-50/50 dark:bg-slate-950/40 border-t border-slate-100 dark:border-slate-800">
                       {q.explanation ? (
-                        <MarkdownQuestionRenderer
-                          content={q.explanation}
+                        <QuestionExplanationEngine
+                          explanation={q.explanation}
                           category={category}
                           testId={testId}
-                          manifestBasePath={manifestBasePath}
+                          domain={q.domain}
+                          skill={q.skill}
+                          questionNumber={q.questionNumber || qIdx + 1}
                         />
                       ) : (
-                        <span className="italic text-amber-700/70">No explanation provided in frontmatter.</span>
+                        <span className="italic text-slate-500 text-xs">
+                          No explanation provided in frontmatter.
+                        </span>
                       )}
                     </div>
                   )}

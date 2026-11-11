@@ -16,6 +16,7 @@ import {
   Check,
   X,
 } from "lucide-react";
+import { QuestionExplanationEngine } from "./QuestionExplanationEngine";
 
 interface QuestionResultCardProps {
   item: EnrichedResponseItem;
@@ -196,18 +197,14 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
 
         {/* Explanation Box: Displayed only when the solution is revealed */}
         {showSolution && item.explanation && (
-          <div className="mt-8 p-4 rounded-sm bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 text-xs text-neutral-800 dark:text-neutral-200 animate-in fade-in duration-150">
-            <span className="font-bold text-blue-700 dark:text-blue-300 block mb-1.5 text-xs uppercase tracking-wide">
-              Explanation & Key Strategy:
-            </span>
-            <div className="font-serif text-[14px] leading-relaxed">
-              <MarkdownQuestionRenderer
-                content={item.explanation}
-                category={category}
-                testId={testId}
-              />
-            </div>
-          </div>
+          <QuestionExplanationEngine
+            explanation={item.explanation}
+            category={category}
+            testId={testId}
+            domain={item.domain}
+            skill={item.skill}
+            questionNumber={item.responseOrder}
+          />
         )}
       </div>
     </div>

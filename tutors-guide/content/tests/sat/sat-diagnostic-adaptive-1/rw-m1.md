@@ -221,8 +221,8 @@ questions:
     questionNumber: 5
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Craft and Structure"
+    skill: "Text Structure and Purpose"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -277,8 +277,8 @@ questions:
     questionNumber: 6
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Craft and Structure"
+    skill: "Text Structure and Purpose"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
@@ -331,7 +331,7 @@ questions:
     correctAnswer: "D"
     domain: "Information and Ideas"
     skill: "Central Ideas and Details"
-    difficulty: "Medium"
+    difficulty: "Easy"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -434,8 +434,8 @@ questions:
     questionNumber: 9
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Craft and Structure"
+    skill: "Text Structure and Purpose"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -539,7 +539,7 @@ questions:
     questionType: "MC"
     correctAnswer: "A"
     domain: "Information and Ideas"
-    skill: "Inferences"
+    skill: "Command of Evidence"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
@@ -561,8 +561,8 @@ questions:
     questionNumber: 12
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Craft and Structure"
-    skill: "Text Structure and Purpose"
+    domain: "Information and Ideas"
+    skill: "Inferences"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -608,7 +608,7 @@ questions:
     questionType: "MC"
     correctAnswer: "B"
     domain: "Standard English Conventions"
-    skill: "Boundaries"
+    skill: "Form, Structure, and Sense"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -637,9 +637,9 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The use of geothermal energy, which harnesses heat from the Earth's core, presents a compelling alternative to fossil fuels. Unlike solar or wind power, geothermal plants can generate electricity consistently, regardless of weather conditions. However, the initial drilling costs for these ______ can run into the hundreds of millions of dollars, often poses a significant barrier to their widespread adoption.
+      The use of geothermal energy, which harnesses heat from the Earth's core, presents a compelling alternative to fossil fuels. Unlike solar or wind power, geothermal plants can generate electricity consistently, regardless of weather conditions. However, the initial drilling costs for these ______ can run into the hundreds of millions of dollars, often pose a significant barrier to their widespread adoption.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The phrase 'a substantial investment' is a nonrestrictive appositive describing 'facilities'. It must be set off by a pair of commas (one before 'a' and one after 'investment') so that the main verb 'poses' correctly follows the subject 'costs' (via the intervening structure)."
+    explanation: "The phrase 'a substantial investment' is a nonrestrictive appositive describing 'facilities'. It must be set off by a pair of commas (one before 'a' and one after 'investment') so that the main verb 'pose' correctly follows the subject 'costs' (via the intervening structure)."
     options:
       - id: "A"
         text: "facilities, a substantial investment, that"
@@ -723,7 +723,7 @@ questions:
     questionType: "MC"
     correctAnswer: "A"
     domain: "Standard English Conventions"
-    skill: "Boundaries"
+    skill: "Form, Structure, and Sense"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -768,7 +768,7 @@ questions:
     questionNumber: 21
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Medium"
     containsGraph: false
@@ -791,7 +791,7 @@ questions:
     questionNumber: 22
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Information and Ideas"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Medium"
     containsGraph: false
@@ -814,7 +814,7 @@ questions:
     questionNumber: 23
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Information and Ideas"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Medium"
     containsGraph: false
@@ -837,8 +837,8 @@ questions:
     questionNumber: 24
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -866,8 +866,8 @@ questions:
     questionNumber: 25
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -895,8 +895,8 @@ questions:
     questionNumber: 26
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -924,8 +924,8 @@ questions:
     questionNumber: 27
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
     difficulty: "Medium"
     containsGraph: false
     containsChart: false
@@ -933,8 +933,8 @@ questions:
     stimulus: |
       While researching a topic, a student has taken the following notes:
 
-      * The Bathysphere, created in the 1930s Naturalist William Beebe and engineer Otis Barton, was the first successful manned deep-sea submersible and a revolutionary achievement in deep-sea observation.
-      * The Bathysphere was comprised of an unpowered and unmaneuverable spherical steel chamber that was tethered a surface support ship, which lowered and raised it via a steel cable.
+      * The Bathysphere, created in the 1930s by Naturalist William Beebe and engineer Otis Barton, was the first successful manned deep-sea submersible and a revolutionary achievement in deep-sea observation.
+      * The Bathysphere was comprised of an unpowered and unmaneuverable spherical steel chamber that was tethered to a surface support ship, which lowered and raised it via a steel cable.
       * The Bathysphere achieved a then record depth of 3,028 feet (923 meters) in 1934 off Bermuda.
       * The Bathyscaphe, created after WWII by Swiss physicist Auguste Piccard, consisted of two main components: a heavy, thick-walled steel spherical cabin suspended beneath a large, cigar-shaped float.
       * The Bathyscaphe was untethered and self-propelled, using gasoline to provide buoyancy and steel shot as ballast.
@@ -943,7 +943,7 @@ questions:
     explanation: "The prompt specifies contrasting the bathysphere and bathyscaphe by focusing on their maneuverability. Option B contrasts the unpowered, tethered bathysphere with the self-propelled, independently moving bathyscaphe."
     options:
       - id: "A"
-        text: "The Bathyscaphe used gasoline to provide buoyancy and the steel shot as balast, while the Bathysphere was untethered and self-propelled."
+        text: "The Bathyscaphe used gasoline to provide buoyancy and the steel shot as ballast, while the Bathysphere was untethered and self-propelled."
       - id: "B"
         text: "The Bathysphere was an unpowered spherical steel chamber that was tethered by a cable, while the later Bathyscaphe was self-propelled and could move independently."
       - id: "C"

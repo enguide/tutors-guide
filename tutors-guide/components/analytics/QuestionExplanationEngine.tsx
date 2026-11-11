@@ -1,0 +1,433 @@
+// components/analytics/QuestionExplanationEngine.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+
+import React, { useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import remarkGfm from "remark-gfm";
+import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import {
+  DesmosExplanationEmbed,
+  DesmosExpression,
+  DesmosGraphBounds,
+} from "@/components/tools/DesmosExplanationEmbed";
+import {
+  AlgebraicDerivationRail,
+  DerivationStep,
+} from "@/components/analytics/AlgebraicDerivationRail";
+import { Compass, Workflow, Sparkles, Calculator } from "lucide-react";
+
+interface QuestionExplanationEngineProps {
+  explanation: string;
+  category?: string;
+  testId?: string;
+  domain?: string;
+  skill?: string;
+  questionNumber?: number;
+}
+
+interface SolutionTab {
+  id: string;
+  title: string;
+  content: string;
+}
+
+/**
+ * 1. Safely extracts :::desmos ... ::: blocks into HTML placeholders
+ */
+function extractDesmosBlocks(content: string) {
+  const desmosConfigs: Record<
+    string,
+    {
+      expressions: DesmosExpression[];
+      bounds?: DesmosGraphBounds;
+      caption?: string;
+      height?: number;
+    }
+  > = {};
+
+  const processed = content.replace(
+    /:::desmos\s*([\s\S]*?):::/g,
+    (_, jsonStr) => {
+      try {
+        const cleaned = jsonStr.trim();
+        const parsed = JSON.parse(cleaned);
+        const placeholderId = `desmos-${Math.random().toString(36).substring(2, 9)}`;
+        desmosConfigs[placeholderId] = parsed;
+        return `<div data-desmos-id="${placeholderId}"></div>`;
+      } catch (err) {
+        console.error("Failed to parse Desmos JSON:", err, jsonStr);
+        return `<div class="p-3 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs rounded border border-red-300">Error parsing Desmos configuration: Invalid JSON</div>`;
+      }
+    }
+  );
+
+  return { processed, desmosConfigs };
+}
+
+/**
+ * 2. Safely extracts :::derivation ... ::: blocks into HTML placeholders
+ */
+function extractDerivationBlocks(content: string) {
+  const derivationMap: Record<string, DerivationStep[]> = {};
+
+  const processed = content.replace(/:::derivation\s*([\s\S]*?):::/g, (_, body) => {
+    const rawSteps = body.split(/(?=== step:)/g);
+    const steps: DerivationStep[] = [];
+
+    rawSteps.forEach((raw: string) => {
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith("== step:")) return;
+
+      const lines = trimmed.split("\n");
+      const title = lines[0].replace("== step:", "").trim();
+
+      let why = "";
+      const mathLines: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim().startsWith("-- why:")) {
+          why = line.replace("-- why:", "").trim();
+        } else {
+          mathLines.push(line);
+        }
+      }
+
+      steps.push({
+        stepNumber: steps.length + 1,
+        title,
+        why: why || undefined,
+        mathContent: mathLines.join("\n").trim(),
+      });
+    });
+
+    const placeholderId = `deriv-${Math.random().toString(36).substring(2, 9)}`;
+    derivationMap[placeholderId] = steps;
+    return `<div data-derivation-id="${placeholderId}"></div>`;
+  });
+
+  return { processed, derivationMap };
+}
+
+/**
+ * 3. Pre-extracts custom containers before tab regex matching
+ */
+function extractTabsAndBlocks(rawContent: string) {
+  // Step A: Extract Desmos and Derivation blocks first to prevent inner ":::" collisions
+  const { processed: contentWithDesmos, desmosConfigs } = extractDesmosBlocks(rawContent);
+  const { processed: contentWithBoth, derivationMap } = extractDerivationBlocks(contentWithDesmos);
+
+  // Step B: Match :::tabs ... :::
+  const tabBlockRegex = /:::tabs([\s\S]*?):::(?:tabs)?/;
+  const match = contentWithBoth.match(tabBlockRegex);
+
+  if (!match) {
+    return {
+      hasTabs: false,
+      preface: contentWithBoth,
+      tabs: [] as SolutionTab[],
+      postface: "",
+      desmosConfigs,
+      derivationMap,
+    };
+  }
+
+  const preface = contentWithBoth.substring(0, match.index).trim();
+  const postface = contentWithBoth.substring(match.index! + match[0].length).trim();
+  const rawTabsBody = match[1];
+
+  const tabSections = rawTabsBody.split(/(?=== tab:)/g);
+  const tabs: SolutionTab[] = [];
+
+  tabSections.forEach((section, idx) => {
+    const trimmed = section.trim();
+    if (!trimmed.startsWith("== tab:")) return;
+
+    const firstLineEnd = trimmed.indexOf("\n");
+    if (firstLineEnd === -1) {
+      tabs.push({
+        id: `tab-${idx}`,
+        title: trimmed.substring(7).trim(),
+        content: "",
+      });
+      return;
+    }
+
+    const title = trimmed.substring(7, firstLineEnd).trim();
+    const tabContent = trimmed.substring(firstLineEnd).trim();
+
+    tabs.push({
+      id: `tab-${idx}`,
+      title,
+      content: tabContent,
+    });
+  });
+
+  return {
+    hasTabs: true,
+    preface,
+    tabs,
+    postface,
+    desmosConfigs,
+    derivationMap,
+  };
+}
+
+export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps> = ({
+  explanation,
+  domain,
+  skill,
+}) => {
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+
+  const { hasTabs, preface, tabs, postface, desmosConfigs, derivationMap } = useMemo(
+    () => extractTabsAndBlocks(explanation),
+    [explanation]
+  );
+
+  const activeTab = hasTabs && tabs.length > 0 ? tabs[activeTabIdx] || tabs[0] : null;
+
+  const markdownComponents = useMemo(
+    () => ({
+      div: ({ node, ...props }: any) => {
+        const desmosId = props["data-desmos-id"];
+        if (desmosId && desmosConfigs[desmosId]) {
+          const config = desmosConfigs[desmosId];
+          return (
+            <DesmosExplanationEmbed
+              id={desmosId}
+              expressions={config.expressions}
+              bounds={config.bounds}
+              height={config.height}
+              caption={config.caption}
+            />
+          );
+        }
+
+        const derivId = props["data-derivation-id"];
+        if (derivId && derivationMap[derivId]) {
+          return <AlgebraicDerivationRail steps={derivationMap[derivId]} />;
+        }
+
+        return <div {...props} />;
+      },
+
+      h3: ({ children }: any) => (
+        <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200 mt-6 mb-3 flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-1.5 not-prose">
+          <Workflow className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          {children}
+        </h3>
+      ),
+
+      blockquote: ({ children }: any) => (
+        <blockquote className="my-4 border-l-3 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3 rounded-r-sm text-neutral-800 dark:text-neutral-200 text-[13.5px] leading-relaxed not-italic">
+          {children}
+        </blockquote>
+      ),
+
+      table: ({ children }: any) => (
+        <div className="my-5 w-full overflow-x-auto not-prose border border-neutral-200 dark:border-neutral-800 rounded-md">
+          <table className="w-full border-collapse text-[13px] font-sans text-neutral-800 dark:text-neutral-200">
+            {children}
+          </table>
+        </div>
+      ),
+
+      thead: ({ children }: any) => (
+        <thead className="bg-neutral-100 dark:bg-neutral-800/80 border-b border-neutral-200 dark:border-neutral-700 font-semibold text-neutral-900 dark:text-neutral-100">
+          {children}
+        </thead>
+      ),
+
+      tr: ({ children }: any) => (
+        <tr className="border-b border-neutral-200 dark:border-neutral-800/60 last:border-b-0 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+          {children}
+        </tr>
+      ),
+
+      th: ({ children }: any) => (
+        <th className="px-3.5 py-2 text-left font-semibold">{children}</th>
+      ),
+
+      td: ({ children }: any) => (
+        <td className="px-3.5 py-2.5 align-top">{children}</td>
+      ),
+
+      ul: ({ children }: any) => (
+        <ul className="space-y-2.5 my-3 list-none pl-0 not-prose">{children}</ul>
+      ),
+
+      li: ({ children }: any) => (
+        <li className="flex items-start text-[14px] leading-relaxed text-neutral-800 dark:text-neutral-200">
+          <span className="w-4 shrink-0 text-blue-500 font-bold mr-1.5 select-none">
+            ›
+          </span>
+          <div className="flex-1 min-w-0">{children}</div>
+        </li>
+      ),
+
+      ol: ({ children }: any) => (
+        <ol className="list-decimal pl-5 space-y-1.5 my-3 text-[14px] leading-relaxed">
+          {children}
+        </ol>
+      ),
+
+      p: ({ children }: any) => (
+        <p className="mb-3.5 last:mb-0 text-[14px] leading-relaxed text-neutral-800 dark:text-neutral-200">
+          {children}
+        </p>
+      ),
+
+      strong: ({ children }: any) => (
+        <strong className="font-semibold text-neutral-950 dark:text-white">
+          {children}
+        </strong>
+      ),
+
+      hr: () => (
+        <hr className="my-5 border-neutral-200 dark:border-neutral-800" />
+      ),
+    }),
+    [desmosConfigs, derivationMap]
+  );
+
+  return (
+    <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden font-sans">
+      {/* Header Banner */}
+      <div className="px-5 py-3.5 bg-linear-to-r from-blue-50 via-slate-50 to-white dark:from-blue-950/40 dark:via-neutral-900 dark:to-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center shadow-xs">
+            <Compass className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+              Explanation
+            </h2>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+              {domain ? `${domain} • ` : ""}
+              {skill || "Methodology & Traps"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300">
+            <Sparkles className="w-3 h-3" /> dSAT Calibrated
+          </span>
+        </div>
+      </div>
+
+      {/* Main Body */}
+      <div className="p-6 md:p-8">
+        {/* Preface */}
+        {preface && (
+          <div className="prose prose-neutral dark:prose-invert max-w-none text-neutral-900 dark:text-neutral-100 font-sans">
+            <ReactMarkdown
+              remarkPlugins={[remarkMath, remarkGfm]}
+              rehypePlugins={[
+                rehypeRaw,
+                [
+                  rehypeKatex,
+                  {
+                    output: "htmlAndMathml",
+                    strict: false,
+                    trust: true,
+                    throwOnError: false,
+                  },
+                ],
+              ]}
+              components={markdownComponents}
+            >
+              {preface}
+            </ReactMarkdown>
+          </div>
+        )}
+
+        {/* Tabbed Solutions */}
+        {hasTabs && tabs.length > 0 && (
+          <div className="my-6 border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/40">
+            {/* Tab Headers */}
+            <div className="flex items-center border-b border-neutral-200 dark:border-neutral-800 bg-neutral-100/70 dark:bg-neutral-900 px-3 pt-2 gap-1 overflow-x-auto no-scrollbar">
+              {tabs.map((tab, idx) => {
+                const isActive = activeTabIdx === idx;
+                const isDesmos = tab.title.toLowerCase().includes("desmos");
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTabIdx(idx)}
+                    className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-all border-b-2 rounded-t-sm whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? "border-blue-600 bg-white dark:bg-neutral-800 text-blue-600 dark:text-blue-400 shadow-xs"
+                        : "border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                    }`}
+                  >
+                    {isDesmos ? (
+                      <Calculator className="w-3.5 h-3.5" />
+                    ) : (
+                      <Workflow className="w-3.5 h-3.5" />
+                    )}
+                    {tab.title}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab Body */}
+            <div className="p-5 md:p-6 bg-white dark:bg-neutral-900">
+              {activeTab && (
+                <div className="prose prose-neutral dark:prose-invert max-w-none font-sans">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath, remarkGfm]}
+                    rehypePlugins={[
+                      rehypeRaw,
+                      [
+                        rehypeKatex,
+                        {
+                          output: "htmlAndMathml",
+                          strict: false,
+                          trust: true,
+                          throwOnError: false,
+                        },
+                      ],
+                    ]}
+                    components={markdownComponents}
+                  >
+                    {activeTab.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Postface */}
+        {postface && (
+          <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-800 prose prose-neutral dark:prose-invert max-w-none font-sans">
+            <ReactMarkdown
+              remarkPlugins={[remarkMath, remarkGfm]}
+              rehypePlugins={[
+                rehypeRaw,
+                [
+                  rehypeKatex,
+                  {
+                    output: "htmlAndMathml",
+                    strict: false,
+                    trust: true,
+                    throwOnError: false,
+                  },
+                ],
+              ]}
+              components={markdownComponents}
+            >
+              {postface}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

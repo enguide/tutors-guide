@@ -32,7 +32,7 @@ questions:
     questionType: "MC"
     correctAnswer: "B"
     domain: "Craft and Structure"
-    skill: "Words in Context"
+    skill: "Text Structure and Purpose"
     difficulty: "Easy"
     containsGraph: false
     containsChart: false
@@ -81,7 +81,7 @@ questions:
     correctAnswer: "C"
     domain: "Craft and Structure"
     skill: "Words in Context"
-    difficulty: "Easy"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -363,7 +363,7 @@ questions:
     correctAnswer: "D"
     domain: "Standard English Conventions"
     skill: "Boundaries"
-    difficulty: "Easy"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -386,7 +386,7 @@ questions:
     correctAnswer: "D"
     domain: "Standard English Conventions"
     skill: "Form, Structure, and Sense"
-    difficulty: "Easy"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -478,7 +478,7 @@ questions:
     correctAnswer: "B"
     domain: "Standard English Conventions"
     skill: "Boundaries"
-    difficulty: "Easy"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
@@ -499,7 +499,7 @@ questions:
     questionNumber: 22
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Craft and Structure"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Easy"
     containsGraph: false
@@ -522,7 +522,7 @@ questions:
     questionNumber: 23
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Craft and Structure"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Easy"
     containsGraph: false
@@ -545,7 +545,7 @@ questions:
     questionNumber: 24
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Craft and Structure"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Easy"
     containsGraph: false
@@ -570,7 +570,7 @@ questions:
     correctAnswer: "C"
     domain: "Craft and Structure"
     skill: "Transitions"
-    difficulty: "Easy"
+    difficulty: "Mediumq"
     containsGraph: false
     containsChart: false
     containsDiagram: false

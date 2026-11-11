@@ -10,47 +10,49 @@ questions:
     correctAnswer: "B"
     domain: "Craft and Structure"
     skill: "Words in Context"
-    difficulty: "Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Despite widespread concern that artificial intelligence will be used to supplant human creativity, many artists are now finding ways to integrate AI into their processes, using it as a tool to generate novel ideas or refine existing works. This evolving relationship suggests a more ______ future where technology acts as a collaborator rather than a competitor.
+      Despite concerns that computer algorithms will displace human artists, many creators incorporate digital tools directly into their daily work. Rather than treating software as a rival, these artists use it to generate unpredictable patterns, establishing a ______ relationship that relies on continuous mutual exchange.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The text describes technology acting as a 'collaborator rather than a competitor' where artists integrate AI into their processes, which points directly to a cooperative, 'synergistic' future."
+    explanation: |
+      The sentence establishes that artists do not treat software as a rival ("competing creator"), but rather cultivate a relationship built on "continuous mutual exchange." The word "symbiotic" means involving a mutually beneficial or cooperative relationship, which accurately reflects this dynamic.
     options:
       - id: "A"
-        text: "anachronistic"
+        text: "adversarial"
       - id: "B"
-        text: "synergistic"
+        text: "symbiotic"
       - id: "C"
         text: "perfunctory"
       - id: "D"
-        text: "antagonistic"
+        text: "anomalous"
   - id: "sat-t1-rw2h-q2"
     questionNumber: 2
     questionType: "MC"
     correctAnswer: "C"
     domain: "Craft and Structure"
     skill: "Words in Context"
-    difficulty: "Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The architect's design for the new museum sought to entirely ______ conventional notions of gallery spaces, creating instead a series of interconnected, organically shaped rooms that encourage visitors to experience art in a more fluid and less prescriptive manner.
+      The architect's plan for the new gallery avoids the linear corridors and predetermined pathways typical of standard municipal museums. By arranging a series of open pavilions that encourage unguided exploration, the design deliberately ______ the rigid instructional format common to older cultural institutions.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "Because the architect created alternative, organically shaped spaces instead of standard ones, the design aimed to overturn or 'subvert' conventional notions of gallery spaces."
+    explanation: |
+      The text contrasts the new design's "open pavilions" and "unguided exploration" with the "linear corridors" and "predetermined pathways" of standard facilities. By intentionally rejecting these established conventions, the proposed layout "subverts" (undermines or challenges) the rigid traditional framework.
     options:
       - id: "A"
-        text: "reinforce"
+        text: "corroborates"
       - id: "B"
-        text: "emulate"
+        text: "delineates"
       - id: "C"
-        text: "subvert"
+        text: "subverts"
       - id: "D"
-        text: "delineate"
-  - id: "sat-t1-rwh2-q3"
+        text: "epitomizes"
+  - id: "sat-t1-rw2h-q3"
     questionNumber: 3
     questionType: "MC"
     correctAnswer: "A"
@@ -61,42 +63,44 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Environmental studies have increasingly demonstrated that the cumulative effect of low-level exposure to certain industrial chemicals can be profoundly ______ to public health; while individual doses may seem harmless, years of bioaccumulation can lead to serious chronic conditions.
+      Initial exposure to synthetic plasticizers rarely causes noticeable symptoms, leading toxicologists to warn that the compounds are uniquely ______. While immediate health risks appear negligible, trace amounts can accumulate over several decades and gradually disrupt normal hormone regulation.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The text explains that bioaccumulation leads to serious chronic conditions, indicating that exposure is harmful or 'deleterious' to public health."
+    explanation: |
+      The text indicates that the compounds produce effects that are "rarely noticeable" with "negligible" immediate risk, yet over time they accumulate and "gradually disrupt" vital systems. The missing term must describe something that causes harm subtly and slowly over time. "Insidious" precisely denotes developing gradually and causing serious harm without early detection.
     options:
       - id: "A"
-        text: "deleterious"
+        text: "insidious"
       - id: "B"
-        text: "prescriptive"
+        text: "ephemeral"
       - id: "C"
-        text: "inscrutable"
+        text: "innocuous"
       - id: "D"
-        text: "propitious"
-  - id: "sat-t1-rwh2-q4"
+        text: "intractable"
+  - id: "sat-t1-rw2h-q4"
     questionNumber: 4
     questionType: "MC"
     correctAnswer: "D"
     domain: "Craft and Structure"
     skill: "Words in Context"
-    difficulty: "Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      While distinct in origin, the architectural traditions of ancient Egypt and Mesopotamia exhibit numerous ______ one another, such as the use of monumental structures built with sun-dried bricks and the incorporation of intricate religious iconography—traits developed independently to fulfill analogous societal and environmental demands.
+      Although geographically isolated from each other, the early architectural traditions of ancient Egypt and Mesopotamia developed notable ______ each other. Both societies built monumental structures from sun-dried brick and incorporated elaborate religious iconography, independently arriving at similar solutions to address comparable civic and environmental demands.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
-    explanation: "The text discusses similarities between the architectural traditions of Egypt and Mesopotamia (such as monumental structures and iconography) that fulfilled analogous demands, indicating numerous 'parallels to' one another."
+    explanation: |
+      The passage highlights shared features between two isolated traditions (such as monumental mud-brick architecture and religious imagery) that arose independently to meet similar societal needs. The missing phrase must indicate similarities or correspondences. "Parallels to" correctly indicates that the two architectural traditions shared significant structural similarities.
     options:
       - id: "A"
         text: "divergences from"
       - id: "B"
         text: "innovations over"
       - id: "C"
-        text: "contentions against"
+        text: "disparities with"
       - id: "D"
         text: "parallels to"
-  - id: "sat-t1-rwh2-q5"
+  - id: "sat-t1-rw2h-q5"
     questionNumber: 5
     questionType: "MC"
     correctAnswer: "C"
@@ -107,15 +111,10 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      When professor Magne Nylenna and his colleagues submitted manuscripts containing deliberately introduced methodological flaws to medical journals, they discovered that most reviewers failed to detect the errors. Subsequent evaluations revealed that these findings were hardly ______: when Dr. Fiona Godlee and her team later administered a similar test across hundreds of reviewers, the vast majority again overlooked the planted defects.
+      When researcher Magne Nylenna submitted manuscripts containing planted methodological errors to medical journals, reviewers consistently failed to spot the flaws. Subsequent trials demonstrated that these results were hardly ______: when another team tested hundreds of peer reviewers using similar methods, most participants also overlooked the defects, confirming that the oversight was systemic.
     prompt: "Which choice completes the text with the most logical and precise word or phrase?"
     explanation: |
-      The sentence structure uses a colon to link an initial claim about Nylenna’s findings with an illustrative follow-up study. The text explains that Nylenna's results were "hardly [BLANK]" because a subsequent experiment conducted by Godlee yielded nearly identical outcomes ("the vast majority again overlooked the planted defects"). Therefore, the blank must describe something that is unusual, isolated, or exceptional, which the phrase "hardly" will negate to show that Nylenna's results were reproducible and not an isolated fluke.
-
-      * **C** ("anomalous") means deviating from what is standard, normal, or expected (i.e., an irregular fluke or outlier). Stating that the results were "hardly anomalous" directly aligns with Godlee obtaining the same widespread reviewer oversights.
-      * **A** ("credible") means believable or plausible. Saying the results were "hardly credible" would mean they were dubious or untrustworthy, which directly contradicts the fact that another independent study confirmed and replicated them.
-      * **B** ("consequential") means significant or having important outcomes. The text emphasizes reproducibility and consistency across trials, not whether the findings lacked impact or importance.
-      * **D** ("quantifiable") means able to be measured or expressed as a numerical value. The study clearly measured defect detection rates, and Godlee's replication does not address whether the initial findings could be counted or measured.
+      The text states that subsequent research replicated the initial findings across hundreds of reviewers, demonstrating that the failure was "systemic" rather than an isolated incident. The phrase "hardly [blank]" requires a word denoting an irregular occurrence, fluke, or aberration. "Anomalous" means deviating from what is standard, normal, or expected; stating that the results were "hardly anomalous" indicates they were not isolated flukes.
     options:
       - id: "A"
         text: "credible"
@@ -125,7 +124,7 @@ questions:
         text: "anomalous"
       - id: "D"
         text: "quantifiable"
-  - id: "sat-t1-rwh2-q6"
+  - id: "sat-t1-rw2h-q6"
     questionNumber: 6
     questionType: "MC"
     correctAnswer: "C"
@@ -136,21 +135,20 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The following text is adapted from a critical essay examining the works of Virginia Woolf.
-
-      > Woolf's narrative technique, particularly in novels such as *Mrs. Dalloway*, is characterized by its stream-of-consciousness approach, often delving deep into the subjective experiences of her characters. This method, while offering unparalleled psychological insight, sometimes came at the expense of conventional plot progression. [[u:6]]Thus, while the narrative's intricate interiority occasionally challenged readers accustomed to more straightforward storytelling, it nonetheless offered a revolutionary exploration of consciousness.[[/u]]
-    prompt: "Which choice best describes the function of the underlined portion in the text as a whole?"
-    explanation: "The underlined portion acknowledges a drawback or challenge for readers ('challenged readers accustomed to more straightforward storytelling') while affirming the novel's major artistic contribution ('offered a revolutionary exploration of consciousness')."
+      Virginia Woolf's novel *Mrs. Dalloway* prioritizes the subjective impressions of its characters over continuous external action. By filtering events through fluid internal monologues, the narrative departs from conventional storytelling. While this approach can disorient readers who expect a linear plot, it allows Woolf to depict interior thought with unusual clarity.
+    prompt: "Which choice best describes the function of the final sentence in the text as a whole?"
+    explanation: |
+      The final sentence acknowledges a potential challenge for readers ("can disorient readers who expect a linear plot") before affirming the artistic benefit achieved by the technique ("depict interior thought with unusual clarity"). Choice C accurately reflects this balance between recognizing an obstacle and stating the author's underlying literary objective.
     options:
       - id: "A"
-        text: "It criticizes Woolf for prioritizing experimental form over reader accessibility."
+        text: "It argues that Woolf's narrative technique made her novel largely inaccessible to general audiences."
       - id: "B"
-        text: "It suggests that the complexity of Woolf's style was an intentional barrier to casual readers."
+        text: "It suggests that Woolf obscured the plot primarily to criticize conventional fiction."
       - id: "C"
-        text: "It acknowledges a potential difficulty for readers while affirming the novel's innovative literary contribution."
+        text: "It acknowledges a difficulty the narrative presents to readers while highlighting its intended artistic effect."
       - id: "D"
-        text: "It posits that the novel's critical acclaim was primarily due to its unconventional structure rather than its content."
-  - id: "sat-t1-rwh2-q7"
+        text: "It contends that the novel's critical reputation rests on its pacing rather than its subject matter."
+  - id: "sat-t1-rw2h-q7"
     questionNumber: 7
     questionType: "MC"
     correctAnswer: "C"
@@ -161,19 +159,20 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The migration patterns of certain cetacean species remain largely enigmatic, though prevailing theories suggest that ocean currents and prey distribution play significant roles. Ecologist Dr. Alexandre Zerbini and his colleagues hypothesized that shifts in global oceanic temperatures would induce measurable alterations in humpback whale migratory routes. After gathering and analyzing two decades of satellite telemetry data, they observed that whales frequently diverged from historical paths in years marked by anomalous warming in their traditional feeding grounds, suggesting an adaptive response to resource availability.
+      Whale migration routes remain only partially understood, though currents and prey density are widely considered primary factors. Marine ecologist Alexandre Zerbini hypothesized that regional ocean temperature spikes would prompt humpback whales to adjust their travel paths. Tracking whales over two decades via satellite telemetry, Zerbini's team confirmed that pods consistently shifted away from historical corridors during abnormally warm years, supporting their initial prediction.
     prompt: "Which choice best describes the overall structure of the text?"
-    explanation: "The text discusses a process scientists do not fully understand (cetacean migration patterns), introduces a research team's hypothesis concerning that process (shifts in global temperatures induce route alterations), and presents data collected by the team that corroborates the hypothesis."
+    explanation: |
+      The text opens by describing an incompletely understood biological topic (whale migration paths), introduces a targeted hypothesis proposed by Zerbini's team (temperature spikes cause route changes), and summarizes satellite tracking data that corroborate their prediction. Choice C accurately details this structural progression.
     options:
       - id: "A"
-        text: "It describes an unproven theory about animal behavior, outlines a method used to confirm that theory, and then presents observational evidence that contradicts the theory."
+        text: "It outlines an ecological consensus, reviews a study meant to challenge it, and notes that the data leaves the question open."
       - id: "B"
-        text: "It introduces a complex biological phenomenon, details a research team's hypothesis about that phenomenon, and then describes a finding that necessitated a revision of the hypothesis."
+        text: "It introduces a theoretical model, details a test of that model, and identifies a variable that undermines the findings."
       - id: "C"
-        text: "It discusses a process that scientists do not fully understand, introduces a research team's hypothesis concerning that process, and then presents data collected by the team that corroborates the hypothesis."
+        text: "It identifies an incompletely understood biological process, outlines a specific hypothesis about it, and presents data supporting that hypothesis."
       - id: "D"
-        text: "It outlines a scientific debate regarding migratory behavior, describes one perspective in that debate, and then provides a synthesis of various research findings that resolve the debate."
-  - id: "sat-t1-rwh2-q8"
+        text: "It summarizes two competing explanations for an animal behavior, tests one of them, and reconciles the two theories."
+  - id: "sat-t1-rw2h-q8"
     questionNumber: 8
     questionType: "MC"
     correctAnswer: "C"
@@ -184,23 +183,24 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Researchers at Cornell University's College of Agriculture and Life Sciences examined the impact of different fertilizer compositions on crop yield in a controlled agricultural environment. The group noted a substantial increase in biomass production with the high-nitrogen formulation; crucially, soil pH levels across all experimental plots remained consistent, allowing the researchers to attribute the enhanced yield specifically to the nitrogen content rather than to changes in soil acidity or alkalinity.
-    prompt: "It can most reasonably be inferred from the text that the finding about soil pH levels was important for which reason?"
-    explanation: "Because soil pH remained consistent, researchers could rule out alternative explanations (such as changes in soil acidity or alkalinity) for the increased yield, attributing it solely to nitrogen."
+      Researchers investigated whether a high-nitrogen fertilizer increases wheat yields by boosting photosynthetic capacity or by accelerating early leaf growth. Test plots treated with the high-nitrogen mixture showed germination and leaf emergence rates identical to those of control plots. However, treated plants produced 28% more biomass and maintained substantially higher chlorophyll levels per leaf throughout maturation, leading researchers to conclude that ______
+    prompt: "Which choice most logically completes the text?"
+    explanation: |
+      The study evaluated two competing explanations for increased crop yield: enhanced photosynthetic capacity or faster early leaf development. Because the timing of germination and early leaf growth was identical across all plots, the second explanation is ruled out. Given that treated plants displayed elevated chlorophyll density alongside greater biomass, the researchers can logically infer that the yield increase was driven by enhanced photosynthetic activity rather than an accelerated developmental pace.
     options:
       - id: "A"
-        text: "It indicated that the high-nitrogen formulation had a negligible impact on overall soil health."
+        text: "nitrogen levels should be varied across the growing season to ensure uniform germination times."
       - id: "B"
-        text: "It provided preliminary evidence that consistent soil pH is a prerequisite for effective fertilizer use."
+        text: "high-nitrogen fertilizers are effective only in soils that already contain optimal baseline chlorophyll levels."
       - id: "C"
-        text: "It ruled out a potential alternative explanation for the observed increase in biomass production."
+        text: "the yield increase resulted from enhanced photosynthetic capacity rather than a faster developmental timeline."
       - id: "D"
-        text: "It clarified that the chosen fertilizer compositions did not significantly alter the chemical properties of the soil."
-  - id: "sat-t1-rwh2-q9"
+        text: "chlorophyll density serves as a more dependable indicator of crop yield than overall soil nitrogen content."
+  - id: "sat-t1-rw2h-q9"
     questionNumber: 9
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Information and Ideas"
+    domain: "Craft and Structure"
     skill: "Cross-Text Connections"
     difficulty: "Hard"
     containsGraph: false
@@ -208,78 +208,79 @@ questions:
     containsDiagram: false
     stimulus: |
       **Text 1**
-
-      The notion that creativity is a purely individualistic pursuit often overlooks the profound influence of collaborative environments. [[u:9]]Many groundbreaking innovations stem not from solitary genius, but from the dynamic exchange of ideas and iterative feedback within a collective.[[/u]] To isolate creativity from its social matrix is to fundamentally misunderstand its most fertile origins.
+      Viewing intellectual discovery as an isolated act overlooks the critical influence of working groups. Breakthrough ideas rarely originate in seclusion; instead, they develop through the continuous exchange of perspectives and critique within a research community. Isolating an insight from its social setting obscures the collective discussions that produce meaningful innovation.
 
       **Text 2**
-
-      While collaboration certainly plays a role in refining and disseminating ideas, the initial spark of innovation frequently arises from an individual's unique insight or imaginative leap. Historical accounts of scientific breakthroughs and artistic movements often highlight singular figures who first conceived of radical new approaches, subsequently developing them with peers. The collective then serves more as an accelerator and validator than the primary generator of novel concepts.
-    prompt: "Based on the texts, how would the author of Text 2 most likely respond to the claim in the underlined sentence of Text 1?"
-    explanation: "Text 1 claims that groundbreaking innovations stem from collective exchange rather than solitary genius. Text 2 argues that initial sparks arise from individuals while collectives serve to refine and validate. Thus, the author of Text 2 would concede that communal feedback facilitates development while maintaining that the creative genesis remains a solitary phenomenon."
+      While research groups certainly help refine and test ideas, the foundational moment of discovery almost always happens within a single mind. Scientific records repeatedly show individual thinkers synthesizing disparate concepts before sharing their initial proposals with peers. Group discussion serves mainly to evaluate and polish an existing concept, not to generate the initial intellectual leap.
+    prompt: "Based on the texts, how would the author of Text 2 most likely respond to the claim in the second sentence of Text 1?"
+    explanation: |
+      The second sentence of Text 1 asserts that major breakthroughs rarely originate in seclusion, instead developing through critique within a research community. The author of Text 2 agrees that working groups help "evaluate and polish" concepts, but insists that the foundational moment of discovery happens within an individual mind before peer input occurs. Choice D accurately conveys this concessive yet distinct perspective.
     options:
       - id: "A"
-        text: "By contending that the collective environment is more likely to constrain than to catalyze the development of radical concepts."
+        text: "By arguing that collective feedback typically discourages researchers from pursuing genuinely unconventional ideas."
       - id: "B"
-        text: "By positing that historical narratives of \"singular figures\" are often retrospective social constructs rather than reflections of reality."
+        text: "By suggesting that accounts crediting individual thinkers are often retrospective simplifications of collective work."
       - id: "C"
-        text: "By arguing that the \"dynamic exchange of ideas\" is actually the final stage of innovation rather than its foundational catalyst."
+        text: "By asserting that group critique takes place only after an innovation has already gained broad public acceptance."
       - id: "D"
-        text: "By conceding that communal feedback facilitates development while maintaining that the creative genesis remains a solitary phenomenon."
-  - id: "sat-t1-rwh2-q10"
+        text: "By acknowledging that collaborative feedback helps refine concepts while maintaining that the primary insight originates with an individual."
+  - id: "sat-t1-rw2h-q10"
     questionNumber: 10
     questionType: "MC"
     correctAnswer: "B"
     domain: "Information and Ideas"
-    skill: "Inferences"
+    skill: "Command of Evidence"
     difficulty: "Hard"
     containsGraph: false
     containsChart: true
     containsDiagram: false
     stimulus: |
-      Mean Response Times for Task Completion (in seconds)
+      Mean Task Completion Times Under Sensory Distraction (in seconds)
 
-      | Condition | Group A | Group B | Group C |
+      | Task Type | Baseline (No Distraction) | Auditory Distraction | Visual Distraction |
       | :--- | :---: | :---: | :---: |
-      | Simple Calculation | $15.2$ | $18.5$ | $19.1$ |
-      | Data Entry | $28.9$ | $35.1$ | $37.8$ |
-      | Problem Solving | $42.1$ | $55.6$ | $61.3$ |
+      | Simple Calculation | 15.2 | 18.5 | 19.1 |
+      | Data Entry | 28.9 | 35.1 | 37.8 |
+      | Complex Problem Solving | 42.1 | 55.6 | 68.4 |
 
-      To investigate how different types of distractions affect task completion times, researchers conducted an experiment with three groups. Group A performed a set of novel tasks without distraction, Group B with auditory distraction, and Group C with visual distraction. Compared to the mean times for the group that operated without distraction, the mean times for the group that was forced to contend with visual distraction ______
-    prompt: "Which choice most effectively uses data from the table to complete the statement?"
-    explanation: "Looking at the table, Group C (visual distraction) has higher mean times (19.1, 37.8, 61.3) across all three tasks compared to Group A without distraction (15.2, 28.9, 42.1), indicating that visual distractions generally slowed task completion."
+      Psychologists tested how auditory and visual distractions affect task completion times. A researcher hypothesized that while both distractions slow performance across all tasks, visual distraction imposes an escalating penalty as cognitive demand rises, impairing complex reasoning far more severely than auditory interference does.
+    prompt: "Which choice best describes data from the table that support the researcher's hypothesis?"
+    explanation: |
+      The researcher's hypothesis requires showing that the negative impact of visual distraction grows disproportionately larger than that of auditory distraction as task complexity increases. Choice B provides direct evidence: for Simple Calculation, visual distraction added only 0.6 seconds relative to auditory distraction (19.1 vs. 18.5), whereas for Complex Problem Solving, visual distraction added 12.8 seconds over auditory distraction (68.4 vs. 55.6).
     options:
       - id: "A"
-        text: "ranged from $19.1$ to $61.3$ seconds, indicating that task completion varied widely."
+        text: "Mean completion times under visual distraction exceeded baseline by 3.9 seconds for Simple Calculation and by 8.9 seconds for Data Entry."
       - id: "B"
-        text: "were higher for all three tasks, indicating that visual distractions generally slowed task completion."
+        text: "Visual distraction increased completion times over auditory distraction by less than 1 second for Simple Calculation, but by more than 12 seconds for Complex Problem Solving."
       - id: "C"
-        text: "ranged from $15.2$ to $42.1$ seconds, with Problem Solving requiring the most time."
+        text: "Completion times under auditory distraction were consistently slower than baseline, reaching a maximum of 55.6 seconds for Complex Problem Solving."
       - id: "D"
-        text: "were primarily influenced by the type of task rather than the presence of distraction."
-  - id: "sat-t1-rwh2-q11"
+        text: "Complex Problem Solving produced the longest mean completion times across all three conditions, ranging from 42.1 seconds to 68.4 seconds."
+  - id: "sat-t1-rw2h-q11"
     questionNumber: 11
     questionType: "MC"
     correctAnswer: "A"
     domain: "Information and Ideas"
     skill: "Central Ideas and Details"
-    difficulty: "Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      With the 1855 publication of *Leaves of Grass*, Walt Whitman fundamentally redefined the \"poetic speaker.\" While contemporary verse typically employed a detached, lyrical persona, Whitman utilized an immersive \"I\" designed to dissolve the boundary between poet and reader. This shift was a calculated social maneuver; by adopting a first-person perspective that claimed to contain \"multitudes,\" Whitman transformed the individual voice into a microcosm of democratic pluralism, where personal and collective identities become indistinguishable.
-    prompt: "According to the passage, a key effect of Whitman's embrace of free verse was to:"
-    explanation: "The text explains that Whitman's immersive first-person perspective dissolved boundaries between poet and reader, transforming the individual voice into a microcosm of democratic pluralism where personal and collective identities merge."
+      In his 1855 poetry collection *Leaves of Grass*, Walt Whitman broke with nineteenth-century American literary conventions. While contemporary poets typically favored a detached, formal speaker, Whitman used an intimate first-person voice. By claiming his speaker contained "multitudes," Whitman transformed personal expression into an expansive vehicle meant to represent the diversity of a democratic society.
+    prompt: "Based on the text, what was the primary function of Whitman's poetic speaker?"
+    explanation: |
+      The text states that Whitman replaced the conventional detached speaker with an intimate first-person voice that contained "multitudes," allowing personal expression to represent "the diversity of a democratic society." Choice A accurately reflects this purpose by stating that the speaker transformed individual expression into an embodiment of shared identity.
     options:
       - id: "A"
-        text: "replace established lyrical traditions with a style that merges individual and communal identities."
+        text: "To transform individual expression into an embodiment of a shared collective identity."
       - id: "B"
-        text: "provide a literal historical record of the diverse individuals who influenced his work."
+        text: "To document the specific historical events that influenced nineteenth-century American poets."
       - id: "C"
-        text: "underscore the poet's sense of personal isolation from nineteenth-century society."
+        text: "To emphasize the speaker's emotional detachment from contemporary democratic culture."
       - id: "D"
-        text: "maintain the detached, objective perspective characteristic of contemporary European verse."
-  - id: "sat-t1-rwh2-q12"
+        text: "To deliver moral instruction through an authoritative and objective philosophical persona."
+  - id: "sat-t1-rw2h-q12"
     questionNumber: 12
     questionType: "MC"
     correctAnswer: "C"
@@ -290,19 +291,20 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      For much of history, astronomical observations were limited by the naked eye and early optical instruments, restricting our understanding of the universe to relatively bright, nearby objects. This limitation fostered a geocentric or, later, a heliocentric model confined to our solar system and nearby stars. The advent of radio astronomy in the mid-20th century, however, revolutionized our cosmic perspective. By detecting radiation invisible to optical telescopes, radio astronomers uncovered distant galaxies, quasars, and the cosmic microwave background radiation, profoundly expanding the observable universe and revealing phenomena previously unimaginable, thereby demonstrating that the boundaries of our cosmic knowledge are ______
+      Before the mid-twentieth century, astronomers relied almost exclusively on optical telescopes, leading them to describe interstellar space as cold, uniform, and inert. When radio and infrared detectors were introduced, however, scientists detected turbulent molecular clouds and high-energy radiation invisible to optical instruments. These observations demonstrated that earlier models were incomplete not because astronomers had misread optical data, but because ______
     prompt: "Which choice most logically completes the text?"
-    explanation: "The text describes how our knowledge was restricted by limited tools, and how new tools (radio astronomy) expanded our cosmic view, demonstrating that our knowledge boundaries are tied to and limited/constrained by our observational tools."
+    explanation: |
+      The passage explains that optical observations led to an incomplete view of interstellar space as inert, whereas non-visible wavelengths (radio and infrared) uncovered energetic, turbulent phenomena that were undetectable by optical means. The text clarifies that earlier models failed not due to errors in interpreting optical data, but because optical observations alone could not detect the physical phenomena driving the medium's energetic behavior.
     options:
       - id: "A"
-        text: "primarily determined by the physical distance of celestial objects."
+        text: "early optical telescopes lacked the magnification required to distinguish individual stars in distant galaxies."
       - id: "B"
-        text: "best advanced through the development of ever-larger optical telescopes."
+        text: "astronomers had mistakenly assumed that high-energy radiation was confined to the visible spectrum."
       - id: "C"
-        text: "constrained by the reach of our observational tools."
+        text: "the visible light spectrum could not capture the energetic processes driving interstellar activity."
       - id: "D"
-        text: "independent of the specific wavelengths of light being measured."
-  - id: "sat-t1-rwh2-q13"
+        text: "interstellar clouds had undergone major physical changes between the early and mid-twentieth century."
+  - id: "sat-t1-rw2h-q13"
     questionNumber: 13
     questionType: "MC"
     correctAnswer: "B"
@@ -315,19 +317,21 @@ questions:
     stimulus: |
       ![](./assets/dSAT-T1-RW2H-Q11.svg)
 
-      A research team investigated the potential impact of daily commute time on employee productivity, as measured by average time required to complete a standard task. One hundred full-time employees from a large technology firm participated in a four-week study. Participants were divided into three groups: those with commute times under 30 minutes, those with commute times between 30 and 60 minutes, and those with commute times over 60 minutes. Task completion times were recorded weekly for each employee, and averages were calculated for each group. The researchers concluded that longer commute times were correlated with lower average productivity.
-    prompt: "Which choice best describes data from the table that supports the researchers' conclusion?"
-    explanation: "The data shows that the group with 30-60 minute commute times had lower average task completion times across all four weeks than the group with over 60 minute commute times (and similarly, under 30 minutes was lower still), supporting the conclusion that longer commutes correlate with lower productivity (higher completion times)."
+      Researchers tracked employee productivity across three commute-duration groups: under 30 minutes, 30 to 60 minutes, and over 60 minutes. Once a week for four weeks, participants completed a timed analytical evaluation. Based on the results, the researchers concluded that longer daily commutes were consistently associated with slower task completion times throughout the study period.
+    prompt: "Which choice best describes data from the graph that support the researchers' conclusion?"
+    explanation: |
+      The researchers concluded that longer daily commutes consistently led to slower task completion (higher completion times) across the entire study period. Choice B directly supports this claim by pointing out that in each individual week, the group with the shortest commute had the lowest completion time, while the group with the longest commute had the highest completion time.
     options:
       - id: "A"
-        text: "The group with commute times over 60 minutes displayed the most variability (over 7 minutes) in their task completion times during the four weeks of the study."
+        text: "The over-60-minute group saw its completion time decline from Week 2 to Week 3 before rising again in Week 4."
       - id: "B"
-        text: "The average task completion time for the group with 30-60 minute commute times was lower across all four weeks than the average completion time for the group with over 60 minute commute times."
+        text: "In each of the four weeks, mean completion times were lowest for the under-30-minute group and highest for the over-60-minute group."
       - id: "C"
-        text: "All three groups took longer on average to complete their measured task in week 3 than they did in week 1."
+        text: "The under-30-minute group completed the task in 15 minutes during Week 1, compared to 18 minutes for the 30-to-60-minute group."
       - id: "D"
-        text: "During the third week of observation, the group with commute times under 30 minutes took less than 21 minutes complete their task."
-  - id: "sat-t1-rwh2-q14"
+        text: "Completion times for both the under-30-minute and 30-to-60-minute groups peaked during Week 3 before falling in Week 4."
+
+  - id: "sat-t1-rw2h-q14"
     questionNumber: 14
     questionType: "MC"
     correctAnswer: "D"
@@ -338,19 +342,21 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The history of cartography is not merely a record of improving geographical accuracy; it is also a narrative of cultural priorities and shifting power dynamics. Early world maps, for instance, often placed the mapmaker's own region at the center, regardless of its true global position, thus projecting a symbolic significance onto a specific geopolitical space. Even modern projections, such as the widely used Mercator map, inherently distort the relative sizes of continents to preserve navigational angles. This phenomenon demonstrates that the act of creating a map, far from being a purely objective scientific endeavor, is always, to some degree, ______
+      Every map projection inevitably reflects selective priorities rather than an exact depiction of physical space. Medieval European maps placed Jerusalem at the center of the world to emphasize religious authority over geographic distance. Modern Mercator projections distort polar landmasses to maintain straight navigation bearings for sea travel. This ongoing reliance on altered spatial arrangements suggests that all map projections are inherently ______
     prompt: "Which choice most logically completes the text?"
-    explanation: "The text explains that maps reflect cultural priorities, power dynamics, and symbolic geopolitical choices rather than pure objectivity, showing map-making to be a political and culturally resonant act of world-making."
+    explanation: |
+      The passage provides examples showing that mapmakers—whether guided by medieval religious beliefs or modern navigational requirements—consistently alter geographical proportions to serve specific functional or ideological objectives. Therefore, every map reflects structural compromises designed for particular ends rather than an unmediated representation of reality. Choice D precisely captures this conclusion.
     options:
       - id: "A"
-        text: "an obsolete practice superseded by digital geographical tools."
+        text: "imprecise approximations that digital navigation tools have rendered entirely obsolete."
       - id: "B"
-        text: "a practical exercise intended solely for maritime navigation."
+        text: "compromises intended to balance practical navigation needs against religious symbolism."
       - id: "C"
-        text: "a precise mathematical calculation free of subjective interpretation."
+        text: "mathematical models whose accuracy is determined by the nationality of the cartographer."
       - id: "D"
-        text: "a political and culturally resonant act of world-making."
-  - id: "sat-t1-rwh2-q15"
+        text: "selective frameworks that prioritize specific practical or cultural goals over spatial accuracy."
+
+  - id: "sat-t1-rw2h-q15"
     questionNumber: 15
     questionType: "MC"
     correctAnswer: "A"
@@ -363,42 +369,45 @@ questions:
     stimulus: |
       ![](./assets/dSAT-T1-RW2H-Q15.svg)
 
-      A group of sports scientists at the Norwegian University of Science and Technology (NTNU) investigated the relative effectiveness of two distinct six-week training regimens on Recovery Heart Rate (RHR—each participant's heart rate 1 minute after peak exercise), a key physiological indicator of cardiovascular fitness. Group X incorporated high-intensity interval training, while Group Y undertook on a steady-state aerobic protocol. The data suggests that while ______
-    prompt: "Which choice most effectively uses data from the graph to complete the text?"
-    explanation: "Looking at the graph, Group Y (steady-state) starts higher and remains higher for the first three weeks, but Group X (HIIT) drops faster initially while Group Y achieves a superior final reduction/result by week 6."
+      Physiologists compared recovery heart rate (RHR)—where lower values reflect superior cardiovascular fitness—between participants doing high-intensity interval training (Group X) and those doing continuous aerobic exercise (Group Y). Both programs lowered RHR over six weeks, but an investigator observed that although participants in both groups improved their cardiovascular efficiency, ______
+    prompt: "Which choice most effectively uses data from the graph to complete the statement?"
+    explanation: |
+      The graph indicates that Group X's recovery heart rate decreased steadily each week, dropping from 115 BPM in Week 1 to 95 BPM in Week 6 (a total reduction of 20 BPM). In contrast, Group Y began at 118 BPM, dropped to 105 BPM (a reduction of 13 BPM), and experienced a plateau between Weeks 4 and 5 at 108 BPM. Choice A accurately describes both Group X's larger total reduction and Group Y's mid-study plateau.
     options:
       - id: "A"
-        text: "the recovery heart rate for Group Y showed a consistent decrease over the six-week period, the high-intensity interval training of Group X resulted in a more substantial and rapid reduction in RHR."
+        text: "Group X achieved a larger overall reduction in RHR than Group Y, maintaining steady weekly decreases while Group Y plateaued between Weeks 4 and 5."
       - id: "B"
-        text: "the steady-state protocol consistently resulted in a higher recovery heart rate than the high intensity interval training for the first three weeks, the magnitude of improvement for Group Y in the subsequent weeks was sufficient to achieve a superior final result by Week 6."
+        text: "Group Y recorded lower recovery heart rates than Group X through Week 3, but Group X achieved a faster recovery rate by Week 6."
       - id: "C"
-        text: "both Group X and Group Y initiated the study with nearly identical average RHR (approximately 115 BPM and 118 BPM respectively), the high-intensity interval training resulted in a final heart rate that was only 10 BPM lower than its starting rate."
+        text: "Group X reduced its recovery heart rate by 10 BPM over the study, whereas Group Y achieved a total decrease of more than 20 BPM."
       - id: "D"
-        text: "the average recovery heart rate for Group X saw a precipitous decline in the first five weeks, the rate of decline for Group Y was significantly steeper, resulting in a final recovery heart rate of 105 BPM."
-  - id: "sat-t1-rwh2-q16"
+        text: "both regimens generated identical weekly reductions through Week 3, after which Group X showed no further measurable improvement."
+  - id: "sat-t1-rw2h-q16"
     questionNumber: 16
     questionType: "MC"
     correctAnswer: "A"
     domain: "Standard English Conventions"
-    skill: "Boundaries"
-    difficulty: "Hard"
+    skill: "Form, Structure, and Sense"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      The city council's recent initiative to revitalize urban parks includes plans for new recreational facilities and increased green infrastructure. This concerted effort to enhance public spaces, driven by a desire to improve community well-being and services, ______ a forward-thinking approach to city planning.
+      Urban planners emphasize that the installation of urban green spaces—including bioswales, permeable sidewalks, and expanded tree canopies across neglected neighborhoods—______ sustained collaboration among regional agencies to ensure long-term maintenance.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The subject of the sentence is the singular noun phrase \"This concerted effort\" (with the intervening phrase \"driven by a desire...\"), which requires the singular present tense verb \"reflects\"."
+    explanation: |
+      The subject of the clause introduced by "that" is the singular noun phrase "the installation" (of urban green spaces). The phrase enclosed by em dashes ("including bioswales... neighborhoods") is a nonessential parenthetical list that does not affect the grammatical number of the subject. The singular subject "installation" requires the singular verb form "requires."
     options:
       - id: "A"
-        text: "reflects"
+        text: "requires"
       - id: "B"
-        text: "reflect"
+        text: "require"
       - id: "C"
-        text: "has reflected"
+        text: "are requiring"
       - id: "D"
-        text: "was reflecting"
-  - id: "sat-t1-rwh2-q17"
+        text: "have required"
+
+  - id: "sat-t1-rw2h-q17"
     questionNumber: 17
     questionType: "MC"
     correctAnswer: "D"
@@ -409,43 +418,21 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      While many believe the Industrial Revolution was solely a period of rapid mechanization, historians increasingly emphasize its role as a fundamental societal ______ demographics and labor structures worldwide.
+      Images returned by the New Horizons spacecraft revealed that Pluto's frozen surface conceals a surprising geological ______ a vast, nitrogen-rich plain known as Sputnik Planitia that continuously renews itself through slow thermal convection.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The noun phrase ends with \"societal transformation\". The clause or phrase following it is a participial phrase (\"altering demographics...\") that describes the action of the transformation, and it should be separated by a comma."
+    explanation: |
+      The sentence begins with an independent clause: "Images returned by the New Horizons spacecraft revealed that Pluto's frozen surface conceals a surprising geological feature." The segment that follows ("a vast, nitrogen-rich plain known as Sputnik Planitia...") is an appositive noun phrase that specifies and defines the exact "geological feature" introduced in the main clause. A colon is standard and appropriate to connect an independent clause to an appositive noun phrase that explains, illustrates, or specifies an element of that clause. Choice D supplies the colon cleanly without introducing unnecessary verbs or comma splices.
     options:
       - id: "A"
-        text: "transformation; altering"
+        text: "feature; being"
       - id: "B"
-        text: "transformation: and altering"
+        text: "feature, and it is"
       - id: "C"
-        text: "transformation, and altering"
+        text: "feature, it is"
       - id: "D"
-        text: "transformation, altering"
-  - id: "sat-t1-rwh2-q18"
+        text: "feature:"
+  - id: "sat-t1-rw2h-q18"
     questionNumber: 18
-    questionType: "MC"
-    correctAnswer: "A"
-    domain: "Standard English Conventions"
-    skill: "Boundaries"
-    difficulty: "Hard"
-    containsGraph: false
-    containsChart: false
-    containsDiagram: false
-    stimulus: |
-      The complex migratory pattern of monarch butterflies, spanning thousands of miles across generations, ______ a testament to the remarkable evolutionary adaptations these insects have developed.
-    prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The singular subject \"The complex migratory pattern\" requires the singular present tense verb \"remains\", with the intervening prepositional and participial phrases separated by commas."
-    options:
-      - id: "A"
-        text: "remains"
-      - id: "B"
-        text: "is remaining"
-      - id: "C"
-        text: "remain"
-      - id: "D"
-        text: "have remained"
-  - id: "sat-t1-rwh2-q19"
-    questionNumber: 19
     questionType: "MC"
     correctAnswer: "B"
     domain: "Standard English Conventions"
@@ -455,20 +442,21 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Seismologists can accurately model the structural behavior of subterranean fault lines, allowing for crucial long-term risk assessment. Predicting the exact timing of major seismic events remains ______ the sheer complexity of underground stresses and friction fundamentally limits predictive capacity to, at best, broad spatial and temporal windows.
+      Spanning thousands of miles from breeding zones in Canada to overwintering sites in central ______ must coordinate international field observations across multiple borders to track eastern monarch butterflies.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The first part ending with \"remains impossible\" is an independent clause, and the clause beginning with \"the sheer complexity...\" is another independent clause. Joining them requires a comma followed by a coordinating conjunction, or a semicolon and transition word properly punctuated. Option C uses \"impossible, however,\" where \"however\" acts as a parenthetical or introductory word within the second clause, or alternatively, let's verify standard punctuation: option C uses commas correctly around a parenthetical transition following a comma splice if the clauses are linked properly, wait—let's check standard comma splice rules apply unless a semicolon is used. Let's look at the options carefully: option C has \"impossible, however,\", which creates a comma splice unless it's treated as a coordinate clause or parenthetical. Wait, option A uses a semicolon and \"however,\", which correctly joins two independent clauses."
+    explanation: |
+      The sentence begins with an introductory participial phrase ("Spanning thousands of miles from breeding zones in Canada to overwintering sites in central Mexico"). Standard English conventions require that the noun or noun phrase immediately following the introductory modifier must be the logical subject performing or characterized by that action. Because it is the migration route that spans thousands of miles—not the researchers themselves—the clause following the comma must begin with the route, or if structured around the researchers, the modifier must logically describe the subject. In Choice B, the noun phrase "Mexico, monarch migration routes require that entomologists" correctly attributes the physical span to the routes while cleanly introducing the main independent clause.
     options:
       - id: "A"
-        text: "impossible; however,"
+        text: "Mexico, entomologists"
       - id: "B"
-        text: "impossible, however;"
+        text: "Mexico, monarch migration routes require that entomologists"
       - id: "C"
-        text: "impossible, however,"
+        text: "Mexico; entomologists"
       - id: "D"
-        text: "impossible however,"
-  - id: "sat-t1-rwh2-q20"
-    questionNumber: 20
+        text: "Mexico, where entomologists"
+  - id: "sat-t1-rw2h-q19"
+    questionNumber: 19
     questionType: "MC"
     correctAnswer: "C"
     domain: "Standard English Conventions"
@@ -478,9 +466,37 @@ questions:
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Even among the most venomous snakes, the inland taipan (*Oxyuranus microlepidotus*) is exceptionally dangerous, a single bite ______ enough venom to kill over 100 adult humans. Its potent neurotoxins and hemotoxins attack the nervous system and blood, causing rapid paralysis and internal bleeding.
+      Seismologists can reliably identify high-risk fault zones by analyzing historical displacement patterns along tectonic plates. Predicting the exact timing of individual ruptures remains ______ shifts in underground friction restrict forecasts to broad statistical estimates.
     prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
-    explanation: "The clause \"a single bite ______ enough venom...\" is a modifying absolute phrase or needs to be a complete verb clause. Since \"a single bite\" is the subject, it requires the singular present tense verb \"contains\" to form a complete predicate."
+    explanation: |
+      The passage contains three distinct clauses across two sentences. Sentence 1 establishes what seismologists can do (reliably identify high-risk zones). The second sentence contains two independent clauses: (1) "Predicting the exact timing of individual ruptures remains impossible [however]" and (2) "shifts in underground friction restrict forecasts to broad statistical estimates." 
+      
+      The conjunctive adverb "however" is meant to contrast the limitation in the first part of Sentence 2 with the success described in Sentence 1. It does NOT contrast the third clause with the second, because the third clause explains and reinforces why timing cannot be predicted. Therefore, "however" belongs to the first clause of Sentence 2 as a trailing adverb (set off by a comma), and the boundary between the two independent clauses requires a semicolon. Choice C correctly places the comma before "however" and the semicolon after it ("impossible, however;").
+    options:
+      - id: "A"
+        text: "impossible; however,"
+      - id: "B"
+        text: "impossible, however,"
+      - id: "C"
+        text: "impossible, however;"
+      - id: "D"
+        text: "impossible however"
+
+  - id: "sat-t1-rw2h-q20"
+    questionNumber: 20
+    questionType: "MC"
+    correctAnswer: "C"
+    domain: "Standard English Conventions"
+    skill: "Form, Structure, and Sense"
+    difficulty: "Hard"
+    containsGraph: false
+    containsChart: false
+    containsDiagram: false
+    stimulus: |
+      Even among the most venomous snakes, the coastal taipan is unusually lethal, a single bite ______ enough neurotoxin to incapacitate dozens of adult humans within minutes.
+    prompt: "Which choice completes the text so that it conforms to the conventions of Standard English?"
+    explanation: |
+      The text opens with an independent clause: "Even among the most venomous snakes, the coastal taipan is unusually lethal." Following the comma, the phrase starting with "a single bite" functions as an absolute phrase that modifies the main clause. Non-finite participles (such as "containing") allow the absolute phrase to provide descriptive elaboration without becoming an uncoordinated second independent clause. Choice C correctly supplies the participle "containing." Choices A, B, and D provide finite verbs that would create a comma splice.
     options:
       - id: "A"
         text: "contain"
@@ -489,44 +505,47 @@ questions:
       - id: "C"
         text: "containing"
       - id: "D"
-        text: "have contained"
-  - id: "sat-t1-rwh2-q21"
+        text: "has contained"
+
+  - id: "sat-t1-rw2h-q21"
     questionNumber: 21
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Information and Ideas"
+    domain: "Expression of Ideas"
     skill: "Transitions"
-    difficulty: "Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Mangrove ecosystems are vital for coastal protection, acting as natural barriers against storm surges and erosion. ______ their intricate root systems provide crucial habitats for diverse marine life, supporting fisheries and local economies.
+      Mangrove forests serve as critical physical buffers along coastlines, absorbing wave energy and reducing shoreline erosion during storms. ______ the dense root networks of these intertidal trees provide sheltered nurseries for young fish, supporting marine biodiversity across adjacent reefs.
     prompt: "Which choice completes the text with the most logical transition?"
-    explanation: "The first sentence introduces one benefit of mangroves (coastal protection), and the second sentence introduces an additional, separate benefit (providing habitats for marine life and supporting fisheries). This is an additive relationship, making \"Furthermore,\" the most logical transition."
+    explanation: |
+      The first sentence describes one ecological role of mangrove forests (absorbing wave energy and limiting coastal erosion). The second sentence introduces another distinct benefit (providing sheltered nurseries for young fish). The transition must indicate that the second point adds a complementary ecological function to the first. "Additionally," correctly signals this additive relationship.
     options:
       - id: "A"
         text: "Nonetheless,"
       - id: "B"
-        text: "Furthermore,"
+        text: "Additionally,"
       - id: "C"
         text: "In contrast,"
       - id: "D"
         text: "Consequently,"
-  - id: "sat-t1-rwh2-q22"
+  - id: "sat-t1-rw2h-q22"
     questionNumber: 22
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Information and Ideas"
+    domain: "Expression of Ideas"
     skill: "Transitions"
-    difficulty: "Hard"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      While some fungi are parasitic—causing diseases in plants and animals—many others form beneficial symbiotic relationships. ______ mycorrhizal fungi colonize plant roots, enhancing nutrient and water absorption for the host plant while receiving carbohydrates in return.
+      While some soil fungi act as destructive parasites that weaken host plants, many species form mutually beneficial partnerships underground. ______ mycorrhizal fungi grow directly into plant roots to help crops absorb phosphorus from the surrounding soil in exchange for plant-produced sugars.
     prompt: "Which choice completes the text with the most logical transition?"
-    explanation: "The first sentence introduces the broad category of beneficial symbiotic relationships among fungi, and the second sentence provides a specific instance (mycorrhizal fungi). This requires an exemplification transition, making \"For example,\" the correct choice."
+    explanation: |
+      The first sentence introduces the broad claim that many soil fungi establish mutually beneficial partnerships with plants. The second sentence provides a specific, concrete example of this relationship by describing how mycorrhizal fungi trade phosphorus for plant sugars. The transition "Specifically," correctly introduces this detailed illustration of the general concept.
     options:
       - id: "A"
         text: "Consequently,"
@@ -535,21 +554,23 @@ questions:
       - id: "C"
         text: "In short,"
       - id: "D"
-        text: "For example,"
-  - id: "sat-t1-rwh2-q23"
+        text: "Specifically,"
+
+  - id: "sat-t1-rw2h-q23"
     questionNumber: 23
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Antarctica's landscape is overwhelmingly defined by its vast ice sheets, a sharp contrast to the heat and sand that characterize the Sahara Desert of North Africa. ______ people often overlook Antarctica when considering candidates for the world's largest desert, despite its characteristic minimal precipitation.
+      Popular conceptions of deserts are dominated by images of hot sand dunes like those of the Sahara, rather than vast expanses of polar ice. ______ many people overlook Antarctica when naming the world's largest desert, despite its extremely low annual precipitation.
     prompt: "Which choice completes the text with the most logical transition?"
-    explanation: "The first sentence states that Antarctica is defined by ice, which contrasts with the traditional image of a desert, while the second sentence notes that people overlook it despite its minimal precipitation. This creates a concessive or contrasting relationship, making \"However,\" the correct choice."
+    explanation: |
+      The first sentence establishes that people associate deserts with sand and heat rather than ice sheets. The second sentence describes the direct result of that common association: people frequently fail to recognize frozen Antarctica as the world's largest desert. A cause-and-effect transition is required. "Consequently," accurately signals this logical result.
     options:
       - id: "A"
         text: "In addition,"
@@ -559,64 +580,68 @@ questions:
         text: "Consequently,"
       - id: "D"
         text: "For instance,"
-  - id: "sat-t1-rwh2-q24"
+
+  - id: "sat-t1-rw2h-q24"
     questionNumber: 24
     questionType: "MC"
-    correctAnswer: "D"
-    domain: "Information and Ideas"
+    correctAnswer: "A"
+    domain: "Expression of Ideas"
     skill: "Transitions"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
-      Synesthesia, a neurological condition in which stimulation of one sensory or cognitive pathway leads to involuntary experiences in a second sensory or cognitive pathway, manifests in various forms. ______ a person with grapheme-color synesthesia automatically perceives letters and numbers as inherently colored, despite the visual stimuli being printed in black ink.
+      Neuroscientists investigating synesthesia sought to determine whether the condition results from unusual brain wiring formed during early childhood or from altered signaling along normal neural pathways. ______ researchers scanned the visual cortex of study participants as they viewed black-and-white letters on a monitor.
     prompt: "Which choice completes the text with the most logical transition?"
-    explanation: "The first sentence introduces the general concept that synesthesia manifests in various forms, and the second sentence provides a specific case (grapheme-color synesthesia) as an example. Thus, \"For instance,\" is the most logical transition."
+    explanation: |
+      The first sentence outlines a specific research goal (determining whether synesthesia stems from structural wiring or altered signaling). The second sentence describes the experimental method designed to answer that question (scanning participants' brains while they view letters). The phrase "To that end," correctly indicates that the experiment was conducted for the specific purpose outlined in the preceding sentence.
     options:
       - id: "A"
-        text: "Consequently,"
+        text: "To that end,"
       - id: "B"
-        text: "Similarly,"
+        text: "In comparison,"
       - id: "C"
-        text: "Additionally,"
+        text: "Nonetheless,"
       - id: "D"
-        text: "For instance,"
-  - id: "sat-t1-rwh2-q25"
+        text: "Incidentally,"
+  - id: "sat-t1-rw2h-q25"
     questionNumber: 25
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
-    difficulty: "Hard"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: false
     stimulus: |
       While researching a topic, a student has taken the following notes:
 
-      * The Bauhaus school of art and design was founded in Germany in 1919 by Walter Gropius.
-      * It sought to unify art, craft, and technology, influencing movements like functionalism and rationalism.
-      * One of its key principles was "form follows function," emphasizing design based on purpose.
-      * Many Bauhaus artists and architects, including Gropius, emigrated to the United States in the 1930s due to political pressures.
-      * This emigration significantly impacted American architecture and design education.
-    prompt: "The student wants to highlight the core philosophy of the Bauhaus movement for an audience interested in design principles. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
-    explanation: "The prompt specifies highlighting the core philosophy of the Bauhaus movement (unifying art, craft, and technology, and emphasizing \"form follows function\"). Option C directly and effectively highlights these core design principles."
+      * The Bauhaus school of design was founded in Germany in 1919 by architect Walter Gropius.
+      * The school aimed to bridge the traditional divide between fine art, practical craft, and modern technology.
+      * A foundational principle of Bauhaus design was "form follows function."
+      * This idea held that an object's visual design should emerge directly from its practical utility.
+      * Bauhaus design concepts influenced modern architecture and product design throughout the twentieth century.
+    prompt: "The student wants to highlight the core design philosophy of the Bauhaus movement. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
+    explanation: |
+      The prompt specifically asks to highlight the core design philosophy of the Bauhaus movement. Choice C directly describes this philosophy: applying the principle that "form follows function" to connect fine art, craft, and technology so that an object's appearance reflects its practical use. Choice A addresses the school's founding and later architectural influence rather than its design philosophy; Choice B introduces an unsupported claim that the philosophy was created in the United States; and Choice D mischaracterizes the timeline and origins of the movement.
     options:
       - id: "A"
-        text: "The Bauhaus school, founded in Germany in 1919 by Walter Gropius, was a significant influence on American architecture after its artists emigrated."
+        text: "Founded in Germany in 1919 by Walter Gropius, the Bauhaus school went on to shape modern architecture throughout the twentieth century."
       - id: "B"
-        text: "Walter Gropius, who founded the Bauhaus in 1919, was among many artists who emigrated to the U.S. in the 1930s."
+        text: "Walter Gropius developed the core philosophy of the Bauhaus movement after moving to the United States to escape political pressures."
       - id: "C"
-        text: "Emphasizing \"form follows function,\" the Bauhaus movement unified art, craft, and technology, thereby influencing functionalism and rationalism."
+        text: "Grounded in the idea that \"form follows function,\" the Bauhaus philosophy joined fine art, craft, and technology so an object's design reflects its practical purpose."
       - id: "D"
-        text: "Functionalism and rationalism were movements influenced by the Bauhaus school, which was founded in Germany."
-  - id: "sat-t1-rwh2-q26"
+        text: "The Bauhaus design philosophy was adapted from modern architectural trends that existed in Germany before the school was founded in 1919."
+
+  - id: "sat-t1-rw2h-q26"
     questionNumber: 26
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
@@ -624,27 +649,31 @@ questions:
     stimulus: |
       While researching a topic, a student has taken the following notes:
 
-      * The Magna Carta Libertatum (Great Charter of Liberties), commonly known as the Magna Carta, was a peace treaty brokered on June 15, 1215, at Runnymede by King John of England and a coalition of powerful, rebellious barons.
-      * The Charter's enduring significance lies in its declaration that the monarch, like all subjects, was bound by the law: a profound shift from the doctrine of absolute royal power.
-      * It established foundational legal precedents, primarily through Clauses 39 and 40, which guaranteed specific rights to \"free men,\" including the right to a swift and fair trial by one's peers and protection against the arbitrary seizure of person or property.
-      * Though initially unsuccessful in preventing civil war, it served as a critical intellectual and legal antecedent for the development of parliamentary democracy, the English Bill of Rights (1689), and the framework of the United States Constitution and its Bill of Rights.
-    prompt: "The student wants to explain the enduring legacy of the Magna Carta by focusing on its establishment of specific individual rights. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
-    explanation: "The prompt requires explaining the enduring legacy of the Magna Carta by focusing on its establishment of specific individual rights. Option C directly highlights that the Magna Carta codified essential civil liberties for \"free men,\" including the right to due process and protection against arbitrary seizure."
+      * In June 1215, King John of England granted the Magna Carta to resolve a dispute with rebel barons.
+      * The charter was designed to place legal limits on royal authority.
+      * Clauses 39 and 40 established explicit legal safeguards for "free men."
+      * These clauses banned arbitrary imprisonment and guaranteed the right to a lawful trial.
+      * They also protected free men from having land or personal possessions confiscated without due process.
+      * Centuries later, these provisions served as precedents for the United States Constitution.
+    prompt: "The student wants to explain how the Magna Carta established specific individual protections for free men. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
+    explanation: |
+      The prompt directs the student to explain how the charter established specific protections for free men. Choice C accurately cites Clauses 39 and 40, identifying the exact rights guaranteed: access to a lawful trial and protection against arbitrary detention and unlawful property seizure. Choice A incorrectly states that Clauses 39 and 40 created the English Bill of Rights; Choice B addresses the broad constitutional constraint on the monarchy rather than the specific protections granted to free men; and Choice D introduces an inaccurate claim about preventing civil conflict through property confiscation.
     options:
       - id: "A"
-        text: "Although initially brokered as a pact of reconciliation between King John and rebellious barons in 1215, the Magna Carta served as a critical intellectual and legal antecedent for the development of parliamentary democracy"
+        text: "Agreed to in 1215 at Runnymede, Clauses 39 and 40 established the English Bill of Rights by protecting rebel barons from royal prosecution."
       - id: "B"
-        text: "The Magna Carta, or \"Great Charter,\" fundamentally subordinated the monarch to the rule of law and served as an important precursor for later governing frameworks, including the U.S. Constitution."
+        text: "Although intended to settle a dispute between King John and rebel barons, the Magna Carta ultimately served to limit monarchical power under statutory law."
       - id: "C"
-        text: "A foundational charter for constitutional governance, the Magna Carta codified essential civil liberties for \"free men,\" including the right to due process and protection against the arbitrary seizure of person or property."
+        text: "Through Clauses 39 and 40, the Magna Carta established protections for free men by guaranteeing lawful trials and prohibiting arbitrary imprisonment and property seizure."
       - id: "D"
-        text: "Despite its initial failure to avert domestic strife, the Magna Carta was formally ratified at Runnymede in June of 1215."
-  - id: "sat-t1-rwh2-q27"
+        text: "The Magna Carta granted individual protections by ensuring that monarchs could not seize personal property from free men without sparking civil conflict."
+
+  - id: "sat-t1-rw2h-q27"
     questionNumber: 27
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Information and Ideas"
-    skill: "Central Ideas and Details"
+    domain: "Expression of Ideas"
+    skill: "Rhetorical Synthesis"
     difficulty: "Hard"
     containsGraph: false
     containsChart: false
@@ -652,20 +681,22 @@ questions:
     stimulus: |
       While researching a topic, a student has taken the following notes:
 
-      * A team of ecologists from the Royal Zoological Society of Scotland (RZSS) studied the impact of reintroducing the Eurasian beaver (*Castor fiber*) to a section of the Scottish Highlands, a species extirpated from the region 400 years prior.
-      * They monitored the beavers' activity and its subsequent effects on the local ecosystem over five years, establishing a baseline of conditions before release.
-      * The team used high-resolution drones and ground surveys to track the creation of dams, canals, and ponds, mapping hydrogeological changes.
-      * Water quality was tested bi-monthly for nutrient load and sediment retention, and quadrat-based botanical surveys were conducted annually to assess changes in plant diversity.
-      * The study concluded that the beavers' dam-building increased wetland area by an average of 44% and significantly improved water retention during dry periods.
-    prompt: "The student wants to present the methodology of the study used by the team. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
-    explanation: "The prompt asks to present the methodology of the study used by the team. Option C (or rather, option B in the choices list which details establishing baseline conditions, using drones, ground surveys, water quality tests, and botanical surveys) effectively outlines the methods used. Let's check option B: 'After establishing baseline conditions, the team used high-resolution drones and ground surveys to track beaver activity and conducted bi-monthly water quality tests and annual quadrat-based botanical surveys to assess environmental changes.'"
+      * Ecologists assessed the environmental impact of reintroducing Eurasian beavers (*Castor fiber*) to the Scottish Highlands.
+      * Before releasing any beavers, the team recorded baseline conditions across several river systems.
+      * Over five years, researchers used drone imagery and ground surveys to track changes in river channels and ponds.
+      * Field teams tested water samples every two months to measure sediment retention and nutrient runoff.
+      * Researchers surveyed plant diversity along riverbanks once a year.
+      * The study determined that beaver activity expanded local wetland area by an average of 44%.
+    prompt: "The student wants to describe the methodology used to evaluate environmental changes. Which choice most effectively uses relevant information from the notes to accomplish this goal?"
+    explanation: |
+      The prompt requires describing the research team's methodology. Choice B details the methods listed in the notes: recording pre-release baseline conditions, mapping physical changes using drones and ground surveys, and testing water samples every two months while monitoring plant diversity annually. Choice A reports the study's primary conclusion (a 44% increase in wetland area) rather than its methodology; Choice C misassigns the methods by claiming drones analyzed water samples and plant surveys monitored dams; and Choice D reverses the timeline by asserting that baseline data was collected after releasing the animals.
     options:
       - id: "A"
-        text: "Ecologists monitored the reintroduction of the Eurasian beaver (*Castor fiber*) in the Scottish Highlands for five years, observing an average 44% increase in wetland area and confirming the beaver's role as a keystone species."
+        text: "A five-year ecological study in the Scottish Highlands found that reintroducing Eurasian beavers expanded local wetland habitats by an average of 44%."
       - id: "B"
-        text: "After establishing baseline conditions, the team used high-resolution drones and ground surveys to track beaver activity and conducted bi-monthly water quality tests and annual quadrat-based botanical surveys to assess environmental changes."
+        text: "After establishing a pre-release baseline, researchers mapped physical changes with drones and ground surveys, tested water bi-monthly, and surveyed vegetation annually."
       - id: "C"
-        text: "A team of ecologists from the Royal Zoological Society of Scotland (RZSS) conducted a five-year study in the Scottish Highlands, reintroducing the Eurasian beaver and then monitoring its impact on the local ecosystem."
+        text: "To track environmental changes, researchers used high-resolution drones to evaluate water chemistry and conducted plant surveys to monitor changes in dams."
       - id: "D"
-        text: "A study on the reintroduction of beavers, a species extirpated 400 years ago, showed that the animals' dam-building activity significantly improved water retention in the Scottish Highlands during dry periods."
+        text: "Researchers assessed the species' impact by releasing beavers into rivers, recording baseline conditions afterward, and measuring the resulting 44% increase in wetlands."
 ---

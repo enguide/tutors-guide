@@ -311,7 +311,7 @@ questions:
   - id: "sat-t1-m2e-q11"
     questionNumber: 11
     questionType: "MC"
-    correctAnswer: "D"
+    correctAnswer: "B"
     domain: "Algebra"
     skill: "Linear equations in two variables"
     difficulty: "Easy"
@@ -337,11 +337,11 @@ questions:
       - id: "A"
         text: "$12$"
       - id: "B"
-        text: "$38$"
-      - id: "C"
-        text: "$60$"
-      - id: "D"
         text: "$22$"
+      - id: "C"
+        text: "$38$"
+      - id: "D"
+        text: "$60$"
   - id: "sat-t1-m2e-q12"
     questionNumber: 12
     questionType: "MC"
@@ -428,7 +428,7 @@ questions:
     correctAnswer: "B"
     domain: "Geometry and Trigonometry"
     skill: "Lines, angles, and triangles"
-    difficulty: "Easy"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: false
     containsDiagram: true
@@ -593,7 +593,7 @@ questions:
     correctAnswer: "D"
     domain: "Advanced Math"
     skill: "Nonlinear functions"
-    difficulty: "Easy"
+    difficulty: "Medium"
     containsGraph: false
     containsChart: true
     containsDiagram: false
@@ -685,8 +685,8 @@ questions:
     questionNumber: 22
     questionType: "MC"
     correctAnswer: "A"
-    domain: "Algebra"
-    skill: "Operations with polynomials"
+    domain: "Advanced Math"
+    skill: "Equivalent Expressions"
     difficulty: "Easy"
     containsGraph: false
     containsChart: false
