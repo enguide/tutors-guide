@@ -713,17 +713,17 @@ questions:
       * **(D) 140:** *Wrong Target Trap.* This is the number of bananas sold ($B$).
     options:
       - id: "A"
-        text: "40"
+        text: "$40$"
       - id: "B"
-        text: "60"
+        text: "$60$"
       - id: "C"
-        text: "80"
+        text: "$80$"
       - id: "D"
-        text: "140"
+        text: "$140$"
 
   - id: "sat-t1-m1-q9"
     questionNumber: 9
-    questionType: "SPR"
+    questionType: "FR"
     correctAnswer: "34"
     domain: "Advanced Math"
     skill: "Nonlinear Functions"
