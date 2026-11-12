@@ -1,13 +1,15 @@
 // components/analytics/AlgebraicDerivationRail.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { ArrowRight, Info } from "lucide-react";
+import { resolveTestAssetUrl } from "@/lib/contentPaths";
 
 export interface DerivationStep {
   stepNumber: number;
@@ -18,9 +20,83 @@ export interface DerivationStep {
 
 interface AlgebraicDerivationRailProps {
   steps: DerivationStep[];
+  category?: string;
+  testId?: string;
+  manifestBasePath?: string;
 }
 
-export const AlgebraicDerivationRail: React.FC<AlgebraicDerivationRailProps> = ({ steps }) => {
+export const AlgebraicDerivationRail: React.FC<AlgebraicDerivationRailProps> = ({
+  steps,
+  category,
+  testId,
+  manifestBasePath,
+}) => {
+  const markdownComponents = useMemo(
+    () => ({
+      img: ({ src, alt = "" }: any) => {
+        if (typeof src !== "string" || !src.trim()) {
+          return null;
+        }
+
+        let resolvedSrc =
+          category && testId
+            ? resolveTestAssetUrl(category, testId, src, manifestBasePath)
+            : src;
+
+        if (
+          !resolvedSrc.startsWith("http://") &&
+          !resolvedSrc.startsWith("https://") &&
+          !resolvedSrc.startsWith("/")
+        ) {
+          resolvedSrc = "/" + resolvedSrc.replace(/^(\.\/|\/)?/, "");
+        }
+
+        const isSvg = resolvedSrc.toLowerCase().endsWith(".svg");
+
+        return (
+          <figure className="my-2 flex flex-col items-center w-full">
+            <img
+              src={resolvedSrc}
+              alt={alt || "Derivation step diagram"}
+              className={`max-h-[240px] max-w-full w-auto h-auto object-contain mx-auto select-none ${
+                isSvg
+                  ? "dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
+                  : "rounded-[2px]"
+              }`}
+              loading="eager"
+            />
+            {alt && (
+              <figcaption className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1 text-center font-mono">
+                {alt}
+              </figcaption>
+            )}
+          </figure>
+        );
+      },
+
+      p: ({ children }: any) => {
+        const childrenArray = React.Children.toArray(children);
+        const hasBlockElement = childrenArray.some((child) => {
+          if (React.isValidElement(child)) {
+            return (
+              child.type === "figure" ||
+              (child.props as any)?.node?.tagName === "img" ||
+              (child.props as any)?.src !== undefined
+            );
+          }
+          return false;
+        });
+
+        if (hasBlockElement) {
+          return <div className="my-2 last:mb-0">{children}</div>;
+        }
+
+        return <p className="mb-2 last:mb-0">{children}</p>;
+      },
+    }),
+    [category, testId, manifestBasePath]
+  );
+
   return (
     <div className="relative my-6 space-y-6 not-prose font-sans">
       {/* Continuous Timeline Spine */}
@@ -56,13 +132,22 @@ export const AlgebraicDerivationRail: React.FC<AlgebraicDerivationRailProps> = (
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                 {/* Mathematical Derivation Lane */}
                 <div className="md:col-span-7 bg-neutral-50/70 dark:bg-neutral-950/50 border border-neutral-200/70 dark:border-neutral-800/80 rounded-md p-3.5 overflow-x-auto flex items-center justify-center min-h-18">
-                  <div className="text-[14.5px] leading-relaxed text-neutral-900 dark:text-neutral-100">
+                  <div className="w-full text-[14.5px] leading-relaxed text-neutral-900 dark:text-neutral-100">
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkGfm]}
                       rehypePlugins={[
                         rehypeRaw,
-                        [rehypeKatex, { output: "htmlAndMathml", strict: false, trust: true }],
+                        [
+                          rehypeKatex,
+                          {
+                            output: "htmlAndMathml",
+                            strict: false,
+                            trust: true,
+                            throwOnError: false,
+                          },
+                        ],
                       ]}
+                      components={markdownComponents}
                     >
                       {step.mathContent}
                     </ReactMarkdown>
@@ -81,8 +166,17 @@ export const AlgebraicDerivationRail: React.FC<AlgebraicDerivationRailProps> = (
                         remarkPlugins={[remarkMath, remarkGfm]}
                         rehypePlugins={[
                           rehypeRaw,
-                          [rehypeKatex, { output: "htmlAndMathml", strict: false, trust: true }],
+                          [
+                            rehypeKatex,
+                            {
+                              output: "htmlAndMathml",
+                              strict: false,
+                              trust: true,
+                              throwOnError: false,
+                            },
+                          ],
                         ]}
+                        components={markdownComponents}
                       >
                         {step.why}
                       </ReactMarkdown>

@@ -17,12 +17,14 @@ import {
   AlgebraicDerivationRail,
   DerivationStep,
 } from "@/components/analytics/AlgebraicDerivationRail";
+import { resolveTestAssetUrl } from "@/lib/contentPaths";
 import { Compass, Workflow, Sparkles, Calculator } from "lucide-react";
 
 interface QuestionExplanationEngineProps {
   explanation: string;
   category?: string;
   testId?: string;
+  manifestBasePath?: string;
   domain?: string;
   skill?: string;
   questionNumber?: number;
@@ -178,6 +180,9 @@ function extractTabsAndBlocks(rawContent: string) {
 
 export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps> = ({
   explanation,
+  category,
+  testId,
+  manifestBasePath,
   domain,
   skill,
 }) => {
@@ -209,10 +214,60 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
 
         const derivId = props["data-derivation-id"];
         if (derivId && derivationMap[derivId]) {
-          return <AlgebraicDerivationRail steps={derivationMap[derivId]} />;
+          return (
+            <AlgebraicDerivationRail
+              steps={derivationMap[derivId]}
+              category={category}
+              testId={testId}
+              manifestBasePath={manifestBasePath}
+            />
+          );
         }
 
         return <div {...props} />;
+      },
+
+      img: ({ src, alt = "" }: any) => {
+        if (typeof src !== "string" || !src.trim()) {
+          return null;
+        }
+
+        let resolvedSrc =
+          category && testId
+            ? resolveTestAssetUrl(category, testId, src, manifestBasePath)
+            : src;
+
+        if (
+          !resolvedSrc.startsWith("http://") &&
+          !resolvedSrc.startsWith("https://") &&
+          !resolvedSrc.startsWith("/")
+        ) {
+          resolvedSrc = "/" + resolvedSrc.replace(/^(\.\/|\/)?/, "");
+        }
+
+        const isSvg = resolvedSrc.toLowerCase().endsWith(".svg");
+
+        return (
+          <figure className="my-4 flex flex-col items-center w-full not-prose">
+            <div className="p-3 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs max-w-full flex items-center justify-center">
+              <img
+                src={resolvedSrc}
+                alt={alt || "Explanation diagram"}
+                className={`max-h-[320px] max-w-full w-auto h-auto object-contain mx-auto select-none ${
+                  isSvg
+                    ? "dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
+                    : "rounded-[2px]"
+                }`}
+                loading="eager"
+              />
+            </div>
+            {alt && (
+              <figcaption className="text-xs text-neutral-500 dark:text-neutral-400 mt-1.5 text-center tracking-tight font-mono">
+                {alt}
+              </figcaption>
+            )}
+          </figure>
+        );
       },
 
       h3: ({ children }: any) => (
@@ -275,11 +330,29 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
         </ol>
       ),
 
-      p: ({ children }: any) => (
-        <p className="mb-3.5 last:mb-0 text-[14px] leading-relaxed text-neutral-800 dark:text-neutral-200">
-          {children}
-        </p>
-      ),
+      p: ({ children }: any) => {
+        const childrenArray = React.Children.toArray(children);
+        const hasBlockElement = childrenArray.some((child) => {
+          if (React.isValidElement(child)) {
+            return (
+              child.type === "figure" ||
+              (child.props as any)?.node?.tagName === "img" ||
+              (child.props as any)?.src !== undefined
+            );
+          }
+          return false;
+        });
+
+        if (hasBlockElement) {
+          return <div className="my-3 last:mb-0">{children}</div>;
+        }
+
+        return (
+          <p className="mb-3.5 last:mb-0 text-[14px] leading-relaxed text-neutral-800 dark:text-neutral-200">
+            {children}
+          </p>
+        );
+      },
 
       strong: ({ children }: any) => (
         <strong className="font-semibold text-neutral-950 dark:text-white">
@@ -291,7 +364,7 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
         <hr className="my-5 border-neutral-200 dark:border-neutral-800" />
       ),
     }),
-    [desmosConfigs, derivationMap]
+    [desmosConfigs, derivationMap, category, testId, manifestBasePath]
   );
 
   return (
