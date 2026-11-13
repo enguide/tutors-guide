@@ -105,64 +105,35 @@ This section provides a comprehensive breakdown of the application's foundationa
 
 ### `types/content.ts`
 
-* **Purpose & Scope:** Serves as the schema for static test files (Markdown files and `metadata.json`), detailing how sections, questions, adaptive routing rules, and scoring curves are parsed.
+* **Purpose & Scope:** Serves as the schema for static test files (Markdown files and `metadata.json`), detailing how sections, questions, adaptive routing rules, psychometric difficulty weights, and scoring curves are parsed.
 
 
 * **Exports:**
 * `QuestionType`: `"MC" | "FR" | "FRQ_HANDWRITTEN"`
-
-
 * `QuestionLayoutMode`: `"split" | "single"`
-
-
 * `QuestionDifficulty`: `"Easy" | "Medium" | "Hard"`
-
-
 * `QuestionOption` (Interface: `id`, `text`)
-
-
 * `QuestionFrontmatter` (Interface)
-
-
 * `SectionFrontmatter` (Interface)
-
-
 * `SectionManifest` (Interface)
-
-
 * `AdaptiveRoutingRule` (Interface)
-
-
 * `AdaptiveStage` (Interface)
-
-
 * `TestMetadata` (Interface)
-
-
 * `ParsedSection` (Interface)
-
-
-* `LinearCurveMapping`, `APGradeCutoffs`, `ExamScoringConfig` (Interfaces)
-
-
+* `LinearCurveMapping`, `APGradeCutoffs`, `DifficultyWeightMatrix`, `AdaptiveDomainCurveSet`, `AdaptiveScoringConfig`, `ExamScoringConfig` (Interfaces)
 
 
 * **Type Definitions & Shapes:**
-* `QuestionFrontmatter`: Contains parsed frontmatter per question, including `id`, `correctAnswer`, `prompt`, `stimulus` (or fallback `passage`), `domain`, `skill`, `explanation`, and optional layout override.
-
-
-* `AdaptiveRoutingRule` & `AdaptiveStage`: Dictate dynamic stage movement (`threshold`, `onPass`, `onFail`), enabling multi-stage tests like the Digital SAT.
-
-
-* `ExamScoringConfig`: Controls the evaluation engine strategy (`scaleType`: `"SAT_ADAPTIVE" | "ACT_CONCORDANCE" | "AP_WEIGHTED" | "GRE_SECTION"`), section multipliers (`apWeights`), and raw-to-scaled score mappings (`curves`).
-
-
+* `QuestionFrontmatter`: Contains parsed frontmatter per question, including `id`, `correctAnswer`, `prompt`, `stimulus` (or fallback `passage`), `domain`, `skill`, `difficulty` (`"Easy" | "Medium" | "Hard"`), `explanation`, and optional layout override.
+* `AdaptiveRoutingRule` & `AdaptiveStage`: Dictate dynamic stage movement (`threshold`, `onPass`, `onFail`), enabling multi-stage tests like the Digital SAT and section-adaptive GRE.
+* `DifficultyWeightMatrix` & `AdaptiveScoringConfig`: Configure module-tier item weights (`routing`, `hard`, `easy` $\times$ `Easy`, `Medium`, `Hard`), domain-specific normalized ability equating curves (`domainCurves`), and raw branch overrides (`branchRawCurves`).
+* `ExamScoringConfig`: Controls the evaluation engine strategy (`scaleType`: `"SAT_ADAPTIVE" | "SAT_LINEAR" | "ACT_CONCORDANCE" | "AP_WEIGHTED" | "GRE_SECTION" | "ACADEMIC_MASTERY"`), optional `percentileTable` overrides, `adaptiveConfig`, section multipliers (`apWeights`), GRE curves (`greConfig`), and raw-to-scaled mappings (`curves`).
 
 
 * **Dependencies & Imports:** `SectionExamConfig`, `SupportedExamCategory` from `./examConfig`.
 
 
-* **Key Logic & Edge Cases:** Supports both linear sections (fixed progression) and multi-stage branch configurations via `stages` and `routing` trees.
+* **Key Logic & Edge Cases:** Supports both linear sections (fixed progression) and multi-stage branch configurations via `stages` and `routing` trees, while allowing per-test psychometric weight and curve overrides in `metadata.json` without database schema changes.
 
 
 

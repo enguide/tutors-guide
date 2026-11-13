@@ -10,6 +10,7 @@
     "db:seed": "prisma db seed",
     "seed:alpha": "tsx prisma/seed-alpha-pair.ts",
     "validate:content": "npx tsx scripts/validate-content.ts",
+    "simulate:sat": "tsx scripts/simulateSatScoring.ts",
     "prebuild": "npm run validate:content"
   },
   "prisma": {

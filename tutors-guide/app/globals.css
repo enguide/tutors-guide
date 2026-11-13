@@ -507,3 +507,182 @@ span[data-act-highlight="true"] {
 .dark .dcg-calculator-api-container .dcg-grapher {
   background-color: transparent !important;
 }
+
+/* ==========================================================================
+   Semantic Reading & Writing In-Context Explanation Tokens
+   ========================================================================== */
+span[data-rw-fade="true"] {
+  opacity: 0.34;
+  color: #6b7280;
+  transition: opacity 150ms ease;
+}
+
+.dark span[data-rw-fade="true"] {
+  opacity: 0.36;
+  color: #9ca3af;
+}
+
+span[data-rw-pivot="true"] {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.65);
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.dark span[data-rw-pivot="true"] {
+  background-color: rgba(96, 165, 250, 0.2);
+  color: #93c5fd;
+  border-bottom-color: rgba(96, 165, 250, 0.7);
+}
+
+span[data-rw-clause="ic"] {
+  border-bottom: 2px solid rgba(5, 150, 105, 0.75);
+  padding-bottom: 1px;
+}
+
+span[data-rw-clause="ic"]::before {
+  content: "IC";
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: super;
+  color: #047857;
+  margin-right: 2px;
+}
+
+.dark span[data-rw-clause="ic"] {
+  border-bottom-color: rgba(52, 211, 153, 0.75);
+}
+
+.dark span[data-rw-clause="ic"]::before {
+  color: #6ee7b7;
+}
+
+span[data-rw-clause="dc"] {
+  border-bottom: 1.5px dashed rgba(217, 119, 6, 0.85);
+  padding-bottom: 1px;
+}
+
+span[data-rw-clause="dc"]::before {
+  content: "DC";
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: super;
+  color: #b45309;
+  margin-right: 2px;
+}
+
+.dark span[data-rw-clause="dc"] {
+  border-bottom-color: rgba(251, 191, 36, 0.85);
+}
+
+.dark span[data-rw-clause="dc"]::before {
+  color: #fcd34d;
+}
+
+/* ==========================================================================
+   Target Blank, Student Prediction & Keyed Answer (Amber Progression)
+   ========================================================================== */
+span[data-rw-blank="true"] {
+  display: inline-block;
+  width: 5.5rem;
+  height: 1.2em;
+  vertical-align: -0.22em;
+  margin: 0 3px;
+  border: 1.5px dashed #d97706;
+  background-color: rgba(245, 158, 11, 0.12);
+  border-radius: 4px;
+}
+
+.dark span[data-rw-blank="true"] {
+  border-color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.16);
+}
+
+div[data-rw-predict="true"] {
+  display: table;
+  margin: 0.75rem auto 0 auto;
+  padding: 0.35rem 0.85rem;
+  border: 1.5px dashed #d97706;
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 6px;
+  text-align: center;
+}
+
+div[data-rw-predict="true"]::before {
+  content: "Prediction: ";
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #b45309;
+  margin-right: 4px;
+}
+
+.dark div[data-rw-predict="true"] {
+  border-color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.16);
+  color: #fde68a;
+}
+
+.dark div[data-rw-predict="true"]::before {
+  color: #fbbf24;
+}
+
+div[data-rw-insight="true"] {
+  display: table;
+  margin: 0.75rem auto 0 auto;
+  padding: 0.35rem 0.85rem;
+  border: 1.5px dashed #d97706;
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 6px;
+  text-align: center;
+}
+
+div[data-rw-insight="true"]::before {
+  content: "Insight: ";
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #b45309;
+  margin-right: 4px;
+}
+
+.dark div[data-rw-insight="true"] {
+  border-color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.16);
+  color: #fde68a;
+}
+
+.dark div[data-rw-insight="true"]::before {
+  color: #fbbf24;
+}
+
+span[data-rw-ans="true"] {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 2px;
+  border: 1.5px solid #d97706;
+  background-color: rgba(245, 158, 11, 0.16);
+  color: #92400e;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.dark span[data-rw-ans="true"] {
+  border-color: #fbbf24;
+  background-color: rgba(251, 191, 36, 0.22);
+  color: #fde68a;
+}

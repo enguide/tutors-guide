@@ -1,6 +1,7 @@
 {
   "id": "sat-diagnostic-adaptive-2",
   "title": "Digital SAT Diagnostic Practice 2 (Adaptive)",
+  "status": "draft",
   "category": "SAT",
   "entitlement": "SAT",
   "description": "Full-length 2-stage computer-adaptive diagnostic exam matching official College Board timing and module lengths.",

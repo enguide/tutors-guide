@@ -237,3 +237,71 @@ Steps by 2 pixels ($y += 2, x += 2$) to achieve sub-10ms performance on low-powe
 
 
 * **CDN Public URL Resolution:** Resolves file URLs via `NEXT_PUBLIC_STORAGE_CDN_URL`, ensuring images load from CDN edge caches rather than root bucket origins.
+---
+
+### `lib/scoring/adaptiveScorer.ts`
+
+* **Purpose & Scope:** Psychometric multistage adaptive scoring engine for the Digital SAT (and section-adaptive GRE). Computes difficulty-weighted ability scores across routing and branched modules and maps normalized ability onto Bluebook-calibrated 200–800 domain scales.
+
+
+* **Exports:**
+* `calculateSATDomainScore(params): SATDomainCalculationResult`
+* `synthesizeAdaptiveTestScores(metadata, resultsMap, itemRecordsBySection?): AdaptiveScoreSynthesis`
+* `normalizeQuestionDifficulty(raw?: string): QuestionDifficulty`
+* Constants: `DEFAULT_DSAT_DIFFICULTY_WEIGHTS`, `DEFAULT_DSAT_EQUATING_CURVES`
+* Interfaces: `ItemScoringRecord`, `StageScoreSummary`, `AdaptiveScoreSynthesis`, `SATDomainCalculationResult`
+
+
+* **Parameters / Inputs:**
+* `metadata`: `TestMetadata` — Contains `stages`, routing thresholds (`threshold`, `onPass`, `onFail`), and optional `scoring.adaptiveConfig`.
+* `resultsMap`: `Map<string, { numCorrect: number; totalQuestions: number }>` — Section-level raw counts.
+* `itemRecordsBySection?`: `Map<string, ItemScoringRecord[]>` — Optional item-level correctness, `difficulty`, and `domain` records.
+
+
+* **Return Value / Emitted State:**
+* `AdaptiveScoreSynthesis`: `{ compositeScore, stageSummaries, trajectoryDescription }`, where each `StageScoreSummary` includes `domainScore` (200–800), `routedTier` (`"hard" | "easy"`), `domainKey` (`"rw" | "math" | "general"`), `weightedEarned`, `weightedMax`, `normalizedAbility` (0–100), `abilityTheta` (-3.00 to +3.00 IRT-proxy), and `equatingBand` (SEM interval).
+
+
+* **Dependencies & Imports:**
+* `AdaptiveDomainCurveSet`, `AdaptiveScoringConfig`, `DifficultyWeightMatrix`, `QuestionDifficulty`, `TestMetadata` from `@/types/content`.
+* `lookupScaledScore` from `./curveEngine`.
+
+
+* **Key Logic & Edge Cases:**
+* **Difficulty-Weighted Ability ($\theta$-proxy):** Weights `Easy`, `Medium`, and `Hard` items differently depending on module role (`routing`: `1.0 / 1.18 / 1.38`; `hard`: `1.15 / 1.38 / 1.65`; `easy`: `0.85 / 1.0 / 1.18`), normalizing malformed difficulty strings safely.
+* **Domain-Specific Bluebook Curves & Overlap Zone:** Applies separate equating curves for Reading & Writing (`rw`) and Mathematics (`math`). Enforces realistic branch bounds (`easy`: `200–610`; `hard`: `460–800`), creating an authentic `460–610` overlap zone rather than an artificial hard-track floor.
+* **Graceful Raw Fallback:** Falls back to module-tier average weights (`1.15` for M1, `1.38` for M2-Hard, `0.98` for M2-Easy) when item-level response records are unavailable.
+
+---
+
+### `lib/scoring/scoringEngine.ts`
+
+* **Purpose & Scope:** Central multi-exam scoring orchestrator built on an extensible Strategy Registry (`SCORING_STRATEGIES`), converting section results and item-level records into composite scores, percentiles, and display badges across all supported exam programs.
+
+
+* **Exports:**
+* `calculateSectionScaledScore(sectionId, rawScore, metadata): number | null`
+* `synthesizeExamComposite(metadata, results, itemRecordsBySection?): FinalScoreSynthesis`
+* Interfaces: `SectionScoreInput`, `FinalScoreSynthesis`, `ScoringContext`, `ExamScoringStrategy`
+
+
+* **Parameters / Inputs:**
+* `metadata`: `TestMetadata` — Program category and `scoring` configuration (`scaleType`, `curves`, `apWeights`, `adaptiveConfig`, `percentileTable`).
+* `results`: `SectionScoreInput[]` — Array of completed section score summaries.
+* `itemRecordsBySection?`: `Map<string, ItemScoringRecord[]>` — Optional item-level records for adaptive psychometric equating.
+
+
+* **Return Value / Emitted State:**
+* `FinalScoreSynthesis`: `{ compositeScore, percentile, scaledSectionScores, displayBadge, subscoreDetails }`.
+
+
+* **Dependencies & Imports:**
+* `APGradeCutoffs`, `ExamScoringConfig`, `TestMetadata` from `@/types/content`.
+* `DEFAULT_SAT_CURVE`, `lookupScaledScore` from `./curveEngine`.
+* `ItemScoringRecord`, `synthesizeAdaptiveTestScores` from `./adaptiveScorer`.
+* `lookupPercentile` from `./percentileEngine`.
+
+
+* **Key Logic & Edge Cases:**
+* **Strategy Registry Dispatch:** Resolves `metadata.scoring.scaleType` (with category-based fallback) to dedicated handlers: `satAdaptiveStrategy` (`SAT_ADAPTIVE` / `SAT_LINEAR`), `actConcordanceStrategy` (`ACT_CONCORDANCE`), `apWeightedStrategy` (`AP_WEIGHTED`), `greSectionStrategy` (`GRE_SECTION`, supporting both multistage adaptive and linear 130–170 forms), and `academicMasteryStrategy` (`ACADEMIC_MASTERY`).
+* **Strict Type Safety:** Enforces `APGradeCutoffs` typing for AP 1–5 composite cutoffs and supports form-level `percentileTable` overrides via `lookupPercentile`.

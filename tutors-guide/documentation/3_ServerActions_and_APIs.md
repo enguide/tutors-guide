@@ -372,86 +372,43 @@ This section covers the operational business logic layer of the application, enc
 
 ### `actions/completeTestSection.ts`
 
-* **Purpose & Scope:** The central exam completion action. Grades multiple-choice, grid-in, and handwritten FRQ questions, calculates section scaled scores, deletes in-flight checkpoints, resolves multi-stage adaptive branching, sets intermission cookies, and synthesizes composite test scores.
+* **Purpose & Scope:** The central exam completion action. Grades multiple-choice, grid-in, and handwritten FRQ questions, calculates section scaled scores, deletes in-flight checkpoints, resolves multi-stage adaptive branching, sets intermission cookies, hydrates item-level difficulty metadata across completed stages, and synthesizes composite test scores.
 
 
 * **Exports:**
 * `completeTestSection(payload: CompleteSectionPayload): Promise<CompleteSectionResult>`
 
 
-
-
 * **Parameters / Props:**
 * `payload` (`CompleteSectionPayload`):
-* `testId`, `testTitle`, `category`, `sectionId`, `sectionOrder`.
-
-
-* `timeRemainingSeconds` (`number`): Remaining section clock.
-
-
-* `navigationHistory` (`{ time: number; qIdx: number }[]`): Behavioral timestamp sequence of student question visits.
-
-
-* `questions` (`QuestionFrontmatter[]`): Authoritative question metadata.
-
-
-* `clientAnswers` (`Record<string, AnswerPayload>`): Student submitted options, FRQ strings, and UI tool usage flags.
-
-
-* `accommodations` (`AccommodationSettings`, optional): Accessibility parameters (time multipliers, etc.).
-
-
-
-
+  * `testId`, `testTitle`, `category`, `sectionId`, `sectionOrder`.
+  * `timeRemainingSeconds` (`number`): Remaining section clock.
+  * `navigationHistory` (`{ time: number; qIdx: number }[]`): Behavioral timestamp sequence of student question visits.
+  * `questions` (`QuestionFrontmatter[]`): Authoritative question metadata (including `difficulty` and `domain`).
+  * `clientAnswers` (`Record<string, AnswerPayload>`): Student submitted options, FRQ strings, and UI tool usage flags.
+  * `accommodations` (`AccommodationSettings`, optional): Accessibility parameters (time multipliers, etc.).
 
 
 * **Return Value / Emitted State:**
 * Success: `{ success: true, nextSectionId, isIntermission, intermissionDuration, isTestComplete, tierSelected, stats: { numCorrect, totalQuestions, rawScore, scaledScore } }`.
-
-
 * Failure: `{ success: false, error: string }`.
-
-
 
 
 * **Dependencies & Imports:**
 * `cookies` from `next/headers`, `auth` from `@/lib/auth`, `prisma` from `@/lib/prisma`.
-
-
 * `evaluateAnswer` from `@/lib/scoring/mathEvaluator`.
-
-
-* `getTestMetadata` from `@/lib/contentLoader`.
-
-
+* `getSectionById`, `getTestMetadata` from `@/lib/contentLoader`.
 * `evaluateNextExamRoute` from `@/lib/adaptive/branchingController`.
-
-
+* `ItemScoringRecord` from `@/lib/scoring/adaptiveScorer`.
 * `calculateSectionScaledScore`, `synthesizeExamComposite` from `@/lib/scoring/scoringEngine`.
-
-
 
 
 * **Key Logic & Edge Cases:**
 * **Role & Re-submission Guards:** Rejects submissions if user role is not `STUDENT`, or if an immutable `Result` already exists for this `[testId, profileId, sectionId]`.
-
-
 * **Optical FRQ Score Aggregation:** Queries `frqSubmission` and child `FrqSubCrop` records. If handwritten FRQ crops exist, sums awarded sub-part points, concatenates sub-part transcriptions, and evaluates overall question correctness against total possible points.
-
-
 * **Dwell Time Derivation:** Computes per-question dwell times (`timeSpentOnResponse`) strictly from intervals between sequential navigation timestamps (`deriveTimeSpentFromNavigationHistory`), accounting for accommodation time multipliers.
-
-
-* **Batched Transaction Pipeline (`prisma.$transaction([...])`):** To support high-volume concurrent cohorts without connection pool exhaustion, question `Response` upserts, immutable `Result` creation, and `SectionCheckpoint` eviction are aggregated into an array of deferred Prisma promises and committed in a single atomic database round-trip (sub-10ms connection hold time).
-
-
-* **Checkpoint Eviction & Cleanup:** Deletes the active in-flight row in `SectionCheckpoint` directly within the completion batch pipeline, preventing orphaned drafts if student attempts reload.
-
-
-* **Adaptive Branching & Composite Score Synthesis:** Evaluates `evaluateNextExamRoute` to determine whether to route to an easy/hard second module or trigger a break. If all stages are finished, invokes `synthesizeExamComposite` and upserts the student's `TestSummary`.
-
-
-
+* **Batched Transaction Pipeline (`prisma.$transaction([...])`):** Aggregates question `Response` upserts, immutable `Result` creation, and `SectionCheckpoint` eviction into an array of deferred Prisma promises committed in a single atomic round-trip.
+* **Adaptive Branching & Item-Weighted Composite Synthesis:** Evaluates `evaluateNextExamRoute` to route to an easy/hard second module or trigger an intermission cookie. When `isTestComplete` triggers on adaptive exams, merges in-memory `questions` metadata from the current section with `getSectionById` frontmatter from prior sections and persisted `Response` records to pass `itemRecordsBySection` into `synthesizeExamComposite`, upserting the final `TestSummary`.
 
 
 ---

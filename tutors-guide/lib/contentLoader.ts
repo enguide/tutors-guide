@@ -5,6 +5,7 @@ import { cache } from "react";
 import matter from "gray-matter";
 import {
   TestMetadata,
+  TestLifecycleStatus,
   SectionFrontmatter,
   ParsedSection,
 } from "@/types/content";
@@ -17,6 +18,7 @@ export interface DiscoveredTestItem {
   testId: string;
   category: string;
   title: string;
+  status: TestLifecycleStatus;
   description: string;
   isAdaptive: boolean;
   sectionCount: number;
@@ -29,9 +31,18 @@ export interface DiscoveredCategory {
   tests: {
     testId: string;
     title: string;
+    status: TestLifecycleStatus;
     category: string;
     sectionsCount: number;
   }[];
+}
+
+export function resolveTestStatus(metadata: Pick<TestMetadata, "status">): TestLifecycleStatus {
+  const normalized = String(metadata.status || "published").trim().toLowerCase();
+  if (normalized === "draft" || normalized === "archived") {
+    return normalized;
+  }
+  return "published";
 }
 
 /**
@@ -117,7 +128,6 @@ export async function ensureTestInDatabase(metadata: TestMetadata) {
     const dbCategory = (metadata.category.toUpperCase() as Category) || Category.NONE;
 
     await prisma.$transaction(async (tx) => {
-      // 1. Upsert the master Test record
       await tx.test.upsert({
         where: { id: metadata.id },
         create: {
@@ -131,7 +141,6 @@ export async function ensureTestInDatabase(metadata: TestMetadata) {
         },
       });
 
-      // 2. Upsert each Section listed in the manifest
       for (const s of metadata.sections) {
         await tx.section.upsert({
           where: { id: s.id },
@@ -156,8 +165,8 @@ export async function ensureTestInDatabase(metadata: TestMetadata) {
 }
 
 /**
- * Scans the filesystem content directory and discovers all valid tests
- * grouped by category for administrative portal inspection.
+ * Scans the filesystem content directory and discovers ALL valid tests
+ * (including drafts/archived) grouped by category for administrative portal inspection.
  */
 export const discoverAllContent = cache(async function discoverAllContent(): Promise<
   DiscoveredCategory[]
@@ -184,6 +193,7 @@ export const discoverAllContent = cache(async function discoverAllContent(): Pro
           tests.push({
             testId: metadata.id || testId,
             title: metadata.title || testId,
+            status: resolveTestStatus(metadata),
             category: categoryKey,
             sectionsCount: metadata.sections?.length || 0,
           });
@@ -205,12 +215,13 @@ export const discoverAllContent = cache(async function discoverAllContent(): Pro
 });
 
 /**
- * Scans the filesystem content directory and discovers all valid tests
- * across all categories, parsing their metadata manifests.
+ * Scans the filesystem content directory and discovers student-facing tests
+ * across all categories. Excludes "draft" and "archived" exams by default.
  */
-export const getAllAvailableTests = cache(async function getAllAvailableTests(): Promise<
-  Record<string, DiscoveredTestItem[]>
-> {
+export const getAllAvailableTests = cache(async function getAllAvailableTests(
+  options: { includeDrafts?: boolean } = {}
+): Promise<Record<string, DiscoveredTestItem[]>> {
+  const { includeDrafts = false } = options;
   const result: Record<string, DiscoveredTestItem[]> = {};
 
   try {
@@ -229,6 +240,11 @@ export const getAllAvailableTests = cache(async function getAllAvailableTests():
 
         const metadata = await getTestMetadata(catDirent.name, testId);
         if (metadata && metadata.sections && metadata.sections.length > 0) {
+          const status = resolveTestStatus(metadata);
+          if (!includeDrafts && status !== "published") {
+            continue;
+          }
+
           const totalSecs = metadata.sections.reduce(
             (acc, s) => acc + (s.timeLimit || 0),
             0
@@ -239,6 +255,7 @@ export const getAllAvailableTests = cache(async function getAllAvailableTests():
             testId: metadata.id,
             category: categoryKey,
             title: metadata.title,
+            status,
             description: metadata.description || "",
             isAdaptive: Boolean(metadata.isAdaptive),
             sectionCount: metadata.sections.length,

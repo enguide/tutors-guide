@@ -37,6 +37,71 @@ interface SolutionTab {
 }
 
 /**
+ * Converts custom inline semantic tokens ([[fade]], [[hl]], [[pivot]], [[ic]], [[dc]])
+ * into data-attributed HTML spans while shielding LaTeX math blocks ($...$ and $$...$$).
+ */
+export function preprocessSemanticTokens(content: string): string {
+  if (!content) return "";
+
+  const mathTokens: string[] = [];
+  let text = content.replace(/(\$\$[\s\S]*?\$\$|\$(?!\$)[^$\n]+?\$)/g, (match) => {
+    mathTokens.push(match);
+    return `XKMATHBLOCKTOKEN${mathTokens.length - 1}ENDX`;
+  });
+
+  text = text.replace(
+    /\[\[blank\]\]/g,
+    '<span data-rw-blank="true" aria-label="blank"></span>'
+  );
+
+  text = text.replace(
+    /\[\[predict\]\]([\s\S]*?)\[\[\/predict\]\]/g,
+    '<div data-rw-predict="true">$1</div>'
+  );
+
+  text = text.replace(
+    /\[\[insight\]\]([\s\S]*?)\[\[\/insight\]\]/g,
+    '<div data-rw-insight="true">$1</div>'
+  );
+  
+  text = text.replace(
+    /\[\[ans\]\]([\s\S]*?)\[\[\/ans\]\]/g,
+    '<span data-rw-ans="true">$1</span>'
+  );
+  
+  text = text.replace(
+    /\[\[fade\]\]([\s\S]*?)\[\[\/fade\]\]/g,
+    '<span data-rw-fade="true">$1</span>'
+  );
+
+  text = text.replace(
+    /\[\[hl\]\]([\s\S]*?)\[\[\/hl\]\]/g,
+    '<span data-act-highlight="true">$1</span>'
+  );
+
+  text = text.replace(
+    /\[\[pivot\]\]([\s\S]*?)\[\[\/pivot\]\]/g,
+    '<span data-rw-pivot="true">$1</span>'
+  );
+
+  text = text.replace(
+    /\[\[ic\]\]([\s\S]*?)\[\[\/ic\]\]/g,
+    '<span data-rw-clause="ic">$1</span>'
+  );
+
+  text = text.replace(
+    /\[\[dc\]\]([\s\S]*?)\[\[\/dc\]\]/g,
+    '<span data-rw-clause="dc">$1</span>'
+  );
+
+  text = text.replace(/XKMATHBLOCKTOKEN(\d+)ENDX/g, (_, index) => {
+    return mathTokens[Number(index)] ?? "";
+  });
+
+  return text;
+}
+
+/**
  * 1. Safely extracts :::desmos ... ::: blocks into HTML placeholders
  */
 function extractDesmosBlocks(content: string) {
@@ -102,7 +167,7 @@ function extractDerivationBlocks(content: string) {
         stepNumber: steps.length + 1,
         title,
         why: why || undefined,
-        mathContent: mathLines.join("\n").trim(),
+        mathContent: preprocessSemanticTokens(mathLines.join("\n").trim()),
       });
     });
 
@@ -129,7 +194,7 @@ function extractTabsAndBlocks(rawContent: string) {
   if (!match) {
     return {
       hasTabs: false,
-      preface: contentWithBoth,
+      preface: preprocessSemanticTokens(contentWithBoth),
       tabs: [] as SolutionTab[],
       postface: "",
       desmosConfigs,
@@ -137,8 +202,12 @@ function extractTabsAndBlocks(rawContent: string) {
     };
   }
 
-  const preface = contentWithBoth.substring(0, match.index).trim();
-  const postface = contentWithBoth.substring(match.index! + match[0].length).trim();
+  const preface = preprocessSemanticTokens(
+    contentWithBoth.substring(0, match.index).trim()
+  );
+  const postface = preprocessSemanticTokens(
+    contentWithBoth.substring(match.index! + match[0].length).trim()
+  );
   const rawTabsBody = match[1];
 
   const tabSections = rawTabsBody.split(/(?=== tab:)/g);
@@ -159,7 +228,7 @@ function extractTabsAndBlocks(rawContent: string) {
     }
 
     const title = trimmed.substring(7, firstLineEnd).trim();
-    const tabContent = trimmed.substring(firstLineEnd).trim();
+    const tabContent = preprocessSemanticTokens(trimmed.substring(firstLineEnd).trim());
 
     tabs.push({
       id: `tab-${idx}`,
@@ -197,6 +266,81 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
 
   const markdownComponents = useMemo(
     () => ({
+      span: ({ node, children, ...props }: any) => {
+        const isFade = props["data-rw-fade"] === "true";
+        const isHighlight = props["data-act-highlight"] === "true";
+        const isPivot = props["data-rw-pivot"] === "true";
+        const clauseType = props["data-rw-clause"];
+
+        if (isFade) {
+          return (
+            <span
+              data-rw-fade="true"
+              className="opacity-40 text-neutral-500 dark:text-neutral-400 transition-opacity duration-150"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        if (isHighlight) {
+          return (
+            <span
+              data-act-highlight="true"
+              className="bg-amber-200/75 dark:bg-amber-400/25 text-neutral-950 dark:text-amber-100 font-medium rounded-[2px] px-1 py-0.5 transition-colors duration-150"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        if (isPivot) {
+          return (
+            <span
+              data-rw-pivot="true"
+              className="bg-blue-500/10 dark:bg-blue-400/20 text-blue-700 dark:text-blue-300 border-b-2 border-blue-500/60 font-semibold rounded-[2px] px-1 py-0.5"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        if (clauseType === "ic") {
+          return (
+            <span
+              data-rw-clause="ic"
+              className="border-b-2 border-emerald-600/70 dark:border-emerald-400/70 pb-[1px]"
+              {...props}
+            >
+              <sup className="text-[9px] font-mono font-bold uppercase tracking-tighter text-emerald-700 dark:text-emerald-300 mr-0.5 select-none">
+                IC
+              </sup>
+              {children}
+            </span>
+          );
+        }
+
+        if (clauseType === "dc") {
+          return (
+            <span
+              data-rw-clause="dc"
+              className="border-b border-dashed border-amber-600/80 dark:border-amber-400/80 pb-[1px]"
+              {...props}
+            >
+              <sup className="text-[9px] font-mono font-bold uppercase tracking-tighter text-amber-700 dark:text-amber-300 mr-0.5 select-none">
+                DC
+              </sup>
+              {children}
+            </span>
+          );
+        }
+
+        return <span {...props}>{children}</span>;
+      },
+
       div: ({ node, ...props }: any) => {
         const desmosId = props["data-desmos-id"];
         if (desmosId && desmosConfigs[desmosId]) {

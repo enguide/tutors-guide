@@ -219,7 +219,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 1. Preprocess placement badges, invisible anchors, underline targets, and highlights
+  // 1. Preprocess placement badges, anchors, underline targets, and semantic explanation tokens
   const processedContent = useMemo(() => {
     if (!content) return "";
 
@@ -229,6 +229,26 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       mathTokens.push(match);
       return `XKMATHBLOCKTOKEN${mathTokens.length - 1}ENDX`;
     });
+
+    text = text.replace(
+    /\[\[blank\]\]/g,
+    '<span data-rw-blank="true" aria-label="blank"></span>'
+  );
+
+  text = text.replace(
+    /\[\[predict\]\]([\s\S]*?)\[\[\/predict\]\]/g,
+    '<div data-rw-predict="true">$1</div>'
+  );
+
+  text = text.replace(
+    /\[\[insight\]\]([\s\S]*?)\[\[\/insight\]\]/g,
+    '<div data-rw-insight="true">$1</div>'
+  );
+
+  text = text.replace(
+    /\[\[ans\]\]([\s\S]*?)\[\[\/ans\]\]/g,
+    '<span data-rw-ans="true">$1</span>'
+  );
 
     text = text.replace(
       /\[\[\[([A-D])\]:(\d+)\]\]/g,
@@ -250,9 +270,30 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       '<span data-act-underline="true">$1</span>'
     );
 
+    // Semantic Reading & Writing explanation tokens
+    text = text.replace(
+      /\[\[fade\]\]([\s\S]*?)\[\[\/fade\]\]/g,
+      '<span data-rw-fade="true">$1</span>'
+    );
+
     text = text.replace(
       /\[\[hl\]\]([\s\S]*?)\[\[\/hl\]\]/g,
       '<span data-act-highlight="true">$1</span>'
+    );
+
+    text = text.replace(
+      /\[\[pivot\]\]([\s\S]*?)\[\[\/pivot\]\]/g,
+      '<span data-rw-pivot="true">$1</span>'
+    );
+
+    text = text.replace(
+      /\[\[ic\]\]([\s\S]*?)\[\[\/ic\]\]/g,
+      '<span data-rw-clause="ic">$1</span>'
+    );
+
+    text = text.replace(
+      /\[\[dc\]\]([\s\S]*?)\[\[\/dc\]\]/g,
+      '<span data-rw-clause="dc">$1</span>'
     );
 
     text = text.replace(/XKMATHBLOCKTOKEN(\d+)ENDX/g, (_, index) => {
@@ -337,6 +378,9 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         const isAnchor = props["data-act-anchor"] === "true";
         const isPlainUnderline = props["data-act-underline"] === "true";
         const isHighlight = props["data-act-highlight"] === "true";
+        const isFade = props["data-rw-fade"] === "true";
+        const isPivot = props["data-rw-pivot"] === "true";
+        const clauseType = props["data-rw-clause"];
 
         if (placementLetter) {
           const isActive = activeQuestionNumber === targetNum;
@@ -367,13 +411,67 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
           );
         }
 
+        if (isFade) {
+          return (
+            <span
+              data-rw-fade="true"
+              className="opacity-40 text-neutral-500 dark:text-neutral-400 transition-opacity duration-150"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
         if (isHighlight) {
           return (
             <span
               data-act-highlight="true"
-              className="transition-colors duration-150 rounded-[2px] px-0.5"
+              className="bg-amber-200/75 dark:bg-amber-400/25 text-neutral-950 dark:text-amber-100 font-medium rounded-[2px] px-1 py-0.5 transition-colors duration-150"
               {...props}
             >
+              {children}
+            </span>
+          );
+        }
+
+        if (isPivot) {
+          return (
+            <span
+              data-rw-pivot="true"
+              className="bg-blue-500/10 dark:bg-blue-400/20 text-blue-700 dark:text-blue-300 border-b-2 border-blue-500/60 font-semibold rounded-[2px] px-1 py-0.5"
+              {...props}
+            >
+              {children}
+            </span>
+          );
+        }
+
+        if (clauseType === "ic") {
+          return (
+            <span
+              data-rw-clause="ic"
+              className="border-b-2 border-emerald-600/70 dark:border-emerald-400/70 pb-[1px]"
+              {...props}
+            >
+              <sup className="text-[9px] font-mono font-bold uppercase tracking-tighter text-emerald-700 dark:text-emerald-300 mr-0.5 select-none">
+                IC
+              </sup>
+              {children}
+            </span>
+          );
+        }
+
+        if (clauseType === "dc") {
+          return (
+            <span
+              data-rw-clause="dc"
+              className="border-b border-dashed border-amber-600/80 dark:border-amber-400/80 pb-[1px]"
+              {...props}
+            >
+              <sup className="text-[9px] font-mono font-bold uppercase tracking-tighter text-amber-700 dark:text-amber-300 mr-0.5 select-none">
+                DC
+              </sup>
               {children}
             </span>
           );

@@ -6,8 +6,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { evaluateAnswer } from "@/lib/scoring/mathEvaluator";
 import { QuestionFrontmatter } from "@/types/content";
-import { getTestMetadata } from "@/lib/contentLoader";
+import { getSectionById, getTestMetadata } from "@/lib/contentLoader";
 import { evaluateNextExamRoute } from "@/lib/adaptive/branchingController";
+import { ItemScoringRecord } from "@/lib/scoring/adaptiveScorer";
 import {
   calculateSectionScaledScore,
   synthesizeExamComposite,
@@ -38,7 +39,7 @@ interface CompleteSectionPayload {
 }
 
 /**
- * Derives the total dwell time spent per question by computing the duration 
+ * Derives the total dwell time spent per question by computing the duration
  * of each interval in navigationHistory up to the final elapsed section time.
  */
 function deriveTimeSpentFromNavigationHistory(
@@ -336,7 +337,65 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
 
     // 10. Synthesize full exam composite score if complete across all stages
     if (routingDecision.isTestComplete) {
-      const synthesis = synthesizeExamComposite(metadata, submittedResults);
+      let itemRecordsBySection: Map<string, ItemScoringRecord[]> | undefined;
+
+      if (metadata.isAdaptive) {
+        // Hydrate question difficulty & domain metadata across all completed sections
+        const questionMetaMap = new Map<string, { difficulty?: string; domain?: string }>();
+
+        // Seed from the current section's questions already in memory
+        for (const q of questions) {
+          questionMetaMap.set(q.id, {
+            difficulty: q.difficulty,
+            domain: q.domain,
+          });
+        }
+
+        // Load metadata for all previously submitted sections
+        const priorSectionIds = submittedSectionIds.filter((id) => id !== sectionId);
+        await Promise.all(
+          priorSectionIds.map(async (secId) => {
+            const parsed = await getSectionById(category.toLowerCase(), testId, secId);
+            if (parsed?.frontmatter?.questions) {
+              for (const q of parsed.frontmatter.questions) {
+                questionMetaMap.set(q.id, {
+                  difficulty: q.difficulty,
+                  domain: q.domain,
+                });
+              }
+            }
+          })
+        );
+
+        const allResponses = await prisma.response.findMany({
+          where: { testId, profileId },
+          select: {
+            questionId: true,
+            sectionId: true,
+            isCorrect: true,
+          },
+        });
+
+        itemRecordsBySection = new Map<string, ItemScoringRecord[]>();
+        for (const r of allResponses) {
+          const qMeta = questionMetaMap.get(r.questionId);
+          const list = itemRecordsBySection.get(r.sectionId) || [];
+          list.push({
+            questionId: r.questionId,
+            sectionId: r.sectionId,
+            isCorrect: r.isCorrect,
+            difficulty: qMeta?.difficulty,
+            domain: qMeta?.domain,
+          });
+          itemRecordsBySection.set(r.sectionId, list);
+        }
+      }
+
+      const synthesis = synthesizeExamComposite(
+        metadata,
+        submittedResults,
+        itemRecordsBySection
+      );
 
       await prisma.testSummary.upsert({
         where: {

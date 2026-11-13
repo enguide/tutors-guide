@@ -7,6 +7,7 @@ import {
   getTestMetadata,
   getSectionById,
   ensureTestInDatabase,
+  resolveTestStatus,
 } from "@/lib/contentLoader";
 import { resolveSectionConfig } from "@/lib/examConfigRegistry";
 import { SupportedExamCategory } from "@/types/examConfig";
@@ -48,11 +49,17 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     redirect(`/dashboard?notice=staff_restricted`);
   }
 
-  // 2. Load test metadata upfront to verify specific course entitlement and structure
+  // 2. Load test metadata upfront to verify lifecycle status, course entitlement, and structure
   const metadata = await getTestMetadata(category, testId);
   const section = await getSectionById(category, testId, sectionId);
 
   if (!metadata || !section) {
+    notFound();
+  }
+
+  // 2b. Lifecycle Gate: Block non-admin access to draft or archived exams via direct URL
+  const testStatus = resolveTestStatus(metadata);
+  if (testStatus !== "published" && !isAdmin) {
     notFound();
   }
 
@@ -105,10 +112,10 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
 
   // 7. Authoritative Server Check: Has this student started ANY section of this test?
   const [
-    checkpointRecord, 
-    existingResponses, 
-    anyCompletedSection, 
-    anyPriorCheckpoint
+    checkpointRecord,
+    existingResponses,
+    anyCompletedSection,
+    anyPriorCheckpoint,
   ] = await Promise.all([
     // Checkpoint for THIS specific section
     prisma.sectionCheckpoint.findUnique({

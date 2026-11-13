@@ -65,8 +65,10 @@ This document provides a comprehensive structural overview of the standardized t
 
 ### C. Scoring & Curve Engine (`lib/scoring/`)
 
-* **Multi-Paradigm Evaluation:** Accommodates traditional linear scaling, weighted subject subscores, and two-stage adaptive equating (`adaptiveScorer.ts`, `curveEngine.ts`).
-* **Mathematical Answer Parsing:** Includes `mathEvaluator.ts` for student-produced responses (grid-ins), evaluating fractions, equivalent decimals, negative bounds, and algebraic equivalents without requiring human intervention.
+* **Strategy Registry Architecture (`scoringEngine.ts`):** Decouples exam evaluation into pluggable, category-specific strategies (`SAT_ADAPTIVE`, `SAT_LINEAR`, `ACT_CONCORDANCE`, `AP_WEIGHTED`, `GRE_SECTION`, and `ACADEMIC_MASTERY`), allowing new standardized tests to be registered without modifying core exam runners.
+* **Psychometric Multistage Equating (`adaptiveScorer.ts`):** Implements item-difficulty weighting (`Easy`, `Medium`, `Hard` across routing, hard, and easy modules) and domain-specific Bluebook equating curves (`RW` vs. `Math`) with an authentic `460–610` branch overlap zone, standardized $\theta$-proxy ability metrics, and Standard Error of Measurement (SEM) bands.
+* **Linear & Weighted Scaling (`curveEngine.ts`, `percentileEngine.ts`):** Supports raw-to-scaled lookup interpolation, AP MC/FRQ multipliers, ACT rounded composites, GRE section-adaptive/linear scaling, and national percentile mapping.
+* **Mathematical Answer Parsing (`mathEvaluator.ts`):** Evaluates student-produced responses (grid-ins), handling fractions, equivalent decimals, negative bounds, LaTeX fractions, and multi-key tolerances without human intervention.
 
 ### D. Deep Analytics & Telemetry Engine (`components/analytics/`, `lib/telemetry/`)
 

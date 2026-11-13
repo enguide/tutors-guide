@@ -33,6 +33,18 @@ export const AlgebraicDerivationRail: React.FC<AlgebraicDerivationRailProps> = (
 }) => {
   const markdownComponents = useMemo(
     () => ({
+      blockquote: ({ children }: any) => (
+        <blockquote className="my-0 pl-0 border-none not-italic text-neutral-900 dark:text-neutral-100 leading-relaxed">
+          {children}
+        </blockquote>
+      ),
+
+      strong: ({ children }: any) => (
+        <strong className="font-semibold text-neutral-950 dark:text-white">
+          {children}
+        </strong>
+      ),
+
       img: ({ src, alt = "" }: any) => {
         if (typeof src !== "string" || !src.trim()) {
           return null;
