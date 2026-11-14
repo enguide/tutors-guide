@@ -3,14 +3,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { QuestionFrontmatter } from "@/types/content";
-import {
-  autosaveResponse,
-  saveSectionCheckpoint,
-  AutosavePayload,
-  CheckpointPayload,
-} from "@/actions/autosave";
+import type { AutosavePayload, CheckpointPayload } from "@/app/api/exam/sync/route";
 import { QuestionType } from "@prisma/client";
 import { examLogger } from "@/lib/telemetry/examLogger";
+import { calculateTimeSpentFromNavHistory } from "@/lib/telemetry/timeTracking";
 
 export type SyncStatus = "synced" | "saving" | "offline" | "retrying";
 
@@ -77,32 +73,6 @@ function readStoredSnapshot(key: string): StoredCache | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Pure calculation that extracts total accumulated seconds spent on each question
- * from the navigationHistory intervals.
- */
-function deriveDwellTimesFromHistory(
-  history: NavigationHistoryEntry[],
-  currentElapsedSeconds: number,
-  questionCount: number
-): number[] {
-  const dwellTimes = new Array(questionCount).fill(0);
-  if (!history || history.length === 0) return dwellTimes;
-
-  for (let i = 0; i < history.length; i++) {
-    const entry = history[i];
-    const nextTime =
-      i + 1 < history.length ? history[i + 1].time : currentElapsedSeconds;
-
-    const dwell = Math.max(0, nextTime - entry.time);
-    if (entry.qIdx >= 0 && entry.qIdx < questionCount) {
-      dwellTimes[entry.qIdx] += dwell;
-    }
-  }
-
-  return dwellTimes;
 }
 
 // Pure helper function for initial state reconciliation
@@ -212,6 +182,25 @@ function resolveInitialProgressState({
   };
 }
 
+async function postExamSync(body: {
+  response?: AutosavePayload;
+  checkpoint?: CheckpointPayload;
+}): Promise<boolean> {
+  const res = await fetch("/api/exam/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    keepalive: true,
+  });
+  if (!res.ok) {
+    // 409 means section was already finalized; treat as terminal so queue doesn't spin
+    if (res.status === 409) return true;
+    return false;
+  }
+  const data = await res.json();
+  return Boolean(data?.success);
+}
+
 export function useTestProgress({
   testId,
   sectionId,
@@ -252,65 +241,112 @@ export function useTestProgress({
   });
 
   const offlineQueueRef = useRef<AutosavePayload[]>(initialState.offlineQueue);
+  const pendingCheckpointRef = useRef<CheckpointPayload | null>(null);
 
   const [isCrossOutMode, setIsCrossOutMode] = useState<boolean>(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
   const [isFormulaSheetOpen, setIsFormulaSheetOpen] = useState<boolean>(false);
 
-  const autosaveTimeoutRef = useRef<{ [questionId: string]: NodeJS.Timeout }>({});
-  const checkpointTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autosaveTimeoutRef = useRef<{ [questionId: string]: ReturnType<typeof setTimeout> }>({});
+  const checkpointTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFlushingRef = useRef<boolean>(false);
 
-  const persistToLocalStorage = useCallback(
-    (
-      updatedAnswers: StudentAnswers,
-      remainingTime: number,
-      activeIdx: number,
-      navHistory: NavigationHistoryEntry[]
-    ) => {
-      if (typeof window === "undefined" || !isTimerRunning) return;
-      try {
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify({
-            answers: updatedAnswers,
-            secondsRemaining: remainingTime,
-            currentIndex: activeIdx,
-            navigationHistory: navHistory,
-            offlineQueue: offlineQueueRef.current,
-            lastSavedAt: Date.now(),
-          })
-        );
-      } catch (e) {
-        console.error("Failed writing progress to localStorage:", e);
-      }
-    },
-    [storageKey, isTimerRunning]
-  );
+  // Wall-clock deadline anchor so main-thread spikes never stall or drift the clock
+  const endTimeRef = useRef<number | null>(null);
+  const hasExpiredRef = useRef<boolean>(false);
 
-  // Dispatch background section checkpoint upsert to PostgreSQL
+  // Keep latest volatile values in a ref so callbacks stay referentially stable across ticks
+  const latestRef = useRef({
+    answers,
+    secondsRemaining,
+    currentIndex,
+    navigationHistory,
+    questions,
+    totalAdjustedSeconds,
+    isTimerRunning,
+    onTimeExpired,
+  });
+
+  useEffect(() => {
+    latestRef.current = {
+      answers,
+      secondsRemaining,
+      currentIndex,
+      navigationHistory,
+      questions,
+      totalAdjustedSeconds,
+      isTimerRunning,
+      onTimeExpired,
+    };
+  });
+
+  // Persist to localStorage outside of state updaters whenever answers, index, or history change
+  useEffect(() => {
+    if (typeof window === "undefined" || !isTimerRunning) return;
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          answers,
+          secondsRemaining: latestRef.current.secondsRemaining,
+          currentIndex,
+          navigationHistory,
+          offlineQueue: offlineQueueRef.current,
+          lastSavedAt: Date.now(),
+        })
+      );
+    } catch (e) {
+      console.error("Failed writing progress to localStorage:", e);
+    }
+  }, [storageKey, isTimerRunning, answers, currentIndex, navigationHistory]);
+
+  // Periodic LocalStorage snapshot every 10 seconds
+  useEffect(() => {
+    if (!isTimerRunning || secondsRemaining % 10 !== 0) return;
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          answers: latestRef.current.answers,
+          secondsRemaining,
+          currentIndex: latestRef.current.currentIndex,
+          navigationHistory: latestRef.current.navigationHistory,
+          offlineQueue: offlineQueueRef.current,
+          lastSavedAt: Date.now(),
+        })
+      );
+    } catch {}
+  }, [storageKey, isTimerRunning, secondsRemaining]);
+
+  // Dispatch background section checkpoint upsert via non-blocking route handler
   const triggerCheckpointSync = useCallback(
     (remainingTime: number, activeIdx: number, navHistory: NavigationHistoryEntry[]) => {
+      pendingCheckpointRef.current = {
+        testId,
+        sectionId,
+        timeRemainingSeconds: remainingTime,
+        lastQuestionIndex: activeIdx,
+        navigationHistory: navHistory,
+        clientUpdatedAt: Date.now(),
+      };
+
       if (checkpointTimeoutRef.current) {
         clearTimeout(checkpointTimeoutRef.current);
       }
 
       checkpointTimeoutRef.current = setTimeout(async () => {
         if (typeof navigator !== "undefined" && !navigator.onLine) return;
-        const payload: CheckpointPayload = {
-          testId,
-          sectionId,
-          timeRemainingSeconds: remainingTime,
-          lastQuestionIndex: activeIdx,
-          navigationHistory: navHistory,
-          clientUpdatedAt: Date.now(),
-        };
+        const checkpoint = pendingCheckpointRef.current;
+        if (!checkpoint) return;
+        pendingCheckpointRef.current = null;
+
         try {
-          await saveSectionCheckpoint(payload);
+          await postExamSync({ checkpoint });
         } catch (err) {
           console.warn("[Checkpoint] Background sync deferred:", err);
         }
-      }, 1200);
+      }, 1500);
     },
     [testId, sectionId]
   );
@@ -330,8 +366,8 @@ export function useTestProgress({
     while (offlineQueueRef.current.length > 0) {
       const payload = offlineQueueRef.current[0];
       try {
-        const res = await autosaveResponse(payload);
-        if (res.success) {
+        const ok = await postExamSync({ response: payload });
+        if (ok) {
           offlineQueueRef.current.shift();
           retryDelay = 1000;
         } else {
@@ -353,7 +389,7 @@ export function useTestProgress({
     setSyncStatus(isCleared ? "synced" : "offline");
   }, []);
 
-  // Listen to browser network connectivity events
+  // Listen to browser network connectivity events (stable listener—never torn down on ticks)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -361,7 +397,9 @@ export function useTestProgress({
       examLogger.log("network", "Browser connection restored (online event)");
       setSyncStatus("retrying");
       flushOfflineQueue();
-      triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
+      const { secondsRemaining: rem, currentIndex: idx, navigationHistory: hist } =
+        latestRef.current;
+      triggerCheckpointSync(rem, idx, hist);
     };
 
     const handleOffline = () => {
@@ -376,7 +414,18 @@ export function useTestProgress({
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [flushOfflineQueue, triggerCheckpointSync, secondsRemaining, currentIndex, navigationHistory]);
+  }, [flushOfflineQueue, triggerCheckpointSync]);
+
+  // Clean up pending debounce timers on unmount
+  useEffect(() => {
+    const autosaveTimers = autosaveTimeoutRef.current;
+    return () => {
+      Object.values(autosaveTimers).forEach((t) => clearTimeout(t));
+      if (checkpointTimeoutRef.current) {
+        clearTimeout(checkpointTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const clearLocalBuffer = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -413,6 +462,8 @@ export function useTestProgress({
   }, []);
 
   const resetTimeLimit = useCallback((newTotalSeconds: number) => {
+    hasExpiredRef.current = false;
+    endTimeRef.current = Date.now() + newTotalSeconds * 1000;
     setSecondsRemaining(newTotalSeconds);
   }, []);
 
@@ -421,7 +472,11 @@ export function useTestProgress({
       setCurrentIndexState((prevIdx) => {
         const nextIdx = typeof updater === "function" ? updater(prevIdx) : updater;
         if (nextIdx !== prevIdx) {
-          const elapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
+          const {
+            totalAdjustedSeconds: totalSec,
+            secondsRemaining: remSec,
+          } = latestRef.current;
+          const elapsed = Math.max(0, totalSec - remSec);
           const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
 
           setNavigationHistory((prevHistory) => {
@@ -431,56 +486,53 @@ export function useTestProgress({
                 ? prevHistory
                 : [...prevHistory, nextEntry];
 
-            persistToLocalStorage(answers, secondsRemaining, nextIdx, updatedHistory);
-            triggerCheckpointSync(secondsRemaining, nextIdx, updatedHistory);
+            triggerCheckpointSync(remSec, nextIdx, updatedHistory);
             return updatedHistory;
           });
         }
         return nextIdx;
       });
     },
-    [
-      totalAdjustedSeconds,
-      secondsRemaining,
-      answers,
-      persistToLocalStorage,
-      triggerCheckpointSync,
-    ]
+    [triggerCheckpointSync]
   );
 
+  // Wall-clock anchored countdown timer (250ms poll prevents drift or visual freezing)
   useEffect(() => {
-    if (!isTimerRunning) return;
-
-    const timer = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          examLogger.log("navigation", "Section timer expired");
-          onTimeExpired?.();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isTimerRunning, onTimeExpired]);
-
-  // Periodic LocalStorage and Checkpoint write (every 10 seconds)
-  useEffect(() => {
-    if (isTimerRunning && secondsRemaining % 10 === 0) {
-      persistToLocalStorage(answers, secondsRemaining, currentIndex, navigationHistory);
-      triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
+    if (!isTimerRunning) {
+      endTimeRef.current = null;
+      return;
     }
-  }, [
-    isTimerRunning,
-    secondsRemaining,
-    answers,
-    currentIndex,
-    navigationHistory,
-    persistToLocalStorage,
-    triggerCheckpointSync,
-  ]);
+
+    if (endTimeRef.current === null) {
+      endTimeRef.current = Date.now() + latestRef.current.secondsRemaining * 1000;
+    }
+
+    const tick = () => {
+      if (endTimeRef.current === null) return;
+      const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+
+      setSecondsRemaining((prev) => {
+        if (prev === remaining) return prev;
+        return remaining;
+      });
+
+      if (remaining <= 0 && !hasExpiredRef.current) {
+        hasExpiredRef.current = true;
+        examLogger.log("navigation", "Section timer expired");
+        latestRef.current.onTimeExpired?.();
+      }
+    };
+
+    const timer = setInterval(tick, 250);
+    return () => clearInterval(timer);
+  }, [isTimerRunning]);
+
+  // Periodic server checkpoint heartbeat every 10 seconds
+  useEffect(() => {
+    if (!isTimerRunning || secondsRemaining <= 0 || secondsRemaining % 10 !== 0) return;
+    const { currentIndex: idx, navigationHistory: hist } = latestRef.current;
+    triggerCheckpointSync(secondsRemaining, idx, hist);
+  }, [isTimerRunning, secondsRemaining, triggerCheckpointSync]);
 
   const scheduleAutosave = useCallback(
     (
@@ -494,14 +546,16 @@ export function useTestProgress({
         clearTimeout(autosaveTimeoutRef.current[questionId]);
       }
 
-      const targetQuestion = questions[index];
+      const currentQuestions = latestRef.current.questions;
+      const currentTotalSec = latestRef.current.totalAdjustedSeconds;
+      const targetQuestion = currentQuestions[index];
       if (!targetQuestion) return;
 
-      const elapsed = Math.max(0, totalAdjustedSeconds - currentSecondsRemaining);
-      const dwellTimes = deriveDwellTimesFromHistory(
+      const elapsed = Math.max(0, currentTotalSec - currentSecondsRemaining);
+      const dwellTimes = calculateTimeSpentFromNavHistory(
         currentNavHistory,
         elapsed,
-        questions.length
+        currentQuestions.length
       );
       const calculatedTimeSpent = dwellTimes[index] ?? 0;
 
@@ -526,10 +580,28 @@ export function useTestProgress({
           return;
         }
 
+        // Coalesce any pending checkpoint sync into the same single network request
+        if (checkpointTimeoutRef.current) {
+          clearTimeout(checkpointTimeoutRef.current);
+          checkpointTimeoutRef.current = null;
+        }
+        const coalescedCheckpoint: CheckpointPayload = {
+          testId,
+          sectionId,
+          timeRemainingSeconds: latestRef.current.secondsRemaining,
+          lastQuestionIndex: latestRef.current.currentIndex,
+          navigationHistory: latestRef.current.navigationHistory,
+          clientUpdatedAt: Date.now(),
+        };
+        pendingCheckpointRef.current = null;
+
         setSyncStatus("saving");
         try {
-          const res = await autosaveResponse(payload);
-          if (!res.success) {
+          const ok = await postExamSync({
+            response: payload,
+            checkpoint: coalescedCheckpoint,
+          });
+          if (!ok) {
             offlineQueueRef.current.push(payload);
             setSyncStatus("retrying");
             flushOfflineQueue();
@@ -540,14 +612,22 @@ export function useTestProgress({
           offlineQueueRef.current.push(payload);
           setSyncStatus("offline");
         }
-      }, 750);
+      }, 600);
     },
-    [testId, sectionId, sectionOrder, questions, totalAdjustedSeconds, flushOfflineQueue]
+    [testId, sectionId, sectionOrder, flushOfflineQueue]
   );
 
+  // Referentially stable option selection handler (does NOT recreate on timer ticks)
   const selectOption = useCallback(
     (optionId: string) => {
-      const activeQuestion = questions[currentIndex];
+      const {
+        currentIndex: idx,
+        questions: qs,
+        secondsRemaining: remSec,
+        navigationHistory: navHist,
+      } = latestRef.current;
+
+      const activeQuestion = qs[idx];
       if (!activeQuestion) return;
 
       const qId = activeQuestion.id;
@@ -564,80 +644,71 @@ export function useTestProgress({
           Boolean(currentAnswer.selectedOptionId) &&
           currentAnswer.selectedOptionId !== optionId;
 
-        const nextAnswers: StudentAnswers = {
-          ...prevAnswers,
-          [qId]: {
-            ...currentAnswer,
-            selectedOptionId:
-              currentAnswer.selectedOptionId === optionId ? undefined : optionId,
-            eliminatedOptions: nextEliminated,
-            changedAnswer: currentAnswer.changedAnswer || isDivergent,
-          },
+        const updatedQuestionAnswer: StudentAnswers[string] = {
+          ...currentAnswer,
+          selectedOptionId:
+            currentAnswer.selectedOptionId === optionId ? undefined : optionId,
+          eliminatedOptions: nextEliminated,
+          changedAnswer: currentAnswer.changedAnswer || isDivergent,
         };
 
-        persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-        scheduleAutosave(qId, nextAnswers[qId], currentIndex, navigationHistory, secondsRemaining);
-        triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
+        scheduleAutosave(qId, updatedQuestionAnswer, idx, navHist, remSec);
 
-        return nextAnswers;
+        return {
+          ...prevAnswers,
+          [qId]: updatedQuestionAnswer,
+        };
       });
     },
-    [
-      currentIndex,
-      questions,
-      secondsRemaining,
-      navigationHistory,
-      persistToLocalStorage,
-      scheduleAutosave,
-      triggerCheckpointSync,
-    ]
+    [scheduleAutosave]
   );
 
   const setFrqAnswer = useCallback(
     (val: string) => {
-      const activeQuestion = questions[currentIndex];
+      const {
+        currentIndex: idx,
+        questions: qs,
+        secondsRemaining: remSec,
+        navigationHistory: navHist,
+      } = latestRef.current;
+
+      const activeQuestion = qs[idx];
       if (!activeQuestion) return;
 
       const qId = activeQuestion.id;
-      const currentAnswer = answers[qId] || {};
-      const isDivergent =
-        Boolean(currentAnswer.frqUserAnswer) && currentAnswer.frqUserAnswer !== val;
 
-      const nextAnswers: StudentAnswers = {
-        ...answers,
-        [qId]: {
+      setAnswers((prevAnswers) => {
+        const currentAnswer = prevAnswers[qId] || {};
+        const isDivergent =
+          Boolean(currentAnswer.frqUserAnswer) && currentAnswer.frqUserAnswer !== val;
+
+        const updatedQuestionAnswer: StudentAnswers[string] = {
           ...currentAnswer,
           frqUserAnswer: val,
           changedAnswer: currentAnswer.changedAnswer || isDivergent,
-        },
-      };
+        };
 
-      setAnswers(nextAnswers);
-      persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-      scheduleAutosave(qId, nextAnswers[qId], currentIndex, navigationHistory, secondsRemaining);
-      triggerCheckpointSync(secondsRemaining, currentIndex, navigationHistory);
+        scheduleAutosave(qId, updatedQuestionAnswer, idx, navHist, remSec);
+
+        return {
+          ...prevAnswers,
+          [qId]: updatedQuestionAnswer,
+        };
+      });
     },
-    [
-      currentIndex,
-      questions,
-      answers,
-      secondsRemaining,
-      navigationHistory,
-      persistToLocalStorage,
-      scheduleAutosave,
-      triggerCheckpointSync,
-    ]
+    [scheduleAutosave]
   );
 
-  const toggleEliminateOption = useCallback(
-    (optionId: string) => {
-      const activeQuestion = questions[currentIndex];
-      if (!activeQuestion) return;
+  const toggleEliminateOption = useCallback((optionId: string) => {
+    const { currentIndex: idx, questions: qs } = latestRef.current;
+    const activeQuestion = qs[idx];
+    if (!activeQuestion) return;
 
-      const qId = activeQuestion.id;
-      const currentAnswer = answers[qId] || {};
+    const qId = activeQuestion.id;
+
+    setAnswers((prevAnswers) => {
+      const currentAnswer = prevAnswers[qId] || {};
       const list = new Set(currentAnswer.eliminatedOptions || []);
-
       let nextSelectedOptionId = currentAnswer.selectedOptionId;
 
       if (list.has(optionId)) {
@@ -649,101 +720,111 @@ export function useTestProgress({
         }
       }
 
-      const nextAnswers: StudentAnswers = {
-        ...answers,
+      return {
+        ...prevAnswers,
         [qId]: {
           ...currentAnswer,
           selectedOptionId: nextSelectedOptionId,
           eliminatedOptions: Array.from(list),
         },
       };
-
-      setAnswers(nextAnswers);
-      persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-    },
-    [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage]
-  );
+    });
+  }, []);
 
   const toggleFlag = useCallback(() => {
-    const activeQuestion = questions[currentIndex];
+    const { currentIndex: idx, questions: qs } = latestRef.current;
+    const activeQuestion = qs[idx];
     if (!activeQuestion) return;
 
     const qId = activeQuestion.id;
-    const currentAnswer = answers[qId] || {};
-    const nextFlagged = !currentAnswer.flagged;
 
-    const nextAnswers: StudentAnswers = {
-      ...answers,
-      [qId]: {
-        ...currentAnswer,
-        flagged: nextFlagged,
-      },
-    };
-
-    setAnswers(nextAnswers);
-    persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-  }, [currentIndex, questions, answers, secondsRemaining, navigationHistory, persistToLocalStorage]);
+    setAnswers((prevAnswers) => {
+      const currentAnswer = prevAnswers[qId] || {};
+      return {
+        ...prevAnswers,
+        [qId]: {
+          ...currentAnswer,
+          flagged: !currentAnswer.flagged,
+        },
+      };
+    });
+  }, []);
 
   const toggleCalculator = useCallback(() => {
     setIsCalculatorOpen((prev) => !prev);
   }, []);
 
   const markCalculatorUsed = useCallback(() => {
-    const activeQuestion = questions[currentIndex];
+    const {
+      currentIndex: idx,
+      questions: qs,
+      secondsRemaining: remSec,
+      navigationHistory: navHist,
+    } = latestRef.current;
+
+    const activeQuestion = qs[idx];
     if (!activeQuestion) return;
 
     const qId = activeQuestion.id;
+
     setAnswers((prevAnswers) => {
       const currentAnswer = prevAnswers[qId] || {};
       if (currentAnswer.usedCalculator) return prevAnswers;
 
-      const nextAnswers: StudentAnswers = {
-        ...prevAnswers,
-        [qId]: {
-          ...currentAnswer,
-          usedCalculator: true,
-        },
+      const updatedQuestionAnswer: StudentAnswers[string] = {
+        ...currentAnswer,
+        usedCalculator: true,
       };
 
-      persistToLocalStorage(nextAnswers, secondsRemaining, currentIndex, navigationHistory);
-      scheduleAutosave(qId, nextAnswers[qId], currentIndex, navigationHistory, secondsRemaining);
-      return nextAnswers;
+      scheduleAutosave(qId, updatedQuestionAnswer, idx, navHist, remSec);
+
+      return {
+        ...prevAnswers,
+        [qId]: updatedQuestionAnswer,
+      };
     });
-  }, [
-    currentIndex,
-    questions,
-    secondsRemaining,
-    navigationHistory,
-    persistToLocalStorage,
-    scheduleAutosave,
-  ]);
+  }, [scheduleAutosave]);
 
   const getFinalizedNavigationHistory = useCallback((): NavigationHistoryEntry[] => {
-    const finalElapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
-    const lastEntry = navigationHistory[navigationHistory.length - 1];
+    const {
+      totalAdjustedSeconds: totalSec,
+      secondsRemaining: remSec,
+      navigationHistory: navHist,
+      currentIndex: idx,
+    } = latestRef.current;
+
+    const finalElapsed = Math.max(0, totalSec - remSec);
+    const lastEntry = navHist[navHist.length - 1];
 
     if (!lastEntry) {
-      return [{ time: 0, qIdx: 0 }, { time: finalElapsed, qIdx: currentIndex }];
+      return [{ time: 0, qIdx: 0 }, { time: finalElapsed, qIdx: idx }];
     }
 
-    if (lastEntry.time === finalElapsed && lastEntry.qIdx === currentIndex) {
-      return navigationHistory;
+    if (lastEntry.time === finalElapsed && lastEntry.qIdx === idx) {
+      return navHist;
     }
 
-    return [...navigationHistory, { time: finalElapsed, qIdx: currentIndex }];
-  }, [totalAdjustedSeconds, secondsRemaining, navigationHistory, currentIndex]);
+    return [...navHist, { time: finalElapsed, qIdx: idx }];
+  }, []);
 
   const getFinalizedAnswers = useCallback((): StudentAnswers => {
-    const finalElapsed = Math.max(0, totalAdjustedSeconds - secondsRemaining);
+    const {
+      totalAdjustedSeconds: totalSec,
+      secondsRemaining: remSec,
+      questions: qs,
+      answers: currentAnswers,
+    } = latestRef.current;
+
+    const finalElapsed = Math.max(0, totalSec - remSec);
     const finalNavHistory = getFinalizedNavigationHistory();
-    const calculatedDwellTimes = deriveDwellTimesFromHistory(
+    const calculatedDwellTimes = calculateTimeSpentFromNavHistory(
       finalNavHistory,
       finalElapsed,
-      questions.length
+      qs.length
     );
 
-    const finalizedAnswers: StudentAnswers = { ...answers };
-    questions.forEach((q, idx) => {
+    const finalizedAnswers: StudentAnswers = { ...currentAnswers };
+    qs.forEach((q, idx) => {
       const existing = finalizedAnswers[q.id] || {};
       finalizedAnswers[q.id] = {
         ...existing,
@@ -752,7 +833,7 @@ export function useTestProgress({
     });
 
     return finalizedAnswers;
-  }, [totalAdjustedSeconds, secondsRemaining, getFinalizedNavigationHistory, questions, answers]);
+  }, [getFinalizedNavigationHistory]);
 
   return {
     activeQuestion: questions[currentIndex],

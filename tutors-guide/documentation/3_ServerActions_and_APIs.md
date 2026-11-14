@@ -35,6 +35,39 @@ This section covers the operational business logic layer of the application, enc
 
 ---
 
+### `app/api/exam/sync/route.ts`
+
+* **Purpose & Scope:** Lightweight, non-blocking REST endpoint for active student test sessions. Coalesces in-flight question answer upserts and section checkpoint snapshots (clock, question index, navigation history) into a single atomic database transaction without triggering Next.js Router transitions.
+
+* **Exports:**
+  * `POST(req: Request): Promise<NextResponse>`
+  * Interfaces: `AutosavePayload`, `CheckpointPayload`
+
+* **Parameters / Props:**
+  * JSON Body (`ExamSyncRequestBody`):
+    * `response?` (`AutosavePayload`): `testId`, `sectionId`, `questionId`, `sectionOrder`, `responseOrder`, `responseType`, `selectedOptionId`, `frqUserAnswer`, `correctAnswerKey`, `timeSpentOnResponse`, `usedCalculator`.
+    * `checkpoint?` (`CheckpointPayload`): `testId`, `sectionId`, `timeRemainingSeconds`, `lastQuestionIndex`, `navigationHistory`, `accommodations`, `clientUpdatedAt`.
+
+* **Return Value / Emitted State:**
+  * Success: `NextResponse.json({ success: true })` (`200 OK`).
+  * Already Finalized: `NextResponse.json({ success: false, error: "Section already submitted; sync rejected." }, { status: 409 })`.
+  * Failure: `400 Bad Request`, `401 Unauthorized`, or `500 Internal Server Error` with `{ success: false, error: string }`.
+
+* **Dependencies & Imports:**
+  * `NextResponse` from `next/server`.
+  * `auth` from `@/lib/auth`.
+  * `prisma` from `@/lib/prisma`.
+  * `evaluateAnswer` from `@/lib/scoring/mathEvaluator`.
+  * `Prisma`, `QuestionType` from `@prisma/client`.
+  * `AccommodationSettings` from `@/types/accommodations`.
+
+* **Key Logic & Edge Cases:**
+  * **Atomic Coalesced Transaction (`prisma.$transaction`):** Accepts `response`, `checkpoint`, or both in a single request and commits all Prisma upserts in one round-trip, reducing database connections and auth lookups by half when an answer is selected.
+  * **Section Finalization Guard (`409 Conflict`):** Executes an index-only lookup against `prisma.result.findUnique({ where: { testId_profileId_sectionId } })` before writing. If an immutable result already exists, rejects the sync with HTTP `409` so delayed debounces or offline retry queues cannot resurrect deleted checkpoints.
+  * **Monotonic Dwell Time & Answer-Change Tracking:** Compares incoming `timeSpentOnResponse` against any existing `Response` record using `Math.max` to preserve monotonic increments across out-of-order network requests, and flags `changedAnswer` when a student modifies an existing selection.
+
+---
+
 ### `app/api/capture/[token]/events/route.ts`
 
 * **Purpose & Scope:** Server-Sent Events (SSE) endpoint establishing a persistent HTTP stream with the desktop exam runner. It notifies the desktop client in real time when handwritten FRQ sheets are uploaded, cropped, or audited via a mobile device.
@@ -284,59 +317,6 @@ This section covers the operational business logic layer of the application, enc
 ---
 
 ## 2. Server Actions (`actions/`)
-
-### `actions/autosave.ts`
-
-* **Purpose & Scope:** Handles high-frequency asynchronous autosaving for active student test sessions, persisting in-flight question answer selections and periodic section checkpoint snapshots (clock, question index, navigation path).
-
-
-* **Exports:**
-* `saveSectionCheckpoint(payload: CheckpointPayload): Promise<{ success: boolean; error?: string }>`
-
-
-* `autosaveResponse(payload: AutosavePayload): Promise<{ success: boolean; error?: string }>`
-
-
-
-
-* **Parameters / Props:**
-* `CheckpointPayload`: `testId`, `sectionId`, `timeRemainingSeconds`, `lastQuestionIndex`, `navigationHistory`, `accommodations`, `clientUpdatedAt`.
-
-
-* `AutosavePayload`: `testId`, `sectionId`, `questionId`, `sectionOrder`, `responseOrder`, `responseType`, `selectedOptionId`, `frqUserAnswer`, `correctAnswerKey`, `timeSpentOnResponse`, `usedCalculator`.
-
-
-
-
-* **Return Value / Emitted State:** Standard status indicators (`{ success: true }` or `{ success: false, error: string }`).
-
-
-* **Dependencies & Imports:**
-* `auth` from `@/lib/auth`.
-
-
-* `prisma` from `@/lib/prisma`.
-
-
-* `evaluateAnswer` from `@/lib/scoring/mathEvaluator`.
-
-
-
-
-* **Key Logic & Edge Cases:**
-* **Checkpoint Finalization Guard:** `saveSectionCheckpoint` executes a lightweight, index-only lookup against `prisma.result.findUnique({ where: { testId_profileId_sectionId } })`. If an immutable result already exists, the save is aborted immediately, preventing delayed debounces or offline retry queues from resurrecting deleted checkpoints.
-
-
-* **Lean Response Upsertion:** `autosaveResponse` writes directly via `prisma.response.upsert` without pre-checking test status, eliminating read-before-write query duplication during active student testing.
-
-
-* **Monotonic Dwell Time Preservation:** Dwell times are verified against existing responses to ensure monotonic increments across delayed or out-of-order network requests.
-
-
-
-
-
----
 
 ### `actions/breakActions.ts`
 

@@ -54,7 +54,7 @@ This document provides a comprehensive structural overview of the standardized t
 
 * **Multi-Program Shell Architecture:** Houses tailored interface shells mimicking the actual testing interfaces for **SAT** (Bluebook-style), **ACT**, **AP Calculus**, and **GRE**. Adapters (`SATLayoutAdapter`, `ACTLayoutAdapter`, `APLayoutAdapter`, `GRELayoutAdapter`) standardize interface mechanics (headers, navigation drawers, calculators, formula popovers) around unified core layouts (`SplitPassageLayout`, `SingleColumnLayout`).
 * **Adaptive Multi-Stage Branching:** Managed by `lib/adaptive/branchingController.ts`. Specifically configured for tests like the Digital SAT (`sat-diagnostic-adaptive-1`), orchestrating transitions from Routing Module 1 (`m1`) to Easy (`m2-easy`) or Hard (`m2-hard`) Section 2 variants based on real-time routing performance.
-* **Resilient State Persistence:** Driven by `actions/autosave.ts`, `actions/completeTestSection.ts`, and checkpoints in Prisma to prevent state loss during network drops or accidental page reloads.
+* **Resilient State Persistence:** Driven by `app/api/exam/sync/route.ts`, `actions/completeTestSection.ts`, and SectionCheckpoint records in Prisma, pairing localStorage buffering and offline retry queues with non-blocking REST syncs to prevent state loss during network drops or accidental page reloads.
 
 ### B. Free Response Question (FRQ) Mobile Scan & Audit Pipeline (`app/scan/`, `actions/frq*`, `lib/cv/`)
 
@@ -93,7 +93,7 @@ This document provides a comprehensive structural overview of the standardized t
             │                                                      │
             ├──────(FRQ Capture: Mobile/CV Sync)                   │
             │                                                      ▼
-            ▼ (actions/autosave & completeTestSection)    [actions/observability]
+            ▼ (/api/exam/sync & completeTestSection)    [actions/observability]
     [Prisma Postgres DB]
             │
             ├───────────────► [lib/scoring/adaptiveScorer & curveEngine]

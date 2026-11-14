@@ -207,16 +207,18 @@ This section documents the exam runtime environment, comprising the dynamic test
 
 
 * **Dependencies & Imports:**
-* `autosaveResponse`, `saveSectionCheckpoint` from `@/actions/autosave`.
-
-
-* `examLogger` from `@/lib/telemetry/examLogger`.
-
-
-
+  * `AutosavePayload`, `CheckpointPayload` (types) from `@/app/api/exam/sync/route`.
+  * `QuestionType` from `@prisma/client`.
+  * `examLogger` from `@/lib/telemetry/examLogger`.
+  * `calculateTimeSpentFromNavHistory` from `@/lib/telemetry/timeTracking`.
 
 * **Key Logic & Edge Cases:**
-* **Three-Way State Reconciliation (`resolveInitialProgressState`):** Resolves state conflicts on mount between `localStorage` and PostgreSQL server checkpoints using timestamps (`lastSavedAt` vs. `clientUpdatedAt`), preserving answer selections across device switches.
+  * **Three-Way State Reconciliation (`resolveInitialProgressState`):** Resolves state conflicts on mount between `localStorage` and PostgreSQL server checkpoints using timestamps (`lastSavedAt` vs. `clientUpdatedAt`), preserving answer selections across device switches.
+  * **Wall-Clock Deadline Anchoring (`endTimeRef`):** Anchors the section deadline timestamp (`Date.now() + secondsRemaining * 1000`) when the timer starts or resets, polling every `250ms` via `Math.ceil((endTimeRef.current - Date.now()) / 1000)` so main-thread work or network activity never causes clock drift or visual stalls.
+  * **Dwell Time Derivation (`calculateTimeSpentFromNavHistory`):** Computes time spent per question by summing dwell spans across `navigationHistory` step timestamps (`{ time, qIdx }`) up to total elapsed test time.
+  * **Non-Blocking Coalesced Sync (`/api/exam/sync`):** Dispatches background writes via `fetch("/api/exam/sync", { method: "POST", keepalive: true })` instead of Next.js Server Actions to avoid locking the Next.js Router transition pipeline. Question answer changes debounce at `600ms` and coalesce any pending checkpoint snapshot into the same single request, while standalone navigation/heartbeat checkpoints debounce at `1500ms` (with a `10s` periodic heartbeat).
+  * **Referentially Stable Action Handlers (`latestRef`):** Stores volatile state (`secondsRemaining`, `answers`, `navigationHistory`, `currentIndex`) in a ref and runs `localStorage` persistence in post-commit `useEffect` hooks so `selectOption` and navigation handlers do not recreate on every timer tick.
+  * **Offline Queueing & Exponential Backoff:** When offline or on transient failure, autosave payloads accumulate in `offlineQueueRef`. Upon re-establishing connectivity (`window.addEventListener("online")`), `flushOfflineQueue` processes queued records sequentially with exponential backoff (`1s` up to `10s`), treating HTTP `409` (already submitted) as terminal.
 
 
 * **Dwell Time Derivation (`deriveDwellTimesFromHistory`):** Rather than using naive interval timers, computes time spent per question by summing dwell spans across `navigationHistory` step timestamps (`{ time, qIdx }`) up to total elapsed test time.
