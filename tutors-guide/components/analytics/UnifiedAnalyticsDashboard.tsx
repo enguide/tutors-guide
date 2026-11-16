@@ -38,27 +38,7 @@ import {
   AdaptiveTrajectoryData,
 } from "@/types/analytics";
 import { TestMetadata } from "@/types/content";
-import { TopicSkillAccuracyAccordion } from "@/components/analytics/TopicSkillAccuracyAccordion";
-
-const DIFFICULTY_LABELS: Record<string, string> = {
-  "1": "Easy",
-  "2": "Moderate",
-  "3": "Hard",
-  "4": "Expert",
-  Easy: "Easy",
-  Medium: "Moderate",
-  Moderate: "Moderate",
-  Hard: "Hard",
-  Expert: "Expert",
-};
-
-const DIFFICULTY_ORDER: Record<string, number> = {
-  Easy: 1,
-  Moderate: 2,
-  Hard: 3,
-  Expert: 4,
-  Unrated: 99,
-};
+import { SectionPacingTimeline } from "@/components/analytics/SectionPacingTimeline";
 
 const OUTCOME_COLORS = {
   correct: "#444444",
@@ -104,7 +84,6 @@ function formatOrdinalPercentile(percentile?: number | string | null): string | 
 
 const useWindowDimensions = () => {
   const [state, setState] = React.useState({
-    fontSize: 11,
     isLg: false,
     mounted: false,
   });
@@ -113,7 +92,6 @@ const useWindowDimensions = () => {
     const handleResize = () => {
       const width = window.innerWidth;
       setState({
-        fontSize: width < 640 ? 11 : width < 1024 ? 12 : 13,
         isLg: width >= 1024,
         mounted: true,
       });
@@ -140,11 +118,6 @@ const navChartConfig = {
   },
 } satisfies ChartConfig;
 
-const accuracyChartConfig = {
-  correct: { label: "Correct", color: OUTCOME_COLORS.correct },
-  incorrect: { label: "Incorrect", color: OUTCOME_COLORS.incorrect },
-} satisfies ChartConfig;
-
 interface UnifiedAnalyticsDashboardProps {
   metadata: TestMetadata;
   testSummary: TestSummaryData | null;
@@ -160,7 +133,7 @@ export default function UnifiedAnalyticsDashboard({
   responses,
   adaptiveTrajectory,
 }: UnifiedAnalyticsDashboardProps) {
-  const { fontSize, isLg, mounted } = useWindowDimensions();
+  const { isLg, mounted } = useWindowDimensions();
 
   const availableSections = React.useMemo(() => {
     return sectionResults.map((sr) => sr.sectionId);
@@ -395,43 +368,6 @@ export default function UnifiedAnalyticsDashboard({
     return Array.from(new Set(ticks));
   }, [maxNavQuestionIdx]);
 
-  const accuracyData = React.useMemo(() => {
-    const grouped = {
-      difficulties: {} as Record<string, { correct: number; incorrect: number }>,
-    };
-
-    activeResponses.forEach((response) => {
-      const { isCorrect } = response;
-      const rawDiff = response.difficulty || "";
-      const difficulty = DIFFICULTY_LABELS[rawDiff] || rawDiff || "Unrated";
-
-      if (!grouped.difficulties[difficulty]) {
-        grouped.difficulties[difficulty] = { correct: 0, incorrect: 0 };
-      }
-      if (isCorrect) grouped.difficulties[difficulty].correct++;
-      else grouped.difficulties[difficulty].incorrect++;
-    });
-
-    const formatCategory = (cat: Record<string, { correct: number; incorrect: number }>) =>
-      Object.entries(cat).map(([name, metrics]) => ({
-        name,
-        correct: metrics.correct,
-        incorrect: metrics.incorrect,
-      }));
-
-    return {
-      difficulties: formatCategory(grouped.difficulties).sort(
-        (a, b) => (DIFFICULTY_ORDER[a.name] || 99) - (DIFFICULTY_ORDER[b.name] || 99)
-      ),
-    };
-  }, [activeResponses]);
-
-  const calculateChartHeight = (itemCount: number) => {
-    const step = 45;
-    const minHeight = 150;
-    return Math.max(minHeight, itemCount * step);
-  };
-
   const isSatCategory = metadata.category.toUpperCase() === "SAT";
   const isAcademicCategory =
     metadata.category.toUpperCase() === "ACADEMIC" ||
@@ -480,6 +416,7 @@ export default function UnifiedAnalyticsDashboard({
 
   return (
     <div className="flex flex-col items-center gap-4 w-full min-w-0">
+      {/* CHART 1: Scorecard + Time Spent per Question */}
       <Card
         key={`chart-${activeSectionId}`}
         className="rounded-none w-full border border-slate-200 dark:border-slate-800 shadow-sm min-w-0"
@@ -854,6 +791,15 @@ export default function UnifiedAnalyticsDashboard({
         </CardContent>
       </Card>
 
+      {/* CHART 2: Question-by-Question Pacing & Topic Breakdown (synchronized with top section selector) */}
+      <SectionPacingTimeline
+        metadata={metadata}
+        sectionResults={sectionResults}
+        responses={responses}
+        activeSectionId={activeSectionId}
+      />
+
+      {/* CHART 3: Question Navigation Timeline */}
       {activeSectionResult && (
         <Card className="rounded-none w-full min-w-0">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 border-b min-h-16 px-4 sm:px-5 py-3">
@@ -948,74 +894,6 @@ export default function UnifiedAnalyticsDashboard({
           </CardContent>
         </Card>
       )}
-
-      <div className="flex flex-col lg:flex-row gap-4 w-full min-w-0">
-        <div className="w-full lg:w-2/3 min-w-0">
-          <TopicSkillAccuracyAccordion responses={activeResponses} />
-        </div>
-
-        <div className="w-full lg:w-1/3 flex flex-col gap-4 min-w-0">
-          <Card className="rounded-none w-full h-fit min-w-0">
-            <CardHeader className="border-b">
-              <CardTitle>Accuracy by Difficulty</CardTitle>
-              <CardDescription>
-                Breakdown of correct vs. missed questions by difficulty tier.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6 min-w-0">
-              {!mounted ? (
-                <div className="h-40 w-full animate-pulse bg-muted/20" />
-              ) : (
-                <ChartContainer
-                  config={accuracyChartConfig}
-                  className="w-full min-w-0"
-                  style={{
-                    height: calculateChartHeight(accuracyData.difficulties.length),
-                    minHeight: "150px",
-                  }}
-                >
-                  <BarChart
-                    data={accuracyData.difficulties}
-                    layout="vertical"
-                    margin={{ left: 5, right: 5 }}
-                  >
-                    <CartesianGrid horizontal vertical />
-                    <XAxis
-                      type="number"
-                      tick={{ fontSize }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      tick={{ fontSize }}
-                      tickLine={false}
-                      axisLine={false}
-                      width={80}
-                    />
-                    <ChartTooltip
-                      content={<ChartTooltipContent indicator="dashed" />}
-                    />
-                    <Bar
-                      dataKey="correct"
-                      fill={OUTCOME_COLORS.correct}
-                      stackId="a"
-                      radius={0}
-                    />
-                    <Bar
-                      dataKey="incorrect"
-                      fill={OUTCOME_COLORS.incorrect}
-                      stackId="a"
-                      radius={0}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
     </div>
   );
 }

@@ -21,7 +21,6 @@ import {
   BookOpen,
   ChevronDown,
 } from "lucide-react";
-import { SectionPacingTimeline } from "./SectionPacingTimeline";
 
 interface ActionableDiagnosticsPanelProps {
   metadata: TestMetadata;
@@ -333,13 +332,6 @@ export const ActionableDiagnosticsPanel: React.FC<ActionableDiagnosticsPanelProp
           </div>
         </div>
       </div>
-
-      {/* Bottom Full-Width Anchor Visualization: Section Pacing & Topic Breakdown */}
-      <SectionPacingTimeline
-        metadata={metadata}
-        sectionResults={sectionResults}
-        responses={responses}
-      />
     </div>
   );
 };
