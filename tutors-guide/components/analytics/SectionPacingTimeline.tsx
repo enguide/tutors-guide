@@ -40,6 +40,21 @@ const DOMAIN_PALETTE = [
   "#ea580c", // Orange-600
 ];
 
+const DESKTOP_INITIAL_DIMENSION = { width: 960, height: 300 };
+
+const SCATTER_KEYFRAMES_CSS = `
+  @keyframes scatterRise {
+    from {
+      opacity: 0;
+      transform: translate(var(--rise-x, 0px), var(--rise-y, 40px)) scale(0.85);
+    }
+    to {
+      opacity: 1;
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+`;
+
 const timelineChartConfig = {
   plottedTime: {
     label: "Time (s)",
@@ -47,15 +62,22 @@ const timelineChartConfig = {
   },
 } satisfies ChartConfig;
 
-const useIsDesktop = (controlledIsLg?: boolean) => {
+const useDesktopBreakpoint = (controlledIsLg?: boolean) => {
   const [internalIsLg, setInternalIsLg] = useState(false);
 
   useEffect(() => {
     if (controlledIsLg !== undefined) return;
-    const handleResize = () => setInternalIsLg(window.innerWidth >= 1024);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+
+    const syncBreakpoint = () => {
+      setInternalIsLg((prev) =>
+        prev === mediaQuery.matches ? prev : mediaQuery.matches
+      );
+    };
+
+    syncBreakpoint();
+    mediaQuery.addEventListener("change", syncBreakpoint);
+    return () => mediaQuery.removeEventListener("change", syncBreakpoint);
   }, [controlledIsLg]);
 
   return controlledIsLg !== undefined ? controlledIsLg : internalIsLg;
@@ -264,7 +286,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
   hideCardWrapper = false,
   isLg: controlledIsLg,
 }) => {
-  const isLg = useIsDesktop(controlledIsLg);
+  const isLg = useDesktopBreakpoint(controlledIsLg);
   const [selectedSectionId, setSelectedSectionId] = useState<string>(
     () => String(sectionResults[0]?.sectionId ?? "")
   );
@@ -410,6 +432,24 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
     };
   }, [sectionResponses, trackDomainColorMap, targetSeconds, yAxisCap, isLg]);
 
+  const mobileChartHeight = useMemo(
+    () => Math.max(150, plotData.length * 30),
+    [plotData.length]
+  );
+
+  const mobileChartStyle = useMemo(
+    () => ({
+      height: `${mobileChartHeight}px`,
+      minHeight: "150px",
+    }),
+    [mobileChartHeight]
+  );
+
+  const mobileInitialDimension = useMemo(
+    () => ({ width: 360, height: mobileChartHeight }),
+    [mobileChartHeight]
+  );
+
   if (sectionResults.length === 0) return null;
 
   const tooltipContent = ({ active, payload }: any) => {
@@ -454,18 +494,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
 
   const content = (
     <div className="space-y-4 w-full min-w-0">
-      <style>{`
-        @keyframes scatterRise {
-          from {
-            opacity: 0;
-            transform: translate(var(--rise-x, 0px), var(--rise-y, 40px)) scale(0.85);
-          }
-          to {
-            opacity: 1;
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-      `}</style>
+      <style>{SCATTER_KEYFRAMES_CSS}</style>
 
       {!hideCardWrapper && (
         <div className="flex flex-col gap-3 border-b border-border pb-4">
@@ -525,11 +554,9 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
             {!isLg ? (
               <ChartContainer
                 config={timelineChartConfig}
+                initialDimension={mobileInitialDimension}
                 className="w-full min-w-0"
-                style={{
-                  height: `${plotData.length * 30}px`,
-                  minHeight: "150px",
-                }}
+                style={mobileChartStyle}
               >
                 <ScatterChart margin={{ left: 0, right: 12, top: 10, bottom: 8 }}>
                   <CartesianGrid vertical={true} horizontal={false} />
@@ -608,7 +635,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
             ) : (
               <ChartContainer
                 config={timelineChartConfig}
-                initialDimension={{ width: 960, height: 300 }}
+                initialDimension={DESKTOP_INITIAL_DIMENSION}
                 className="aspect-auto h-[300px] pt-2 w-full min-w-0"
               >
                 <ScatterChart margin={{ left: 12, right: 12, top: 14, bottom: 0 }}>

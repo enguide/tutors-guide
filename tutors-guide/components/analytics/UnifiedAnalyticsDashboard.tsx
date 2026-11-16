@@ -49,6 +49,8 @@ const OUTCOME_COLORS = {
   target: "#2563eb",
 };
 
+const DESKTOP_INITIAL_DIMENSION = { width: 960, height: 300 };
+
 function formatOrdinalPercentile(percentile?: number | string | null): string | null {
   if (percentile === null || percentile === undefined) {
     return null;
@@ -85,23 +87,35 @@ function formatOrdinalPercentile(percentile?: number | string | null): string | 
   return `${rounded}${suffix} Percentile`;
 }
 
-const useWindowDimensions = () => {
+/**
+ * Uses matchMedia so mobile browser chrome expansion/retraction during vertical
+ * scrolling (which changes innerHeight and fires window resize) never triggers
+ * unnecessary re-renders unless the 1024px breakpoint is actually crossed.
+ */
+const useDesktopBreakpoint = () => {
   const [state, setState] = React.useState({
     isLg: false,
     mounted: false,
   });
 
   React.useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      setState({
-        isLg: width >= 1024,
-        mounted: true,
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+
+    const syncBreakpoint = () => {
+      setState((prev) => {
+        if (prev.mounted && prev.isLg === mediaQuery.matches) {
+          return prev;
+        }
+        return {
+          isLg: mediaQuery.matches,
+          mounted: true,
+        };
       });
     };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+
+    syncBreakpoint();
+    mediaQuery.addEventListener("change", syncBreakpoint);
+    return () => mediaQuery.removeEventListener("change", syncBreakpoint);
   }, []);
 
   return state;
@@ -136,7 +150,7 @@ export default function UnifiedAnalyticsDashboard({
   responses,
   adaptiveTrajectory,
 }: UnifiedAnalyticsDashboardProps) {
-  const { isLg, mounted } = useWindowDimensions();
+  const { isLg, mounted } = useDesktopBreakpoint();
   const [chartMode, setChartMode] = React.useState<PacingChartMode>("bars");
 
   const availableSections = React.useMemo(() => {
@@ -213,6 +227,24 @@ export default function UnifiedAnalyticsDashboard({
   const clampedBarCount = React.useMemo(
     () => topChartData.filter((d) => d.isClamped).length,
     [topChartData]
+  );
+
+  const mobileBarHeight = React.useMemo(
+    () => Math.max(150, topChartData.length * 30),
+    [topChartData.length]
+  );
+
+  const mobileBarStyle = React.useMemo(
+    () => ({
+      height: `${mobileBarHeight}px`,
+      minHeight: "150px",
+    }),
+    [mobileBarHeight]
+  );
+
+  const mobileBarInitialDimension = React.useMemo(
+    () => ({ width: 360, height: mobileBarHeight }),
+    [mobileBarHeight]
   );
 
   const sectionStats = React.useMemo(() => {
@@ -628,8 +660,9 @@ export default function UnifiedAnalyticsDashboard({
                 <div className="w-full min-w-0">
                   <ChartContainer
                     config={topBarConfig}
+                    initialDimension={mobileBarInitialDimension}
                     className="w-full min-w-0"
-                    style={{ height: `${topChartData.length * 30}px`, minHeight: "150px" }}
+                    style={mobileBarStyle}
                   >
                     <BarChart
                       data={topChartData}
@@ -725,7 +758,7 @@ export default function UnifiedAnalyticsDashboard({
                 <div className="w-full min-w-0">
                   <ChartContainer
                     config={topBarConfig}
-                    initialDimension={{ width: 960, height: 300 }}
+                    initialDimension={DESKTOP_INITIAL_DIMENSION}
                     className="aspect-auto h-[300px] pt-2 w-full min-w-0"
                   >
                     <BarChart
