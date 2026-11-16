@@ -886,7 +886,7 @@ questions:
     questionNumber: 10
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "One-variable data: distributions and measures of center and spread"
     difficulty: "Hard"
     containsGraph: false
@@ -1074,7 +1074,7 @@ questions:
     questionNumber: 12
     questionType: "MC"
     correctAnswer: "D"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Probability and conditional probability"
     difficulty: "Hard"
     containsGraph: false
@@ -1459,7 +1459,7 @@ questions:
     questionNumber: 16
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Ratios, rates, proportional relationships, and units"
     difficulty: "Hard"
     containsGraph: false
@@ -1547,7 +1547,7 @@ questions:
     questionNumber: 17
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "One-variable data: distributions and measures of center and spread"
     difficulty: "Hard"
     containsGraph: false
@@ -1818,7 +1818,7 @@ questions:
     questionNumber: 20
     questionType: "FR"
     correctAnswer: "18"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Probability and conditional probability"
     difficulty: "Medium"
     containsGraph: false

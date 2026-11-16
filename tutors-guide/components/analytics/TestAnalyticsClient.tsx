@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { TestMetadata } from "@/types/content";
 import {
   EnrichedResponseItem,
@@ -12,20 +11,6 @@ import {
 } from "@/types/analytics";
 import UnifiedAnalyticsDashboard from "@/components/analytics/UnifiedAnalyticsDashboard";
 import { QuestionResultCard } from "@/components/analytics/QuestionResultCard";
-import { TopicSkillAccuracyAccordion } from "@/components/analytics/TopicSkillAccuracyAccordion";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
 import {
   BarChart3,
   Search,
@@ -37,31 +22,6 @@ import {
   Filter,
 } from "lucide-react";
 import { ActionableDiagnosticsPanel } from "./ActionableDiagnosticPanel";
-
-const DIFFICULTY_LABELS: Record<string, string> = {
-  "1": "Easy",
-  "2": "Moderate",
-  "3": "Hard",
-  "4": "Expert",
-  Easy: "Easy",
-  Medium: "Moderate",
-  Moderate: "Moderate",
-  Hard: "Hard",
-  Expert: "Expert",
-};
-
-const DIFFICULTY_ORDER: Record<string, number> = {
-  Easy: 1,
-  Moderate: 2,
-  Hard: 3,
-  Expert: 4,
-  Unrated: 99,
-};
-
-const accuracyChartConfig = {
-  correct: { label: "Correct", color: "#444444" },
-  incorrect: { label: "Missed", color: "#ff9999" },
-} satisfies ChartConfig;
 
 interface TestAnalyticsClientProps {
   metadata: TestMetadata;
@@ -105,31 +65,6 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
     if (selectedSectionId === "all") return responses;
     return responses.filter((r) => r.sectionId === selectedSectionId);
   }, [responses, selectedSectionId]);
-
-  const difficultyBreakdown = useMemo(() => {
-    const grouped: Record<string, { correct: number; incorrect: number }> = {};
-
-    currentSectionResponses.forEach((response) => {
-      const rawDiff = response.difficulty || "";
-      const difficulty = DIFFICULTY_LABELS[rawDiff] || rawDiff || "Unrated";
-
-      if (!grouped[difficulty]) {
-        grouped[difficulty] = { correct: 0, incorrect: 0 };
-      }
-      if (response.isCorrect) grouped[difficulty].correct++;
-      else grouped[difficulty].incorrect++;
-    });
-
-    return Object.entries(grouped)
-      .map(([name, metrics]) => ({
-        name,
-        correct: metrics.correct,
-        incorrect: metrics.incorrect,
-      }))
-      .sort(
-        (a, b) => (DIFFICULTY_ORDER[a.name] || 99) - (DIFFICULTY_ORDER[b.name] || 99)
-      );
-  }, [currentSectionResponses]);
 
   const domainOptions = useMemo(() => {
     const set = new Set<string>();
@@ -346,76 +281,6 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                   </button>
                 );
               })}
-            </div>
-
-            {/* Scoped Accuracy Breakdown: By Topic & Skill (Left) + By Difficulty (Right) */}
-            <div className="flex flex-col lg:flex-row gap-4 w-full min-w-0">
-              <div className="w-full lg:w-2/3 min-w-0">
-                <TopicSkillAccuracyAccordion responses={currentSectionResponses} />
-              </div>
-
-              <div className="w-full lg:w-1/3 flex flex-col gap-4 min-w-0">
-                <Card className="rounded-none w-full h-fit min-w-0">
-                  <CardHeader className="border-b">
-                    <CardTitle>Accuracy by Difficulty</CardTitle>
-                    <CardDescription>
-                      Breakdown of correct vs. missed questions by difficulty tier.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6 min-w-0">
-                    {difficultyBreakdown.length > 0 ? (
-                      <ChartContainer
-                        config={accuracyChartConfig}
-                        className="w-full min-w-0"
-                        style={{
-                          height: `${Math.max(150, difficultyBreakdown.length * 45)}px`,
-                        }}
-                      >
-                        <BarChart
-                          data={difficultyBreakdown}
-                          layout="vertical"
-                          margin={{ left: 5, right: 5 }}
-                        >
-                          <CartesianGrid horizontal vertical />
-                          <XAxis
-                            type="number"
-                            tick={{ fontSize: 12 }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis
-                            dataKey="name"
-                            type="category"
-                            tick={{ fontSize: 12 }}
-                            tickLine={false}
-                            axisLine={false}
-                            width={80}
-                          />
-                          <ChartTooltip
-                            content={<ChartTooltipContent indicator="dashed" />}
-                          />
-                          <Bar
-                            dataKey="correct"
-                            fill="#444444"
-                            stackId="a"
-                            radius={0}
-                          />
-                          <Bar
-                            dataKey="incorrect"
-                            fill="#ff9999"
-                            stackId="a"
-                            radius={0}
-                          />
-                        </BarChart>
-                      </ChartContainer>
-                    ) : (
-                      <div className="p-4 text-center text-xs text-muted-foreground">
-                        No difficulty data available for this selection.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
             </div>
 
             {/* Filter Drawer */}

@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ScatterChart,
   Scatter,
@@ -12,8 +12,8 @@ import {
   ReferenceLine,
   ReferenceArea,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import {
   EnrichedResponseItem,
   SectionResultData,
@@ -25,9 +25,9 @@ interface SectionPacingTimelineProps {
   sectionResults: SectionResultData[];
   responses: EnrichedResponseItem[];
   activeSectionId?: string;
+  hideCardWrapper?: boolean;
+  isLg?: boolean;
 }
-
-type OutcomeFilter = "all" | "incorrect" | "correct";
 
 const DOMAIN_PALETTE = [
   "#0284c7", // Sky-600
@@ -39,6 +39,27 @@ const DOMAIN_PALETTE = [
   "#0d9488", // Teal-600
   "#ea580c", // Orange-600
 ];
+
+const timelineChartConfig = {
+  plottedTime: {
+    label: "Time (s)",
+    color: "#2563eb",
+  },
+} satisfies ChartConfig;
+
+const useIsDesktop = (controlledIsLg?: boolean) => {
+  const [internalIsLg, setInternalIsLg] = useState(false);
+
+  useEffect(() => {
+    if (controlledIsLg !== undefined) return;
+    const handleResize = () => setInternalIsLg(window.innerWidth >= 1024);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [controlledIsLg]);
+
+  return controlledIsLg !== undefined ? controlledIsLg : internalIsLg;
+};
 
 function normalizeDifficulty(raw?: string): "Easy" | "Medium" | "Hard" {
   if (!raw) return "Medium";
@@ -99,8 +120,8 @@ function resolveSubjectTrack(sr: SectionResultData): string {
 interface TimelinePoint {
   questionId: string;
   questionNumber: number;
-  timeSpent: number;    // True unclamped seconds
-  plottedTime: number;  // Clamped to [0, yAxisCap] for clean Y-axis scaling
+  timeSpent: number;
+  plottedTime: number;
   isClamped: boolean;
   isCorrect: boolean;
   difficulty: string;
@@ -108,15 +129,9 @@ interface TimelinePoint {
   skill: string;
   domainColor: string;
   targetSeconds: number;
+  isVerticalLayout: boolean;
 }
 
-/**
- * Custom SVG scatter point with matched visual footprint:
- * - Color            -> Subject-track standardized Domain
- * - Shape            -> Difficulty (Triangle = Easy, Square = Medium, Diamond = Hard)
- * - Filled vs. Empty -> Outcome (Solid Filled = Correct; Hollow Outlined = Incorrect)
- * - Top Cap Bar      -> Indicates an outlier clamped to the 2.5x Y-axis ceiling
- */
 const renderTimelineShape = (props: any) => {
   const { cx, cy, payload } = props;
   if (typeof cx !== "number" || typeof cy !== "number" || !payload) {
@@ -127,6 +142,7 @@ const renderTimelineShape = (props: any) => {
   const color = pt.domainColor;
   const diff = normalizeDifficulty(pt.difficulty);
   const isCorrect = pt.isCorrect;
+  const isVertical = pt.isVerticalLayout;
 
   const hollowStrokeWidth = 2.2;
   const inset = isCorrect ? 0 : hollowStrokeWidth / 2;
@@ -135,67 +151,85 @@ const renderTimelineShape = (props: any) => {
   const stroke = isCorrect ? "none" : color;
   const strokeWidth = isCorrect ? 0 : hollowStrokeWidth;
 
-  // Offset slightly downward when pinned to the top Y-axis border so the shape + cap bar stay unclipped
-  const drawY = pt.isClamped ? cy + 5 : cy;
+  const drawX = isVertical
+    ? pt.isClamped
+      ? cx - 5
+      : pt.timeSpent === 0
+      ? cx + 5
+      : cx
+    : cx;
+  const drawY = !isVertical
+    ? pt.isClamped
+      ? cy + 5
+      : pt.timeSpent === 0
+      ? cy - 5
+      : cy
+    : cy;
+
+  const riseX = isVertical ? -28 : 0;
+  const riseY = !isVertical ? 28 : 0;
 
   const capIndicator = pt.isClamped ? (
-    <line
-      x1={cx - 6.5}
-      y1={drawY - 8.5}
-      x2={cx + 6.5}
-      y2={drawY - 8.5}
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-    />
+    isVertical ? (
+      <line
+        x1={drawX + 8.5}
+        y1={drawY - 6.5}
+        x2={drawX + 8.5}
+        y2={drawY + 6.5}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    ) : (
+      <line
+        x1={drawX - 6.5}
+        y1={drawY - 8.5}
+        x2={drawX + 6.5}
+        y2={drawY - 8.5}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    )
   ) : null;
+
+  let shapeNode: React.ReactNode;
 
   if (diff === "Easy") {
     const r = 6.6 - inset;
-    const points = `${cx},${drawY - r} ${cx - r * 0.92},${drawY + r * 0.72} ${
-      cx + r * 0.92
-    },${drawY + r * 0.72}`;
-    return (
-      <g>
-        {capIndicator}
-        <polygon
-          points={points}
-          fill={color}
-          fillOpacity={fillOpacity}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          strokeLinejoin="round"
-        />
-      </g>
+    const points = `${drawX},${drawY - r} ${drawX - r * 0.92},${
+      drawY + r * 0.72
+    } ${drawX + r * 0.92},${drawY + r * 0.72}`;
+    shapeNode = (
+      <polygon
+        points={points}
+        fill={color}
+        fillOpacity={fillOpacity}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
     );
-  }
-
-  if (diff === "Hard") {
+  } else if (diff === "Hard") {
     const r = 6.8 - inset;
-    const points = `${cx},${drawY - r} ${cx + r},${drawY} ${cx},${drawY + r} ${
-      cx - r
-    },${drawY}`;
-    return (
-      <g>
-        {capIndicator}
-        <polygon
-          points={points}
-          fill={color}
-          fillOpacity={fillOpacity}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          strokeLinejoin="round"
-        />
-      </g>
+    const points = `${drawX},${drawY - r} ${drawX + r},${drawY} ${drawX},${
+      drawY + r
+    } ${drawX - r},${drawY}`;
+    shapeNode = (
+      <polygon
+        points={points}
+        fill={color}
+        fillOpacity={fillOpacity}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
     );
-  }
-
-  const half = 5.2 - inset;
-  return (
-    <g>
-      {capIndicator}
+  } else {
+    const half = 5.2 - inset;
+    shapeNode = (
       <rect
-        x={cx - half}
+        x={drawX - half}
         y={drawY - half}
         width={half * 2}
         height={half * 2}
@@ -204,6 +238,20 @@ const renderTimelineShape = (props: any) => {
         stroke={stroke}
         strokeWidth={strokeWidth}
       />
+    );
+  }
+
+  return (
+    <g
+      style={{
+        transformOrigin: `${drawX}px ${drawY}px`,
+        animation: "scatterRise 400ms ease-out both",
+        ["--rise-x" as any]: `${riseX}px`,
+        ["--rise-y" as any]: `${riseY}px`,
+      }}
+    >
+      {capIndicator}
+      {shapeNode}
     </g>
   );
 };
@@ -213,11 +261,13 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
   sectionResults,
   responses,
   activeSectionId: controlledSectionId,
+  hideCardWrapper = false,
+  isLg: controlledIsLg,
 }) => {
+  const isLg = useIsDesktop(controlledIsLg);
   const [selectedSectionId, setSelectedSectionId] = useState<string>(
     () => String(sectionResults[0]?.sectionId ?? "")
   );
-  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
 
   const activeSectionId = useMemo(() => {
     if (controlledSectionId) {
@@ -243,8 +293,6 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
       .sort((a, b) => a.responseOrder - b.responseOrder);
   }, [responses, activeSectionId]);
 
-  // Compute section target seconds/question (accounting for extended-time accommodations),
-  // 0.65x–1.5x target pacing window, and dynamic 2.5x Y-axis ceiling rounded to nearest 10s
   const { targetSeconds, rushedFloorSec, timeSinkCeilingSec, yAxisCap } =
     useMemo(() => {
       if (!activeSectionResult) {
@@ -281,7 +329,6 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
       activeSectionId,
     ]);
 
-  // Standardize domain -> color assignment within the active section's SUBJECT TRACK
   const { trackDomainColorMap, trackDomainEntries } = useMemo(() => {
     const sectionToTrack = new Map<string, string>();
     for (const sr of sectionResults) {
@@ -327,7 +374,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
     };
   }, [sectionResults, responses, sectionResponses, activeSectionId]);
 
-  const { plotData, maxQuestionNum, clampedCount } = useMemo(() => {
+  const { plotData, questionTicks, maxQuestionNum, clampedCount } = useMemo(() => {
     const allPoints: TimelinePoint[] = sectionResponses.map((r, idx) => {
       const dom = r.domain || "General";
       const trueTime = r.timeSpentOnResponse ?? 0;
@@ -344,406 +391,414 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
         skill: r.skill || "General",
         domainColor: trackDomainColorMap.get(dom) ?? DOMAIN_PALETTE[0],
         targetSeconds,
+        isVerticalLayout: !isLg,
       };
-    });
-
-    const filtered = allPoints.filter((pt) => {
-      if (outcomeFilter === "incorrect") return !pt.isCorrect;
-      if (outcomeFilter === "correct") return pt.isCorrect;
-      return true;
     });
 
     const maxQ = allPoints.reduce(
       (acc, p) => Math.max(acc, p.questionNumber),
       1
     );
-    const clamped = filtered.filter((p) => p.isClamped).length;
+    const ticks = allPoints.map((p) => p.questionNumber);
+    const clamped = allPoints.filter((p) => p.isClamped).length;
 
     return {
-      plotData: filtered,
+      plotData: allPoints,
+      questionTicks: ticks,
       maxQuestionNum: maxQ,
       clampedCount: clamped,
     };
-  }, [
-    sectionResponses,
-    trackDomainColorMap,
-    targetSeconds,
-    yAxisCap,
-    outcomeFilter,
-  ]);
-
-  const incorrectCount = useMemo(
-    () => sectionResponses.filter((r) => !r.isCorrect).length,
-    [sectionResponses]
-  );
-  const correctCount = sectionResponses.length - incorrectCount;
+  }, [sectionResponses, trackDomainColorMap, targetSeconds, yAxisCap, isLg]);
 
   if (sectionResults.length === 0) return null;
 
-  return (
-    <div className="bg-card border border-slate-200 dark:border-slate-800 p-4 sm:p-6 rounded-none shadow-sm space-y-4 w-full min-w-0">
-      {/* Top Row: Title + Outcome Toggle (+ Embedded Section Selector only when uncontrolled) */}
-      <div className="flex flex-col gap-3 border-b border-border pb-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+  const tooltipContent = ({ active, payload }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const pt = payload[0].payload as TimelinePoint;
+    const paceRatio = (pt.timeSpent / pt.targetSeconds).toFixed(2);
+    return (
+      <div className="bg-popover text-popover-foreground border border-border p-3 text-xs shadow-md space-y-1.5">
+        <div className="font-bold flex items-center justify-between gap-4">
+          <span>Question {pt.questionNumber}</span>
+          <span
+            className={`font-mono font-bold ${
+              pt.isCorrect
+                ? "text-sky-600 dark:text-sky-400"
+                : "text-rose-600 dark:text-rose-400"
+            }`}
+          >
+            {pt.isCorrect ? "Correct" : "Missed"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+            style={{ backgroundColor: pt.domainColor }}
+          />
+          <span className="font-semibold text-foreground">{pt.domain}</span>
+          <span className="text-muted-foreground">({pt.difficulty})</span>
+        </div>
+        <div className="text-muted-foreground">{pt.skill}</div>
+        <div className="font-mono text-[11px] pt-1 border-t border-border">
+          Time: <strong>{pt.timeSpent}s</strong>
+          {pt.isClamped && (
+            <span className="text-amber-600 dark:text-amber-400 ml-1">
+              (capped at {yAxisCap}s+ on chart)
+            </span>
+          )}{" "}
+          / Target: {pt.targetSeconds}s (<strong>{paceRatio}×</strong>)
+        </div>
+      </div>
+    );
+  };
+
+  const content = (
+    <div className="space-y-4 w-full min-w-0">
+      <style>{`
+        @keyframes scatterRise {
+          from {
+            opacity: 0;
+            transform: translate(var(--rise-x, 0px), var(--rise-y, 40px)) scale(0.85);
+          }
+          to {
+            opacity: 1;
+            transform: translate(0px, 0px) scale(1);
+          }
+        }
+      `}</style>
+
+      {!hideCardWrapper && (
+        <div className="flex flex-col gap-3 border-b border-border pb-4">
           <div>
             <h3 className="text-sm sm:text-base font-bold text-foreground">
               Question-by-Question Pacing & Topic Breakdown
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              The shaded band shows your target pacing window (
-              <span className="font-mono">
-                {rushedFloorSec}s–{timeSinkCeilingSec}s
-              </span>
-              ). Color = content domain; shape = difficulty; filled vs. hollow = outcome.
+              Color = content domain; shape = difficulty; filled vs. hollow = outcome.
             </p>
           </div>
 
-          {/* Outcome Filter Segmented Control */}
-          <div
-            role="group"
-            aria-label="Filter section timeline by outcome"
-            className="inline-flex self-start lg:self-auto border border-border bg-muted/40 p-0.5 rounded-none shrink-0"
-          >
-            <button
-              type="button"
-              onClick={() => setOutcomeFilter("all")}
-              className={`min-h-8 px-3 py-1 text-xs font-bold transition-colors ${
-                outcomeFilter === "all"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              All ({sectionResponses.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setOutcomeFilter("incorrect")}
-              className={`min-h-8 px-3 py-1 text-xs font-bold transition-colors ${
-                outcomeFilter === "incorrect"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Missed ({incorrectCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setOutcomeFilter("correct")}
-              className={`min-h-8 px-3 py-1 text-xs font-bold transition-colors ${
-                outcomeFilter === "correct"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Correct ({correctCount})
-            </button>
-          </div>
+          {!controlledSectionId && (
+            <div className="flex items-center gap-2 overflow-x-auto pt-1 no-scrollbar">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1 shrink-0">
+                Section:
+              </span>
+              {sectionResults.map((sr) => {
+                const secId = String(sr.sectionId);
+                const isSelected = secId === activeSectionId;
+                const misses = sr.totalQuestions - sr.numCorrect;
+
+                return (
+                  <button
+                    key={secId}
+                    type="button"
+                    onClick={() => setSelectedSectionId(secId)}
+                    className={`min-h-9 px-3 py-1.5 rounded-none text-xs font-bold inline-flex items-center gap-2 whitespace-nowrap border transition-colors ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    <span>{sr.section.title}</span>
+                    {misses > 0 && (
+                      <span
+                        className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                          isSelected
+                            ? "bg-primary-foreground/20 text-primary-foreground"
+                            : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                        }`}
+                      >
+                        {misses} missed
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Dynamic Section Selector Bar (only shown when not controlled by parent scorecard) */}
-        {!controlledSectionId && (
-          <div className="flex items-center gap-2 overflow-x-auto pt-1 no-scrollbar">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1 shrink-0">
-              Section:
-            </span>
-            {sectionResults.map((sr) => {
-              const secId = String(sr.sectionId);
-              const isSelected = secId === activeSectionId;
-              const misses = sr.totalQuestions - sr.numCorrect;
-
-              return (
-                <button
-                  key={secId}
-                  type="button"
-                  onClick={() => setSelectedSectionId(secId)}
-                  className={`min-h-9 px-3 py-1.5 rounded-none text-xs font-bold inline-flex items-center gap-2 whitespace-nowrap border transition-colors ${
-                    isSelected
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-muted"
-                  }`}
-                >
-                  <span>{sr.section.title}</span>
-                  {misses > 0 && (
-                    <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                        isSelected
-                          ? "bg-primary-foreground/20 text-primary-foreground"
-                          : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-                      }`}
-                    >
-                      {misses} missed
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Multi-Channel Legend: Subject-Track Domains + Difficulty Shapes + Outcome Fill */}
-      <div className="flex flex-col gap-2 text-[11px] sm:text-xs font-medium bg-muted/20 border border-border/60 px-3 py-2.5">
-        {/* Row 1: All Possible Domains for This Subject Track */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Domains:
-          </span>
-          {trackDomainEntries.map(({ domain, moduleCount, color }) => {
-            const isPresentInModule = moduleCount > 0;
-            return (
-              <span
-                key={domain}
-                className={`flex items-center gap-1.5 transition-opacity ${
-                  isPresentInModule ? "opacity-100" : "opacity-45"
-                }`}
+      {plotData.length > 0 ? (
+        <>
+          <div className="w-full min-w-0">
+            {!isLg ? (
+              <ChartContainer
+                config={timelineChartConfig}
+                className="w-full min-w-0"
+                style={{
+                  height: `${plotData.length * 30}px`,
+                  minHeight: "150px",
+                }}
               >
-                <span
-                  className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="truncate max-w-48 text-foreground">{domain}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  ({moduleCount})
-                </span>
-              </span>
-            );
-          })}
-        </div>
+                <ScatterChart margin={{ left: 0, right: 12, top: 10, bottom: 8 }}>
+                  <CartesianGrid vertical={true} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    dataKey="plottedTime"
+                    orientation="top"
+                    height={40}
+                    domain={[0, yAxisCap]}
+                    allowDataOverflow={true}
+                    tickFormatter={(v) => (v === yAxisCap ? `${v}s+` : `${v}s`)}
+                    label={{
+                      value: "Time Spent (s)",
+                      fontSize: 10,
+                      fontWeight: "bold",
+                      position: "insideTop",
+                      offset: 5,
+                    }}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="questionNumber"
+                    reversed={true}
+                    domain={[0.5, maxQuestionNum + 0.5]}
+                    ticks={questionTicks}
+                    interval={0}
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={12}
+                    width={40}
+                    tickFormatter={(value) => `Q${value}`}
+                  />
 
-        {/* Row 2: Pacing Corridor Key + Difficulty Shapes + Correctness Fill Key */}
-        <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-4 pt-1.5 border-t border-border/50 text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3.5 h-2.5 inline-block bg-sky-500/15 border-y border-dashed border-slate-500" />
-              <span>
-                Target Pacing Zone (
-                <span className="font-mono text-[11px]">
-                  {rushedFloorSec}s–{timeSinkCeilingSec}s
-                </span>
-                )
-              </span>
-            </span>
-            {clampedCount > 0 && (
-              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                <span className="w-3 h-0.5 inline-block bg-current" />
-                <span>
-                  <span className="font-mono">{clampedCount}</span> capped at{" "}
-                  <span className="font-mono">{yAxisCap}s+</span> (hover for exact time)
-                </span>
-              </span>
+                  <ReferenceArea
+                    x1={rushedFloorSec}
+                    x2={timeSinkCeilingSec}
+                    fill="#2563eb"
+                    fillOpacity={0.06}
+                    ifOverflow="extendDomain"
+                  />
+
+                  <ReferenceLine
+                    x={rushedFloorSec}
+                    stroke="#2563eb"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.35}
+                  />
+
+                  <ReferenceLine
+                    x={targetSeconds}
+                    stroke="#2563eb"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                  />
+
+                  <ReferenceLine
+                    x={timeSinkCeilingSec}
+                    stroke="#2563eb"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.35}
+                  />
+
+                  <Tooltip
+                    cursor={{ strokeDasharray: "3 3", strokeOpacity: 0.35 }}
+                    content={tooltipContent}
+                  />
+                  <Scatter
+                    key={`scatter-mobile-${activeSectionId}`}
+                    data={plotData}
+                    shape={renderTimelineShape}
+                    isAnimationActive={false}
+                  />
+                </ScatterChart>
+              </ChartContainer>
+            ) : (
+              <ChartContainer
+                config={timelineChartConfig}
+                initialDimension={{ width: 960, height: 300 }}
+                className="aspect-auto h-[300px] pt-2 w-full min-w-0"
+              >
+                <ScatterChart margin={{ left: 12, right: 12, top: 14, bottom: 0 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    type="number"
+                    dataKey="questionNumber"
+                    domain={[0.5, maxQuestionNum + 0.5]}
+                    ticks={questionTicks}
+                    interval={0}
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={5}
+                    fontSize={12}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="plottedTime"
+                    domain={[0, yAxisCap]}
+                    allowDataOverflow={true}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={5}
+                    tickFormatter={(v) => (v === yAxisCap ? `${v}s+` : `${v}s`)}
+                    fontSize={12}
+                    label={{
+                      value: "Time (s)",
+                      angle: -90,
+                      position: "insideLeft",
+                      fontSize: 10,
+                      fontWeight: "bold",
+                      dy: 15,
+                    }}
+                  />
+
+                  <ReferenceArea
+                    y1={rushedFloorSec}
+                    y2={timeSinkCeilingSec}
+                    fill="#2563eb"
+                    fillOpacity={0.06}
+                    ifOverflow="extendDomain"
+                  />
+
+                  <ReferenceLine
+                    y={rushedFloorSec}
+                    stroke="#2563eb"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.35}
+                  />
+
+                  <ReferenceLine
+                    y={targetSeconds}
+                    stroke="#2563eb"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                  />
+
+                  <ReferenceLine
+                    y={timeSinkCeilingSec}
+                    stroke="#2563eb"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.35}
+                  />
+
+                  <Tooltip
+                    cursor={{ strokeDasharray: "3 3", strokeOpacity: 0.35 }}
+                    content={tooltipContent}
+                  />
+                  <Scatter
+                    key={`scatter-desktop-${activeSectionId}`}
+                    data={plotData}
+                    shape={renderTimelineShape}
+                    isAnimationActive={false}
+                  />
+                </ScatterChart>
+              </ChartContainer>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1" title="Easy Difficulty">
-              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                <polygon points="6,1 1,10.5 11,10.5" fill="currentColor" />
-              </svg>
-              Easy
-            </span>
-            <span className="flex items-center gap-1" title="Medium Difficulty">
-              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                <rect x="2" y="2" width="8" height="8" fill="currentColor" />
-              </svg>
-              Medium
-            </span>
-            <span className="flex items-center gap-1" title="Hard Difficulty">
-              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                <polygon points="6,1 11,6 6,11 1,6" fill="currentColor" />
-              </svg>
-              Hard
-            </span>
+          {/* Single-Line Outcome + Difficulty (Left) & Domains (Right) Legend Strip Below Chart */}
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[11px] sm:text-xs font-medium bg-muted/20 border border-border/60 px-3 py-2.5">
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+              <span
+                className="flex items-center gap-1.5 text-muted-foreground"
+                title="Filled shape indicates a correct answer"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                  <rect x="2" y="2" width="8" height="8" fill="currentColor" />
+                </svg>
+                Correct
+              </span>
+              <span
+                className="flex items-center gap-1.5 text-muted-foreground"
+                title="Hollow outline indicates a missed question"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                  <rect
+                    x="2"
+                    y="2"
+                    width="8"
+                    height="8"
+                    fill="currentColor"
+                    fillOpacity={0.12}
+                    stroke="currentColor"
+                    strokeWidth={2.2}
+                  />
+                </svg>
+                Missed
+              </span>
 
-            <span className="text-border">|</span>
+              <span className="text-border">|</span>
 
-            <span
-              className="flex items-center gap-1.5"
-              title="Filled shape indicates a correct answer"
-            >
-              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                <rect x="2" y="2" width="8" height="8" fill="currentColor" />
-              </svg>
-              Correct
-            </span>
-            <span
-              className="flex items-center gap-1.5"
-              title="Hollow outline indicates a missed question"
-            >
-              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                <rect
-                  x="2"
-                  y="2"
-                  width="8"
-                  height="8"
-                  fill="currentColor"
-                  fillOpacity={0.12}
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                />
-              </svg>
-              Missed
-            </span>
+              <span
+                className="flex items-center gap-1 text-muted-foreground"
+                title="Easy Difficulty"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                  <polygon points="6,1 1,10.5 11,10.5" fill="currentColor" />
+                </svg>
+                Easy
+              </span>
+              <span
+                className="flex items-center gap-1 text-muted-foreground"
+                title="Medium Difficulty"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                  <rect x="2" y="2" width="8" height="8" fill="currentColor" />
+                </svg>
+                Medium
+              </span>
+              <span
+                className="flex items-center gap-1 text-muted-foreground"
+                title="Hard Difficulty"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                  <polygon points="6,1 11,6 6,11 1,6" fill="currentColor" />
+                </svg>
+                Hard
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-x-3.5 gap-y-1.5 ml-auto">
+              {trackDomainEntries.map(({ domain, moduleCount, color }) => {
+                const isPresentInModule = moduleCount > 0;
+                return (
+                  <span
+                    key={domain}
+                    className={`flex items-center gap-1.5 transition-opacity ${
+                      isPresentInModule ? "opacity-100" : "opacity-45"
+                    }`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate max-w-48 text-foreground">{domain}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      ({moduleCount})
+                    </span>
+                  </span>
+                );
+              })}
+
+              {clampedCount > 0 && (
+                <>
+                  <span className="text-border hidden sm:inline">|</span>
+                  <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 shrink-0">
+                    {clampedCount} capped at {yAxisCap}s+ (hover for exact time)
+                  </span>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Scatter Plot */}
-      {plotData.length > 0 ? (
-        <div className="w-full min-w-0 h-[300px]">
-          <ResponsiveContainer width="100%" height={300} minWidth={0}>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 24, left: 4 }}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="currentColor"
-                className="text-border"
-                opacity={0.45}
-              />
-              <XAxis
-                type="number"
-                dataKey="questionNumber"
-                domain={[1, maxQuestionNum]}
-                allowDecimals={false}
-                tickFormatter={(v) => `Q${v}`}
-                fontSize={11}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                label={{
-                  value: "Question Number",
-                  position: "bottom",
-                  offset: 6,
-                  fontSize: 10,
-                  fill: "currentColor",
-                }}
-              />
-              <YAxis
-                type="number"
-                dataKey="plottedTime"
-                domain={[0, yAxisCap]}
-                allowDataOverflow={true}
-                tickFormatter={(v) => (v === yAxisCap ? `${v}s+` : `${v}s`)}
-                fontSize={11}
-                width={48}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                label={{
-                  value: "Time Spent (s)",
-                  angle: -90,
-                  position: "insideLeft",
-                  fontSize: 10,
-                  fill: "currentColor",
-                }}
-              />
-
-              {/* Dynamic 0.65x to 1.5x Healthy Pacing Corridor */}
-              <ReferenceArea
-                y1={rushedFloorSec}
-                y2={timeSinkCeilingSec}
-                fill="#0284c7"
-                fillOpacity={0.06}
-                ifOverflow="extendDomain"
-              />
-
-              {/* Lower Bound: 0.65x Hurried Threshold */}
-              <ReferenceLine
-                y={rushedFloorSec}
-                stroke="#e11d48"
-                strokeDasharray="3 3"
-                strokeOpacity={0.6}
-                label={{
-                  value: `0.65× (${rushedFloorSec}s)`,
-                  position: "insideBottomRight",
-                  fontSize: 9.5,
-                  fill: "#e11d48",
-                }}
-              />
-
-              {/* Center Target: 1.0x Allotted Pace */}
-              <ReferenceLine
-                y={targetSeconds}
-                stroke="#64748b"
-                strokeDasharray="4 4"
-                strokeOpacity={0.85}
-                label={{
-                  value: `Target: ${targetSeconds}s`,
-                  position: "insideTopRight",
-                  fontSize: 10,
-                  fill: "#64748b",
-                }}
-              />
-
-              {/* Upper Bound: 1.5x Over-Time Threshold */}
-              <ReferenceLine
-                y={timeSinkCeilingSec}
-                stroke="#d97706"
-                strokeDasharray="3 3"
-                strokeOpacity={0.7}
-                label={{
-                  value: `1.5× (${timeSinkCeilingSec}s)`,
-                  position: "insideTopRight",
-                  fontSize: 9.5,
-                  fill: "#d97706",
-                }}
-              />
-
-              <Tooltip
-                cursor={{ strokeDasharray: "3 3", strokeOpacity: 0.4 }}
-                content={({ active, payload }) => {
-                  if (!active || !payload || payload.length === 0) return null;
-                  const pt = payload[0].payload as TimelinePoint;
-                  const paceRatio = (pt.timeSpent / pt.targetSeconds).toFixed(2);
-                  return (
-                    <div className="bg-popover text-popover-foreground border border-border p-3 text-xs shadow-md space-y-1.5">
-                      <div className="font-bold flex items-center justify-between gap-4">
-                        <span>Question {pt.questionNumber}</span>
-                        <span
-                          className={`font-mono font-bold ${
-                            pt.isCorrect
-                              ? "text-sky-600 dark:text-sky-400"
-                              : "text-rose-600 dark:text-rose-400"
-                          }`}
-                        >
-                          {pt.isCorrect ? "Correct" : "Missed"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                          style={{ backgroundColor: pt.domainColor }}
-                        />
-                        <span className="font-semibold text-foreground">
-                          {pt.domain}
-                        </span>
-                        <span className="text-muted-foreground">
-                          ({pt.difficulty})
-                        </span>
-                      </div>
-                      <div className="text-muted-foreground">{pt.skill}</div>
-                      <div className="font-mono text-[11px] pt-1 border-t border-border">
-                        Time: <strong>{pt.timeSpent}s</strong>
-                        {pt.isClamped && (
-                          <span className="text-amber-600 dark:text-amber-400 ml-1">
-                            (capped at {yAxisCap}s+ on chart)
-                          </span>
-                        )}{" "}
-                        / Target: {pt.targetSeconds}s (<strong>{paceRatio}×</strong>)
-                      </div>
-                    </div>
-                  );
-                }}
-              />
-              <Scatter
-                data={plotData}
-                shape={renderTimelineShape}
-                isAnimationActive={false}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
+        </>
       ) : (
         <div className="p-8 border border-dashed border-border text-center text-xs text-muted-foreground">
-          No {outcomeFilter === "incorrect" ? "missed" : outcomeFilter} questions in this section.
+          No response data available for this section.
         </div>
       )}
+    </div>
+  );
+
+  if (hideCardWrapper) {
+    return content;
+  }
+
+  return (
+    <div className="bg-card border border-slate-200 dark:border-slate-800 p-4 sm:p-6 rounded-none shadow-sm space-y-4 w-full min-w-0">
+      {content}
     </div>
   );
 };

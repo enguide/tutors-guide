@@ -159,7 +159,7 @@ questions:
     questionNumber: 3
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "One-variable data: distributions and measures of center and spread"
     difficulty: "Easy"
     containsGraph: true
@@ -343,7 +343,7 @@ questions:
     questionNumber: 6
     questionType: "FR"
     correctAnswer: "126"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Percentages"
     difficulty: "Easy"
     containsGraph: false
@@ -613,7 +613,7 @@ questions:
     questionNumber: 10
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Probability and conditional probability"
     difficulty: "Easy"
     containsGraph: true
@@ -821,7 +821,7 @@ questions:
     questionNumber: 13
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Inference from sample statistics and margin of error"
     difficulty: "Medium"
     containsGraph: false

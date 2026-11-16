@@ -377,7 +377,7 @@ questions:
     questionNumber: 5
     questionType: "FR"
     correctAnswer: "120"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Ratios, Rates, and Proportions"
     difficulty: "Easy"
     containsGraph: false
@@ -458,7 +458,7 @@ questions:
     questionNumber: 6
     questionType: "MC"
     correctAnswer: "A"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Percentages"
     difficulty: "Easy"
     containsGraph: false
@@ -549,7 +549,7 @@ questions:
     questionNumber: 7
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Problem-Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Unit Conversions"
     difficulty: "Easy"
     containsGraph: false
@@ -1460,7 +1460,7 @@ questions:
     questionNumber: 17
     questionType: "MC"
     correctAnswer: "B"
-    domain: "Problem Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Scatterplots and Modeling"
     difficulty: "Medium"
     containsGraph: true
@@ -1751,7 +1751,7 @@ questions:
     questionNumber: 20
     questionType: "MC"
     correctAnswer: "C"
-    domain: "Problem Solving and Data Analysis"
+    domain: "Problem Solving & Data Analysis"
     skill: "Rates"
     difficulty: "Hard"
     containsGraph: false

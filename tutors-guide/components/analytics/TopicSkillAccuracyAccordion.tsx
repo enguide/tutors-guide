@@ -322,7 +322,7 @@ export function TopicSkillAccuracyAccordion({
                     <BarChart
                       data={group.skills}
                       layout="vertical"
-                      margin={{ left: 16, right: 16, top: 8, bottom: 8 }}
+                      margin={{ left: 4, right: 16, top: 8, bottom: 8 }}
                     >
                       <CartesianGrid
                         horizontal
@@ -340,7 +340,7 @@ export function TopicSkillAccuracyAccordion({
                       <YAxis
                         dataKey="name"
                         type="category"
-                        width={220}
+                        width={150}
                         tickLine={false}
                         axisLine={false}
                         interval={0}
