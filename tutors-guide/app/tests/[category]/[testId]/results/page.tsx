@@ -6,7 +6,10 @@ import { connection } from "next/server";
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTestMetadata, getSectionById } from "@/lib/contentLoader";
-import { synthesizeAdaptiveTestScores } from "@/lib/scoring/adaptiveScorer";
+import {
+  synthesizeAdaptiveTestScores,
+  ItemScoringRecord,
+} from "@/lib/scoring/adaptiveScorer";
 import { TestAnalyticsClient } from "@/components/analytics/TestAnalyticsClient";
 import { StudentNavbar } from "@/components/navigation/StudentNavbar";
 import { StaffInspectionBar } from "@/components/navigation/StaffInspectionBar";
@@ -49,28 +52,37 @@ async function handleSignOut() {
  * of TestAnalyticsClient and UnifiedAnalyticsDashboard.
  * min-h-[140vh] guarantees vertical scrollbar presence from initial paint.
  */
-function AnalyticsLoadingSkeleton({ testTitle }: { testTitle?: string }) {
+function AnalyticsLoadingSkeleton({
+  testTitle,
+  stickyTopClass = "top-16",
+}: {
+  testTitle?: string;
+  stickyTopClass?: string;
+}) {
   return (
     <div className="w-full bg-slate-50 dark:bg-slate-950 pb-28 animate-pulse min-h-[140vh]">
-      {/* Sticky Tab Bar Skeleton */}
-      <div className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md sticky top-0 z-30 mb-6">
-        <div className="max-w-[1350px] mx-auto px-4 sm:px-8 flex items-center justify-between h-14">
-          <div className="flex items-center gap-4">
-            <div className="h-6 w-36 bg-slate-200 dark:bg-slate-800 rounded-none" />
-            <div className="h-6 w-36 bg-slate-200 dark:bg-slate-800 rounded-none" />
+      {/* Sticky Tab Bar Skeleton (aligned directly beneath top navigation bar) */}
+      <div
+        className={`w-full border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md sticky ${stickyTopClass} z-30 mb-6`}
+      >
+        <div className="max-w-[1350px] mx-auto px-3 sm:px-8 flex items-center justify-between h-14">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="h-6 w-32 sm:w-36 bg-slate-200 dark:bg-slate-800 rounded-none" />
+            <div className="h-6 w-28 sm:w-32 bg-slate-200 dark:bg-slate-800 rounded-none" />
+            <div className="h-6 w-32 sm:w-36 bg-slate-200 dark:bg-slate-800 rounded-none hidden xs:block sm:block" />
           </div>
           {testTitle ? (
-            <span className="text-xs font-medium text-muted-foreground hidden sm:inline-block">
+            <span className="text-xs font-medium text-muted-foreground hidden md:inline-block">
               {testTitle}
             </span>
           ) : (
-            <div className="h-4 w-44 bg-slate-200 dark:bg-slate-800 rounded-none hidden sm:block" />
+            <div className="h-4 w-44 bg-slate-200 dark:bg-slate-800 rounded-none hidden md:block" />
           )}
         </div>
       </div>
 
       {/* Main Analytics Canvas Skeleton */}
-      <div className="max-w-[1350px] mx-auto px-1 sm:px-8 space-y-6">
+      <div className="max-w-[1350px] mx-auto px-4 sm:px-8 space-y-6">
         {/* Top Pacing / Score Card */}
         <div className="bg-card border border-slate-200 dark:border-slate-800 rounded-none p-6 shadow-sm space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
@@ -138,11 +150,13 @@ async function ResultsDataContent({
   testId,
   targetProfileId,
   isStaffInspection,
+  stickyTopClass,
 }: {
   rawCategory: string;
   testId: string;
   targetProfileId: string;
   isStaffInspection: boolean;
+  stickyTopClass: string;
 }) {
   await connection();
 
@@ -218,7 +232,7 @@ async function ResultsDataContent({
     }
   }
 
-  // Enrich database responses with parsed frontmatter
+  // Enrich database responses with parsed frontmatter (including visual modality flags)
   const enrichedResponses: EnrichedResponseItem[] = userResponseRecords.map((r) => {
     const entry = questionMap.get(r.questionId);
     const qMeta = entry?.question;
@@ -243,6 +257,9 @@ async function ResultsDataContent({
       skill: qMeta?.skill ?? "General",
       difficulty: qMeta?.difficulty ?? "Medium",
       explanation: qMeta?.explanation ?? "",
+      containsGraph: Boolean(qMeta?.containsGraph),
+      containsChart: Boolean(qMeta?.containsChart),
+      containsDiagram: Boolean(qMeta?.containsDiagram),
     };
   });
 
@@ -264,6 +281,10 @@ async function ResultsDataContent({
       sectionOrder: sr.section.sectionOrder,
       timeLimit: sr.section.timeLimit,
     },
+    accommodations:
+  sr.accommodations && typeof sr.accommodations === "object"
+    ? (sr.accommodations as { timeMultiplier?: number; extendedTime?: boolean })
+    : null,
   }));
 
   const formattedTestSummary: TestSummaryData | null = testSummaryRecord
@@ -287,7 +308,27 @@ async function ResultsDataContent({
         totalQuestions: sr.totalQuestions,
       });
     });
-    adaptiveTrajectory = synthesizeAdaptiveTestScores(metadata, resultsMap);
+
+    // Pass item-level difficulty records so adaptiveScorer applies calibrated item weights
+    const itemRecordsBySection = new Map<string, ItemScoringRecord[]>();
+    for (const item of enrichedResponses) {
+      const secId = String(item.sectionId);
+      const list = itemRecordsBySection.get(secId) ?? [];
+      list.push({
+        questionId: String(item.questionId),
+        sectionId: secId,
+        isCorrect: item.isCorrect,
+        difficulty: item.difficulty,
+        domain: item.domain,
+      });
+      itemRecordsBySection.set(secId, list);
+    }
+
+    adaptiveTrajectory = synthesizeAdaptiveTestScores(
+      metadata,
+      resultsMap,
+      itemRecordsBySection
+    );
   }
 
   return (
@@ -297,6 +338,7 @@ async function ResultsDataContent({
       sectionResults={formattedSectionResults}
       responses={enrichedResponses}
       adaptiveTrajectory={adaptiveTrajectory}
+      stickyTopClass={stickyTopClass}
     />
   );
 }
@@ -372,9 +414,12 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
     };
   }
 
+  // StaffInspectionBar is h-14 (top-14); StudentNavbar is h-16 (top-16)
+  const stickyTopClass = isStaffInspection ? "top-14" : "top-16";
+
   return (
     <div
-      className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col"
+      className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex flex-col"
       style={{ scrollbarGutter: "stable" }}
     >
       {/* 
@@ -392,12 +437,13 @@ export default async function ResultsPage({ params, searchParams }: ResultsPageP
 
       {/* Analytics Content wrapped in the matching height skeleton */}
       <div className="flex-1">
-        <Suspense fallback={<AnalyticsLoadingSkeleton />}>
+        <Suspense fallback={<AnalyticsLoadingSkeleton stickyTopClass={stickyTopClass} />}>
           <ResultsDataContent
             rawCategory={rawCategory}
             testId={testId}
             targetProfileId={targetProfileId}
             isStaffInspection={isStaffInspection}
+            stickyTopClass={stickyTopClass}
           />
         </Suspense>
       </div>

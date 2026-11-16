@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 interface DiagnosticCadenceCardProps {
+  activeProgram?: string;
   latestCompletedAt: Date | string | null;
   latestCategory: string | null;
   totalCompletedCount: number;
@@ -34,26 +35,23 @@ function getStoredValue(key: string, fallback: string): string {
 }
 
 export function DiagnosticCadenceCard({
+  activeProgram: propActiveProgram,
   latestCompletedAt,
   latestCategory,
   totalCompletedCount,
   nextTestLaunchUrl,
 }: DiagnosticCadenceCardProps) {
+  const activeProgram = propActiveProgram || latestCategory || "SAT";
+
   const isHydrated = useSyncExternalStore(
     subscribeToStorage,
     () => true,
     () => false
   );
 
-  const storedCategory = useSyncExternalStore(
-    subscribeToStorage,
-    () => getStoredValue("target_exam_category", latestCategory || "SAT"),
-    () => latestCategory || "SAT"
-  );
-
   const storedDate = useSyncExternalStore(
     subscribeToStorage,
-    () => getStoredValue(`target_exam_date_${storedCategory}`, ""),
+    () => getStoredValue(`target_exam_date_${activeProgram}`, ""),
     () => ""
   );
 
@@ -61,7 +59,6 @@ export function DiagnosticCadenceCard({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Days until official test sitting
     let daysToOfficial: number | null = null;
     if (storedDate) {
       const [year, month, day] = storedDate.split("-").map(Number);
@@ -70,7 +67,6 @@ export function DiagnosticCadenceCard({
       daysToOfficial = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    // Days since last diagnostic
     let daysSinceLast: number | null = null;
     if (latestCompletedAt) {
       const last = new Date(latestCompletedAt);
@@ -78,14 +74,13 @@ export function DiagnosticCadenceCard({
       daysSinceLast = Math.max(0, Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)));
     }
 
-    // Status Determination
     if (daysToOfficial !== null && daysToOfficial <= 4 && daysToOfficial >= 0) {
       return {
-        status: "TAPER",
         badge: "Final Taper Active",
         title: "Conserve Energy for Test Day",
-        description: "Your official sitting is in less than 5 days. Avoid full-length diagnostics to keep your mental stamina fresh.",
-        actionText: "Review Formula Sheets",
+        description:
+          "Your official sitting is in less than 5 days. Avoid full-length diagnostics to keep your mental stamina fresh.",
+        actionText: "Review Error Logs",
         actionUrl: "/dashboard/results",
         icon: Coffee,
         daysSince: daysSinceLast,
@@ -94,10 +89,10 @@ export function DiagnosticCadenceCard({
 
     if (daysSinceLast === null) {
       return {
-        status: "INITIAL",
         badge: "Baseline Needed",
         title: "Take Your Initial Diagnostic",
-        description: "Complete your first diagnostic test to establish an accurate pacing trace and score baseline.",
+        description:
+          "Complete your first diagnostic test to establish an accurate pacing trace and score baseline.",
         actionText: "Launch Baseline Exam",
         actionUrl: nextTestLaunchUrl || "/dashboard/tests",
         icon: CalendarClock,
@@ -107,7 +102,6 @@ export function DiagnosticCadenceCard({
 
     if (daysSinceLast <= 3) {
       return {
-        status: "REVIEW",
         badge: "Active Review Window",
         title: "Consolidate Error Logs",
         description: `Exam completed ${daysSinceLast === 0 ? "today" : `${daysSinceLast}d ago`}. Analyze your triage notes and second-guesses before taking another diagnostic.`,
@@ -120,7 +114,6 @@ export function DiagnosticCadenceCard({
 
     if (daysSinceLast <= 8) {
       return {
-        status: "DRILL",
         badge: "Skill Reinforcement",
         title: "Target Weak Subdomains",
         description: `${daysSinceLast} days since last diagnostic. Focus on untimed drill sets in your lowest-accuracy domains.`,
@@ -133,7 +126,6 @@ export function DiagnosticCadenceCard({
 
     if (daysSinceLast <= 14) {
       return {
-        status: "OPTIMAL",
         badge: "Optimal Testing Window",
         title: "Ready for Next Diagnostic",
         description: `${daysSinceLast} days since last evaluation. Your review cycle is complete—time to test under timed conditions.`,
@@ -145,7 +137,6 @@ export function DiagnosticCadenceCard({
     }
 
     return {
-      status: "OVERDUE",
       badge: "Cadence Slip Alert",
       title: "Diagnostic Overdue",
       description: `${daysSinceLast} days without a full evaluation. Re-establish diagnostic conditioning to preserve test-taking stamina.`,
@@ -157,32 +148,30 @@ export function DiagnosticCadenceCard({
   }, [latestCompletedAt, storedDate, nextTestLaunchUrl]);
 
   if (!isHydrated) {
-    return <div className="bg-card border border-border p-6 rounded-none h-44 animate-pulse" />;
+    return <div className="bg-card border border-border p-6 rounded-none h-52 animate-pulse" />;
   }
 
   const Icon = cadenceState.icon;
 
   return (
-    <div className="bg-card border border-border rounded-none p-6 flex flex-col justify-between">
-      {/* Top Ledger */}
-      <div className="flex items-center justify-between border-b border-border pb-3">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-primary/10 text-primary border border-primary/20">
+    <div className="h-full bg-card border border-border rounded-none p-5 sm:p-6 flex flex-col justify-between">
+      <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="p-1.5 bg-primary/10 text-primary border border-primary/20 shrink-0">
             <Icon size={14} />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-primary font-mono">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-primary font-mono truncate">
             {cadenceState.badge}
           </span>
         </div>
 
         {cadenceState.daysSince !== null && (
-          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-            <Clock size={11} /> {cadenceState.daysSince}d since last test
+          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 shrink-0">
+            <Clock size={11} /> {cadenceState.daysSince}d ago
           </span>
         )}
       </div>
 
-      {/* Main Content */}
       <div className="py-4 space-y-1.5">
         <h3 className="text-base font-bold text-foreground">{cadenceState.title}</h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -190,15 +179,14 @@ export function DiagnosticCadenceCard({
         </p>
       </div>
 
-      {/* Footer Action */}
-      <div className="pt-3 border-t border-border flex items-center justify-between">
+      <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
         <span className="text-[10px] font-mono text-muted-foreground">
-          {totalCompletedCount} evaluation{totalCompletedCount === 1 ? "" : "s"} logged
+          {totalCompletedCount} exam{totalCompletedCount === 1 ? "" : "s"} logged
         </span>
 
         <Link
           href={cadenceState.actionUrl}
-          className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 transition-colors"
+          className="min-h-8 text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 transition-colors"
         >
           <span>{cadenceState.actionText}</span>
           <ArrowRight size={12} />

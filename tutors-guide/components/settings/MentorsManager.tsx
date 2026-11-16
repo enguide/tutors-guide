@@ -30,6 +30,8 @@ interface MentorsManagerProps {
 
 export function MentorsManager({ initialLinks, currentUserId }: MentorsManagerProps) {
   const [links, setLinks] = useState<MentorshipLinkItem[]>(initialLinks);
+  const [outboundLinkIds, setOutboundLinkIds] = useState<Set<string>>(new Set());
+  const [confirmingRevokeId, setConfirmingRevokeId] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -51,9 +53,9 @@ export function MentorsManager({ initialLinks, currentUserId }: MentorsManagerPr
       try {
         const res = await requestMentorConnection(email);
         if (res.success) {
-          setSuccessMsg(`Connection request created for ${res.tutorName}.`);
+          setSuccessMsg(`Connection request sent to ${res.tutorName}.`);
           setEmailInput("");
-          // Append pending link optimistically
+          setOutboundLinkIds((prev) => new Set(prev).add(res.linkId));
           setLinks((prev) => [
             {
               id: res.linkId,
@@ -80,7 +82,9 @@ export function MentorsManager({ initialLinks, currentUserId }: MentorsManagerPr
       try {
         await respondToMentorshipRequest(linkId, accept);
         if (accept) {
-          setSuccessMsg(`Mentorship confirmed with ${tutorName}. They can now inspect your diagnostics.`);
+          setSuccessMsg(
+            `Mentorship confirmed with ${tutorName}. They can now inspect your diagnostics.`
+          );
           setLinks((prev) =>
             prev.map((l) => (l.id === linkId ? { ...l, status: LinkStatus.ACTIVE } : l))
           );
@@ -94,20 +98,20 @@ export function MentorsManager({ initialLinks, currentUserId }: MentorsManagerPr
     });
   };
 
-  // 3. Unilateral Revocation by student
-  const handleRevoke = (linkId: string, tutorName: string) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to revoke access for ${tutorName}? They will immediately lose access to your diagnostic scores, pacing data, and answer reviews.`
-    );
-    if (!confirmed) return;
-
+  // 3. Unilateral Revocation / Cancellation by student (inline mobile-friendly confirmation)
+  const executeRevoke = (linkId: string, tutorName: string, isCancel = false) => {
     setErrorMsg(null);
     setSuccessMsg(null);
+    setConfirmingRevokeId(null);
 
     startTransition(async () => {
       try {
         await revokeMentorshipAccess(linkId);
-        setSuccessMsg(`Access revoked for ${tutorName}.`);
+        setSuccessMsg(
+          isCancel
+            ? `Cancelled pending request for ${tutorName}.`
+            : `Access revoked for ${tutorName}.`
+        );
         setLinks((prev) => prev.filter((l) => l.id !== linkId));
       } catch (err: any) {
         setErrorMsg(err.message || "Failed to revoke access.");
@@ -116,14 +120,14 @@ export function MentorsManager({ initialLinks, currentUserId }: MentorsManagerPr
   };
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-6 sm:space-y-8 max-w-4xl">
       {/* Header & Data Sovereignty Notice */}
-      <div className="bg-card border border-border p-6 rounded-none space-y-2">
-        <div className="flex items-center gap-2 text-primary font-bold text-base">
-          <Shield className="w-5 h-5 text-blue-600" />
+      <div className="bg-card border border-border p-5 sm:p-6 rounded-none space-y-2">
+        <div className="flex items-center gap-2 text-primary font-bold text-sm sm:text-base">
+          <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
           <span>Diagnostic Data Delegation & Privacy</span>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
           You retain complete ownership over your diagnostic test scores, pacing telemetry, and question reviews.
           Only mentors explicitly authorized below can inspect your test runs. You may revoke access at any time.
         </p>
@@ -131,134 +135,195 @@ export function MentorsManager({ initialLinks, currentUserId }: MentorsManagerPr
 
       {/* Status Banners */}
       {errorMsg && (
-        <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2 rounded-none">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div
+          role="alert"
+          className="p-4 bg-destructive/10 border border-destructive/20 text-destructive text-xs sm:text-sm flex items-start sm:items-center gap-2 rounded-none"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
           <span>{errorMsg}</span>
         </div>
       )}
       {successMsg && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-2 rounded-none">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+        <div
+          role="status"
+          className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm flex items-start sm:items-center gap-2 rounded-none"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {/* Authorize a Tutor Form */}
-      <div className="bg-card border border-border p-6 rounded-none space-y-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-          Authorize a Private Tutor
-        </h3>
+      <div className="bg-card border border-border p-5 sm:p-6 rounded-none space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
+            Authorize a Private Tutor
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Enter your instructor&apos;s registered email address to grant read-only access to your diagnostic results.
+          </p>
+        </div>
+
         <form onSubmit={handleRequestMentor} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input
               type="email"
               required
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
               placeholder="Enter tutor's verified email..."
-              className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-input rounded-none focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full min-h-11 pl-9 pr-3 py-2 text-sm bg-background border border-input rounded-none focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <button
             type="submit"
             disabled={isPending}
-            className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 rounded-none"
+            className="w-full sm:w-auto min-h-11 px-5 py-2.5 text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 rounded-none shrink-0"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-            Connect Mentor
+            <span>Connect Mentor</span>
           </button>
         </form>
       </div>
 
       {/* Pending Approval Requests */}
       {pendingLinks.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
+        <div className="space-y-3 sm:space-y-4">
+          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-2">
+            <Clock className="w-4 h-4 shrink-0" />
             <span>Pending Requests ({pendingLinks.length})</span>
           </h3>
           <div className="grid gap-3">
-            {pendingLinks.map((link) => (
-              <div
-                key={link.id}
-                className="bg-card border border-amber-500/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-none"
-              >
-                <div>
-                  <div className="font-bold text-sm text-foreground">{link.tutor.name}</div>
-                  <div className="text-xs text-muted-foreground">{link.tutor.email}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    Requested on {new Date(link.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
+            {pendingLinks.map((link) => {
+              const isOutbound = outboundLinkIds.has(link.id);
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleRespond(link.id, true, link.tutor.name)}
-                    className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1 rounded-none"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleRespond(link.id, false, link.tutor.name)}
-                    className="px-3 py-1.5 text-xs font-semibold border border-border text-muted-foreground hover:bg-muted transition-colors flex items-center gap-1 rounded-none"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Decline
-                  </button>
+              return (
+                <div
+                  key={link.id}
+                  className="bg-card border border-amber-500/30 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-none"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm text-foreground flex flex-wrap items-center gap-2">
+                      <span className="truncate">{link.tutor.name}</span>
+                      {isOutbound && (
+                        <span className="text-[10px] font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 font-bold uppercase">
+                          Awaiting Tutor
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{link.tutor.email}</div>
+                    <div className="text-[11px] font-mono text-muted-foreground mt-1">
+                      Requested {new Date(link.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  {isOutbound ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => executeRevoke(link.id, link.tutor.name, true)}
+                      className="w-full sm:w-auto min-h-10 px-3.5 py-2 text-xs font-semibold border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-1.5 rounded-none shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel Request</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleRespond(link.id, true, link.tutor.name)}
+                        className="flex-1 sm:flex-initial min-h-10 px-4 py-2 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1.5 rounded-none"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Accept</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleRespond(link.id, false, link.tutor.name)}
+                        className="flex-1 sm:flex-initial min-h-10 px-4 py-2 text-xs font-semibold border border-border text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center gap-1.5 rounded-none"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Decline</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Active Mentors List */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+      <div className="space-y-3 sm:space-y-4">
+        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
           Active Authorized Mentors ({activeLinks.length})
         </h3>
 
         {activeLinks.length === 0 ? (
-          <div className="p-8 border border-dashed border-border text-center text-sm text-muted-foreground rounded-none">
+          <div className="p-8 border border-dashed border-border bg-card text-center text-xs sm:text-sm text-muted-foreground rounded-none">
             No mentors currently have access to your testing telemetry.
           </div>
         ) : (
           <div className="grid gap-3">
-            {activeLinks.map((link) => (
-              <div
-                key={link.id}
-                className="bg-card border border-border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-none"
-              >
-                <div>
-                  <div className="font-bold text-sm text-foreground flex items-center gap-2">
-                    {link.tutor.name}
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 font-bold uppercase">
-                      Active
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{link.tutor.email}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    Connected on {new Date(link.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
+            {activeLinks.map((link) => {
+              const isConfirming = confirmingRevokeId === link.id;
 
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => handleRevoke(link.id, link.tutor.name)}
-                  className="px-3 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-600/30 hover:bg-rose-600/10 transition-colors flex items-center gap-1.5 self-start sm:self-center rounded-none"
+              return (
+                <div
+                  key={link.id}
+                  className="bg-card border border-border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-none"
                 >
-                  <UserX className="w-3.5 h-3.5" />
-                  Revoke Access
-                </button>
-              </div>
-            ))}
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm text-foreground flex flex-wrap items-center gap-2">
+                      <span className="truncate">{link.tutor.name}</span>
+                      <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 font-bold uppercase">
+                        Active
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{link.tutor.email}</div>
+                    <div className="text-[11px] font-mono text-muted-foreground mt-1">
+                      Connected {new Date(link.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  {isConfirming ? (
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => executeRevoke(link.id, link.tutor.name)}
+                        className="flex-1 sm:flex-initial min-h-10 px-3.5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-colors flex items-center justify-center gap-1.5 rounded-none"
+                      >
+                        <UserX className="w-3.5 h-3.5" />
+                        <span>Confirm Revoke</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => setConfirmingRevokeId(null)}
+                        className="min-h-10 px-3 py-2 text-xs font-semibold border border-border text-muted-foreground hover:bg-muted transition-colors rounded-none"
+                      >
+                        Keep
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setConfirmingRevokeId(link.id)}
+                      className="w-full sm:w-auto min-h-10 px-3.5 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-600/30 hover:bg-rose-600/10 transition-colors flex items-center justify-center gap-1.5 rounded-none shrink-0"
+                    >
+                      <UserX className="w-3.5 h-3.5" />
+                      <span>Revoke Access</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

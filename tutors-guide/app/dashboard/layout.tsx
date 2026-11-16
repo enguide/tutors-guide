@@ -17,15 +17,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div
-      className="h-screen overflow-y-auto bg-slate-50 dark:bg-slate-950 text-foreground flex flex-col"
-      style={{ scrollbarGutter: "stable" }}
-    >
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 text-foreground flex flex-col">
       <StudentNavbar
         user={{ name: session.user.name, email: session.user.email }}
         onSignOut={handleSignOut}
       />
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 pb-12">{children}</div>
     </div>
   );
 }

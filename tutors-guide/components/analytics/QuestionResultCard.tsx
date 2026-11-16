@@ -37,9 +37,9 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
   const isPacingRisk = timeSpent > targetSeconds * 1.5;
   const hasStimulus = Boolean(item.passageText && item.passageText.trim().length > 0);
 
-  // Minimal, authentic Bluebook / AP Item Action Bar (Question Number only)[cite: 17, 18]
+  // Minimal, authentic Bluebook / AP Item Action Bar (Question Number only)
   const renderExamActionBar = () => (
-    <div className="flex items-stretch bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden rounded-sm  w-full">
+    <div className="flex items-stretch bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden rounded-sm w-full">
       {/* Left: Stout Question Number Box */}
       <div className="w-9 h-full flex items-center justify-center bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-base font-sans font-bold shrink-0">
         {item.responseOrder}
@@ -53,7 +53,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
   return (
     <div className="rounded-none border border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
       {/* Top Review Header: Topic, Difficulty, Skill + Telemetry Badges + Reveal Button */}
-      <div className="px-5 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/60 flex items-center justify-between flex-wrap gap-3">
+      <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/60 flex items-center justify-between flex-wrap gap-3">
         {/* Left Side: Outcome Status + Metadata Chips */}
         <div className="flex items-center gap-2 flex-wrap">
           {showSolution && (
@@ -86,7 +86,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
         </div>
 
         {/* Right Side: Telemetry Badges (Calculator, Revised, Time) + Solution Toggle */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
           {item.usedCalculator && (
             <span
               title="Calculator opened on this question"
@@ -121,7 +121,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
           <button
             type="button"
             onClick={() => setShowSolution((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors select-none ${
+            className={`min-h-9 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm border transition-colors select-none ${
               showSolution
                 ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-300/70"
                 : "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
@@ -140,17 +140,17 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
         </div>
       </div>
 
-      {/* Main Question Body Rendered in AP/SAT Test Shell Layout[cite: 17, 18] */}
-      <div className="p-6 md:p-8">
+      {/* Main Question Body Rendered in AP/SAT Test Shell Layout */}
+      <div className="p-4 sm:p-6 md:p-8">
         {hasStimulus ? (
-          /* Split-Screen Layout (Reading / Writing / Stimulus-based)[cite: 17, 18] */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:divide-x lg:divide-neutral-200 dark:lg:divide-neutral-800">
-            {/* Left Column: Stimulus / Reading Passage[cite: 17, 18] */}
-            <div className="pr-0 lg:pr-6 space-y-3">
+          /* Split-Screen Layout (Reading / Writing / Stimulus-based) */
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:divide-x lg:divide-neutral-200 dark:lg:divide-neutral-800">
+            {/* Left Column: Stimulus / Reading Passage */}
+            <div className="pr-0 lg:pr-6 space-y-3 min-w-0">
               <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 uppercase tracking-wider pb-1 border-b border-neutral-200 dark:border-neutral-800">
                 <BookOpen size={13} /> Stimulus / Reading Passage
               </div>
-              <div className="font-serif text-[15.5px] leading-[1.65] text-neutral-900 dark:text-neutral-100 max-h-[600px] overflow-y-auto pr-2">
+              <div className="font-serif text-[15.5px] leading-[1.65] text-neutral-900 dark:text-neutral-100 max-h-[600px] overflow-y-auto pr-1 sm:pr-2">
                 <MarkdownQuestionRenderer
                   content={item.passageText!}
                   category={category}
@@ -159,11 +159,11 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
               </div>
             </div>
 
-            {/* Right Column: Question Stem & Choices[cite: 17, 18] */}
-            <div className="pl-0 lg:pl-6 space-y-4">
+            {/* Right Column: Question Stem & Choices */}
+            <div className="pl-0 lg:pl-6 space-y-4 min-w-0">
               {renderExamActionBar()}
 
-              {/* Prompt[cite: 17, 18] */}
+              {/* Prompt */}
               <div className="font-serif text-[15.5px] leading-[1.65] text-neutral-900 dark:text-neutral-100">
                 <MarkdownQuestionRenderer
                   content={item.prompt}
@@ -172,16 +172,16 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
                 />
               </div>
 
-              {/* Options[cite: 17, 18] */}
+              {/* Options */}
               {renderExamOptions(item, showSolution, category, testId)}
             </div>
           </div>
         ) : (
-          /* Single-Column Centered Layout (Math / Discrete items)[cite: 17, 18] */
+          /* Single-Column Centered Layout (Math / Discrete items) */
           <div className="max-w-2xl mx-auto space-y-6">
             {renderExamActionBar()}
 
-            {/* Prompt[cite: 17, 18] */}
+            {/* Prompt */}
             <div className="font-serif text-[15.5px] leading-[1.65] text-neutral-900 dark:text-neutral-100">
               <MarkdownQuestionRenderer
                 content={item.prompt}
@@ -190,7 +190,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
               />
             </div>
 
-            {/* Options[cite: 17, 18] */}
+            {/* Options */}
             {renderExamOptions(item, showSolution, category, testId)}
           </div>
         )}
@@ -211,7 +211,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
   );
 };
 
-// Sub-renderer for Option Cards[cite: 19]
+// Sub-renderer for Option Cards
 function renderExamOptions(
   item: EnrichedResponseItem,
   showSolution: boolean,
@@ -227,9 +227,9 @@ function renderExamOptions(
         </label>
 
         {showSolution ? (
-          <div className="flex items-center gap-4 animate-in fade-in">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 animate-in fade-in">
             <div
-              className={`p-3 border rounded-sm bg-neutral-50 dark:bg-neutral-900 min-w-36 ${
+              className={`p-3 border rounded-sm bg-neutral-50 dark:bg-neutral-900 min-w-32 sm:min-w-36 ${
                 !item.isCorrect
                   ? "border-[#ff9999] ring-2 ring-[#ff9999]"
                   : "border-neutral-300 dark:border-neutral-700"
@@ -249,7 +249,7 @@ function renderExamOptions(
               </span>
             </div>
 
-            <div className="p-3 border-2 border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-900 dark:ring-neutral-100 rounded-sm bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 min-w-36">
+            <div className="p-3 border-2 border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-900 dark:ring-neutral-100 rounded-sm bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 min-w-32 sm:min-w-36">
               <span className="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400 block">
                 Correct Key
               </span>
@@ -265,7 +265,7 @@ function renderExamOptions(
     );
   }
 
-  // Multiple Choice Options[cite: 19]
+  // Multiple Choice Options
   return (
     <div className="space-y-3 pt-2">
       {item.options?.map((option) => {
@@ -273,7 +273,7 @@ function renderExamOptions(
         const isSelected = showSolution && item.selectedOptionId === option.id;
         const isAnswerKey = item.correctAnswerKey === option.id;
 
-        // Default: Exactly matches neutral, unselected exam styling[cite: 19]
+        // Default: Exactly matches neutral, unselected exam styling
         let cardStyle =
           "border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100";
         let discStyle =
@@ -281,52 +281,50 @@ function renderExamOptions(
 
         if (showSolution) {
           if (isAnswerKey) {
-            // Correct Answer Key: Matches the active in-test selection border & ring[cite: 19]
             cardStyle =
               "border-neutral-900 dark:border-neutral-100 ring-2 ring-neutral-900 dark:ring-neutral-100 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100";
             discStyle =
               "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-bold border-transparent";
           } else if (isSelected && !item.isCorrect) {
-            // Student's Incorrect Pick: Uses graph accent color (#ff9999)[cite: 5, 11]
             cardStyle =
               "border-[#ff9999] ring-2 ring-[#ff9999] bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100";
             discStyle =
               "bg-[#ff9999] text-white border-transparent font-bold";
           }
-          // Other choices fall through unaltered with standard borders and zero opacity reduction[cite: 19]
         }
 
         return (
           <div
             key={option.id}
-            className={`relative flex items-center px-4 py-3 rounded-xl border text-left select-none transition-all ${cardStyle}`}
+            className={`relative flex items-center px-3.5 sm:px-4 py-3 rounded-xl border text-left select-none transition-all ${cardStyle}`}
           >
-            <div className="flex items-center gap-3.5 flex-1 min-w-0">
-              {/* Option Letter Disc[cite: 19] */}
+            <div className="flex items-center gap-3 sm:gap-3.5 flex-1 min-w-0">
+              {/* Option Letter Disc */}
               <div
                 className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-sans transition-colors ${discStyle}`}
               >
                 {option.id}
               </div>
 
-              {/* Option Text in Academic Serif[cite: 17, 18, 19] */}
-              <div className="flex-1 min-w-0 font-serif text-[15.5px] leading-[1.6]">
+              {/* Option Text in Academic Serif */}
+              <div className="flex-1 min-w-0 font-serif text-[15px] sm:text-[15.5px] leading-[1.6]">
                 <MarkdownQuestionRenderer
                   content={option.text}
                   category={category}
                   testId={testId}
+                  disableFigureViewer
                   className="prose-p:mb-0"
                 />
               </div>
 
-              {/* Status Badges[cite: 5, 11] */}
+              {/* Status Badges */}
               {showSolution && isAnswerKey && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-sans font-bold px-2 py-0.5 rounded-sm bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 shrink-0 ml-auto">
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-sans font-bold px-2 py-0.5 rounded-sm bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 shrink-0 ml-auto">
                   <Check size={12} strokeWidth={3} /> Correct Key
                 </span>
               )}
               {showSolution && isSelected && !isAnswerKey && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-sans font-bold px-2 py-0.5 rounded-sm bg-[#ff9999] text-white shrink-0 ml-auto">
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-sans font-bold px-2 py-0.5 rounded-sm bg-[#ff9999] text-white shrink-0 ml-auto">
                   <X size={12} strokeWidth={3} /> Your Answer
                 </span>
               )}

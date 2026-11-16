@@ -135,6 +135,21 @@ async function DashboardOverviewContent({
     completedSectionsByTest.get(r.testId)!.add(r.sectionId);
   }
 
+  // Detect adaptive routing track (Upper/Hard vs Lower/Easy) on most recent completed exam
+  const recentAdaptiveBadge = (() => {
+    if (!recentSummary) return null;
+    const sections = completedSectionsByTest.get(recentSummary.testId);
+    if (!sections) return null;
+    const ids = Array.from(sections).map((s) => s.toLowerCase());
+    if (ids.some((id) => id.endsWith("2h") || id.includes("hard"))) {
+      return "Upper Track (M2H)";
+    }
+    if (ids.some((id) => id.endsWith("2l") || id.includes("easy"))) {
+      return "Standard Track (M2L)";
+    }
+    return null;
+  })();
+
   const checkpointByTest = new Map<string, string>();
   for (const cp of userSectionCheckpoints) {
     checkpointByTest.set(cp.testId, cp.sectionId);
@@ -142,15 +157,11 @@ async function DashboardOverviewContent({
 
   const allCategoryTests = availableTestsByCategory[activeProgram] || [];
 
-  // Filter category tests against student's granular entitlements
   const activeProgramTests = allCategoryTests.filter((t) => {
     if (session?.user?.role === "ADMIN") return true;
-
-    // Direct category-wide entitlement (e.g., "SAT" or "ACADEMIC")
     if (userEntitlements.includes(activeProgram)) return true;
     if (userEntitlements.includes(`${activeProgram}:*`)) return true;
 
-    // Granular course check from metadata
     return userEntitlements.some((ent) => {
       const courseSlug = ent.includes(":") ? ent.split(":")[1].toLowerCase() : "";
       return courseSlug ? t.testId.toLowerCase().includes(courseSlug) : false;
@@ -206,14 +217,15 @@ async function DashboardOverviewContent({
   }
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+      {/* Header & Program Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
             Welcome back, {session?.user?.name || "Student"}
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Track your exam readiness, inspect diagnostic telemetry, and launch your next test.
+            Track exam readiness, inspect adaptive module telemetry, and launch your next diagnostic.
           </p>
         </div>
 
@@ -223,30 +235,39 @@ async function DashboardOverviewContent({
         />
       </div>
 
+      {/* Primary Action Above the Fold */}
+      <NextRecommendedHeroCard nextTest={nextTest} launchUrl={nextLaunchUrl} />
+
+      {/* Core Readiness KPIs (1 col mobile -> 2 col tablet -> 3 col desktop) */}
       {availableCategoryTabs.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-          <RecentPerformanceCard recentSummary={recentSummary} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 items-stretch">
+          <RecentPerformanceCard
+            recentSummary={recentSummary}
+            adaptiveTrackBadge={recentAdaptiveBadge}
+          />
           <ScoreTargetGauge
             activeProgram={activeProgram}
             latestScore={recentSummary?.compositeScore ?? null}
             latestTestTitle={recentSummary?.testTitle ?? null}
           />
-          <ExamCountdownWidget activeProgram={activeProgram} />
+          <div className="md:col-span-2 lg:col-span-1">
+            <ExamCountdownWidget activeProgram={activeProgram} />
+          </div>
         </div>
       )}
 
-      <NextRecommendedHeroCard nextTest={nextTest} launchUrl={nextLaunchUrl} />
-
+      {/* Effort & Cadence Telemetry */}
       {availableCategoryTabs.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-          <div className="md:col-span-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+          <div className="lg:col-span-8">
             <StudyInvestmentWidget
               activeProgram={activeProgram}
               examTimeSpentSeconds={responseAggregates._sum.timeSpentOnResponse ?? 0}
             />
           </div>
-          <div className="md:col-span-4">
+          <div className="lg:col-span-4">
             <DiagnosticCadenceCard
+              activeProgram={activeProgram}
               latestCompletedAt={recentSummary?.completedAt ?? null}
               latestCategory={activeProgram}
               totalCompletedCount={completedSummaries.length}
@@ -256,6 +277,7 @@ async function DashboardOverviewContent({
         </div>
       )}
 
+      {/* Horizontal 3-Up Quick Navigation */}
       <QuickNavTiles />
     </main>
   );
@@ -263,17 +285,17 @@ async function DashboardOverviewContent({
 
 function DashboardSkeleton() {
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8 animate-pulse min-h-[120vh]">
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 animate-pulse">
       <div className="h-14 bg-card border border-border rounded-none" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="h-48 bg-card border border-border rounded-none" />
-        <div className="h-48 bg-card border border-border rounded-none" />
-        <div className="h-48 bg-card border border-border rounded-none" />
+      <div className="h-28 bg-card border border-border rounded-none" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="h-52 bg-card border border-border rounded-none" />
+        <div className="h-52 bg-card border border-border rounded-none" />
+        <div className="h-52 bg-card border border-border rounded-none md:col-span-2 lg:col-span-1" />
       </div>
-      <div className="h-32 bg-card border border-border rounded-none" />
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-8 h-48 bg-card border border-border rounded-none" />
-        <div className="md:col-span-4 h-48 bg-card border border-border rounded-none" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        <div className="lg:col-span-8 h-52 bg-card border border-border rounded-none" />
+        <div className="lg:col-span-4 h-52 bg-card border border-border rounded-none" />
       </div>
     </main>
   );

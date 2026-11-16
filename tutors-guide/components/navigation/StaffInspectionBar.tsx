@@ -13,33 +13,38 @@ interface StaffInspectionBarProps {
 export function StaffInspectionBar({ student }: StaffInspectionBarProps) {
   return (
     <div className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40">
-      <div className="max-w-337.5 mx-auto px-4 sm:px-8 h-14 flex items-center justify-between text-xs">
+      <div className="max-w-337.5 mx-auto px-3 sm:px-8 h-14 flex items-center justify-between gap-2 text-xs">
         {/* Left: Navigation back to student inspection view */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
           <Link
             href={`/tgadmin/student/${student.id}`}
-            className="flex items-center gap-1.5 font-bold text-slate-300 hover:text-white transition-colors"
+            className="min-h-10 flex items-center gap-1.5 font-bold text-slate-300 hover:text-white transition-colors"
           >
-            <ArrowLeft size={14} />
-            <span>Back to Student Profile</span>
+            <ArrowLeft size={14} className="shrink-0" />
+            <span className="hidden xs:inline sm:inline">Back to Profile</span>
+            <span className="sm:hidden">Profile</span>
           </Link>
 
           <span className="text-slate-600 hidden sm:inline">|</span>
 
           <Link
             href="/tgadmin"
-            className="text-slate-400 hover:text-white transition-colors hidden sm:inline-flex items-center gap-1"
+            className="min-h-10 text-slate-400 hover:text-white transition-colors hidden sm:inline-flex items-center gap-1"
           >
             <Users size={13} />
             <span>Cohort Roster</span>
           </Link>
         </div>
 
-        {/* Right: Inspection Target Metadata */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-2.5 py-1 font-mono text-[11px] rounded-none">
-            <ShieldCheck size={13} />
-            <span>Inspecting: <strong>{student.name}</strong> ({student.email})</span>
+        {/* Right: Inspection Target Metadata (Truncates cleanly on 375px screens) */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-2.5 py-1.5 font-mono text-[11px] rounded-none min-w-0">
+            <ShieldCheck size={13} className="shrink-0" />
+            <span className="truncate max-w-[170px] sm:max-w-xs md:max-w-md">
+              <span className="hidden sm:inline">Inspecting: </span>
+              <strong className="text-white">{student.name}</strong>
+              <span className="hidden md:inline"> ({student.email})</span>
+            </span>
           </div>
         </div>
       </div>

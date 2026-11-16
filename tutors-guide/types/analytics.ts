@@ -22,6 +22,9 @@ export interface EnrichedResponseItem {
   skill: string;
   difficulty: string;
   explanation: string;
+  containsGraph?: boolean;
+  containsChart?: boolean;
+  containsDiagram?: boolean;
 }
 
 export interface SectionResultData {
@@ -33,6 +36,7 @@ export interface SectionResultData {
   rawScore: number;
   scaledScore: number | null;
   timeRemainingSeconds: number;
+  accommodations?: { timeMultiplier?: number; extendedTime?: boolean } | null;
   navigationHistory: { time: number; qIdx: number }[] | null;
   section: {
     id: string;

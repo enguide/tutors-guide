@@ -28,6 +28,9 @@ export interface QuestionFrontmatter {
   skill?: string;
   difficulty?: QuestionDifficulty | string;
   explanation?: string;
+  containsGraph?: boolean;
+  containsChart?: boolean;
+  containsDiagram?: boolean;
 }
 
 export interface SectionFrontmatter {

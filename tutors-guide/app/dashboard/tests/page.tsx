@@ -11,6 +11,7 @@ import {
   Sparkles,
   CheckCircle2,
   PlayCircle,
+  RotateCcw,
 } from "lucide-react";
 import { getAllAvailableTests, getTestMetadata, DiscoveredTestItem } from "@/lib/contentLoader";
 import { prisma } from "@/lib/prisma";
@@ -44,14 +45,37 @@ const CATEGORY_META: Record<
   },
 };
 
+function isTestEntitled(
+  role: string | undefined,
+  userEntitlements: string[],
+  category: string,
+  testId: string
+): boolean {
+  if (role === "ADMIN") return true;
+  if (userEntitlements.includes(category)) return true;
+  if (userEntitlements.includes(`${category}:*`)) return true;
+
+  return userEntitlements.some((ent) => {
+    const [prefix, slug] = ent.split(":");
+    if (prefix?.toUpperCase() !== category.toUpperCase()) return false;
+    return slug ? testId.toLowerCase().includes(slug.toLowerCase()) : true;
+  });
+}
+
 async function TestsLibraryContent() {
   await connection();
   const session = await auth();
 
-  const userEntitlements = (session?.user?.entitlements || []) as Category[];
+  const userEntitlements: string[] = session?.user?.entitlements || [];
+  const userRole = session?.user?.role;
 
-  // 1. Fetch available tests, completed summaries, AND user section results
-  const [availableTestsByCategory, completedSummaries, userSectionResults] = await Promise.all([
+  // 1. Fetch available tests, completed summaries, section results, AND active checkpoints
+  const [
+    availableTestsByCategory,
+    completedSummaries,
+    userSectionResults,
+    userSectionCheckpoints,
+  ] = await Promise.all([
     getAllAvailableTests(),
     session?.user?.id
       ? prisma.testSummary.findMany({
@@ -65,15 +89,24 @@ async function TestsLibraryContent() {
           select: { testId: true, sectionId: true },
         })
       : Promise.resolve([]),
+    session?.user?.id
+      ? prisma.sectionCheckpoint.findMany({
+          where: { profileId: session.user.id },
+          select: { testId: true, sectionId: true },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const entitledCategories = Object.entries(availableTestsByCategory).filter(([category]) =>
-    userEntitlements.includes(category as Category)
-  );
+  // Filter categories & tests using the same granular entitlement logic as /dashboard
+  const entitledCategories = Object.entries(availableTestsByCategory)
+    .map(([category, tests]) => [
+      category,
+      tests.filter((t) => isTestEntitled(userRole, userEntitlements, category, t.testId)),
+    ] as [string, DiscoveredTestItem[]])
+    .filter(([, tests]) => tests.length > 0);
 
   const completedMap = new Map(completedSummaries.map((s) => [s.testId, s]));
 
-  // Track finished section counts and set of completed section IDs per test
   const completedSectionsByTest = new Map<string, Set<string>>();
   for (const r of userSectionResults) {
     if (!completedSectionsByTest.has(r.testId)) {
@@ -82,7 +115,12 @@ async function TestsLibraryContent() {
     completedSectionsByTest.get(r.testId)!.add(r.sectionId);
   }
 
-  // Pre-resolve pending section IDs for any in-progress tests
+  const checkpointByTest = new Map<string, string>();
+  for (const cp of userSectionCheckpoints) {
+    checkpointByTest.set(cp.testId, cp.sectionId);
+  }
+
+  // Pre-resolve pending section IDs for any in-progress tests (either finished sections or active checkpoint)
   const inProgressMap = new Map<
     string,
     { resumeSectionId: string; completedCount: number }
@@ -90,56 +128,115 @@ async function TestsLibraryContent() {
 
   for (const [category, tests] of entitledCategories) {
     for (const test of tests) {
-      if (!completedMap.has(test.testId) && completedSectionsByTest.has(test.testId)) {
-        const finishedSet = completedSectionsByTest.get(test.testId)!;
-        const meta = await getTestMetadata(category.toLowerCase(), test.testId);
-        if (meta && meta.sections) {
-          const nextPending = meta.sections.find((s) => !finishedSet.has(s.id));
-          if (nextPending) {
-            inProgressMap.set(test.testId, {
-              resumeSectionId: nextPending.id,
-              completedCount: finishedSet.size,
-            });
+      if (!completedMap.has(test.testId)) {
+        const finishedSet = completedSectionsByTest.get(test.testId) || new Set<string>();
+        const activeDraftSectionId = checkpointByTest.get(test.testId);
+
+        if (finishedSet.size > 0 || activeDraftSectionId) {
+          const meta = await getTestMetadata(category.toLowerCase(), test.testId);
+          if (meta && meta.sections) {
+            const nextPending =
+              (activeDraftSectionId && meta.sections.find((s) => s.id === activeDraftSectionId)) ||
+              meta.sections.find((s) => !finishedSet.has(s.id));
+
+            if (nextPending) {
+              inProgressMap.set(test.testId, {
+                resumeSectionId: nextPending.id,
+                completedCount: finishedSet.size,
+              });
+            }
           }
         }
       }
     }
   }
 
+  const totalTestsCount = entitledCategories.reduce((acc, [, tests]) => acc + tests.length, 0);
+
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-          <BookOpen className="w-6 h-6 text-primary" />
-          <span>Diagnostic Testing Library</span>
-        </h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Full-length diagnostic exams strictly mirroring official test specifications and timing constraints.
-        </p>
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-5">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+            <span>Diagnostic Testing Library</span>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Full-length diagnostic exams strictly mirroring official test specifications and adaptive routing.
+          </p>
+        </div>
+
+        {totalTestsCount > 0 && (
+          <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground shrink-0">
+            <span>
+              <strong className="text-foreground">{completedSummaries.length}</strong> Completed
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-foreground">{totalTestsCount}</strong> Licensed
+            </span>
+          </div>
+        )}
       </div>
 
+      {/* Quick Category Jump Bar (Mobile & Multi-Program Convenience) */}
+      {entitledCategories.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0 mr-1">
+            Jump to:
+          </span>
+          {entitledCategories.map(([category]) => {
+            const meta = CATEGORY_META[category];
+            return (
+              <a
+                key={category}
+                href={`#category-${category.toLowerCase()}`}
+                className="min-h-8 inline-flex items-center text-xs font-mono font-bold px-3 py-1 bg-card border border-border hover:border-primary/50 text-foreground shrink-0 transition-colors"
+              >
+                {meta?.label || category}
+              </a>
+            );
+          })}
+        </div>
+      )}
+
       {entitledCategories.length === 0 ? (
-        <div className="p-12 border border-dashed border-border bg-card text-center space-y-3 rounded-none">
+        <div className="p-8 sm:p-12 border border-dashed border-border bg-card text-center space-y-3 rounded-none">
           <p className="text-base font-bold text-foreground">No Active Program Licenses</p>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
             You do not currently have any active exam category entitlements assigned to your profile.
-            Enter an institutional join code or link an authorized tutor to unlock practice exams.
+            Enter an institutional join code or link an authorized mentor to unlock practice exams.
           </p>
+          <div className="pt-2">
+            <Link
+              href="/settings/mentors"
+              className="min-h-10 px-4 py-2 bg-primary text-primary-foreground text-xs font-bold inline-flex items-center gap-1.5"
+            >
+              <span>Manage Access & Mentors</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-10">
           {entitledCategories.map(([category, tests]) => {
-            const meta = CATEGORY_META[category] || {
+            const meta = CATEGORY_META[category as Category] || {
               label: category,
               platform: "Testing Engine",
               badge: "bg-muted text-muted-foreground border-border",
             };
 
             return (
-              <section key={category} className="space-y-4">
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <h2 className="text-base font-bold uppercase tracking-wider text-foreground">
+              <section
+                key={category}
+                id={`category-${category.toLowerCase()}`}
+                className="space-y-4 scroll-mt-20"
+              >
+                {/* Section Header (Wraps cleanly on 375px screens) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-bold uppercase tracking-wider text-foreground">
                       {meta.label}
                     </h2>
                     <span className={`text-[10px] font-mono px-2 py-0.5 border ${meta.badge}`}>
@@ -147,10 +244,11 @@ async function TestsLibraryContent() {
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground font-mono">
-                    {tests.length} Diagnostic{tests.length === 1 ? "" : "s"} Available
+                    {tests.length} Diagnostic{tests.length === 1 ? "" : "s"}
                   </span>
                 </div>
 
+                {/* Responsive Card Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {tests.map((test: DiscoveredTestItem) => {
                     const completed = completedMap.get(test.testId);
@@ -160,6 +258,20 @@ async function TestsLibraryContent() {
                     const targetSectionId = inProgressInfo
                       ? inProgressInfo.resumeSectionId
                       : test.firstSectionId;
+
+                    // Detect adaptive Module 2 track for completed CAT exams
+                    const completedSections = completedSectionsByTest.get(test.testId);
+                    const adaptiveTrackLabel = (() => {
+                      if (!completed || !test.isAdaptive || !completedSections) return null;
+                      const ids = Array.from(completedSections).map((s) => s.toLowerCase());
+                      if (ids.some((id) => id.endsWith("2h") || id.includes("hard"))) {
+                        return "Upper Track (M2H)";
+                      }
+                      if (ids.some((id) => id.endsWith("2l") || id.includes("easy"))) {
+                        return "Standard Track (M2L)";
+                      }
+                      return null;
+                    })();
 
                     return (
                       <div
@@ -171,8 +283,9 @@ async function TestsLibraryContent() {
                         }`}
                       >
                         <div className="space-y-3">
+                          {/* Title & Status Badges */}
                           <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-sm font-bold text-foreground line-clamp-1">
+                            <h3 className="text-sm font-bold text-foreground leading-snug">
                               {test.title}
                             </h3>
                             <div className="flex items-center gap-1 shrink-0">
@@ -193,48 +306,86 @@ async function TestsLibraryContent() {
                             {test.description}
                           </p>
 
-                          <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground pt-1">
-                            <span className="flex items-center gap-1">
-                              <Layers className="w-3.5 h-3.5" />
-                              {isInProgress
-                                ? `${inProgressInfo!.completedCount}/${test.sectionCount} Done`
-                                : `${test.sectionCount} Module${test.sectionCount > 1 ? "s" : ""}`}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              ~{test.totalTimeMinutes}m
-                            </span>
+                          {/* Module & Timing Specs */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-muted-foreground pt-1">
+                            <div className="flex items-center gap-4">
+                              <span className="flex items-center gap-1">
+                                <Layers className="w-3.5 h-3.5" />
+                                {isInProgress
+                                  ? `${inProgressInfo!.completedCount}/${test.sectionCount} Done`
+                                  : `${test.sectionCount} Module${test.sectionCount > 1 ? "s" : ""}`}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                ~{test.totalTimeMinutes}m
+                              </span>
+                            </div>
+
+                            {adaptiveTrackLabel && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 border border-primary/20 text-primary font-semibold">
+                                {adaptiveTrackLabel}
+                              </span>
+                            )}
                           </div>
+
+                          {/* Visual Module Progress Bar for In-Progress Attempts */}
+                          {isInProgress && test.sectionCount > 0 && (
+                            <div className="w-full bg-muted/60 h-1.5 border border-border overflow-hidden">
+                              <div
+                                className="bg-blue-600 dark:bg-blue-400 h-full transition-all"
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    Math.round(
+                                      (inProgressInfo!.completedCount / test.sectionCount) * 100
+                                    )
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
 
-                        {/* Action Footer */}
-                        <div className="pt-5 mt-4 border-t border-border">
+                        {/* Action Footer (44px+ Mobile Touch Targets) */}
+                        <div className="pt-4 mt-4 border-t border-border">
                           {completed ? (
-                            <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center justify-between gap-2 w-full">
                               <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                 <CheckCircle2 size={13} />
                                 <span>Score: {completed.compositeScore ?? "Submitted"}</span>
                               </span>
 
-                              <Link
-                                href={`/tests/${category.toLowerCase()}/${test.testId}/results`}
-                                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-                              >
-                                Review Telemetry <ArrowRight size={12} />
-                              </Link>
+                              <div className="flex items-center gap-3">
+                                <Link
+                                  href={`/tests/${category.toLowerCase()}/${test.testId}/${test.firstSectionId}`}
+                                  title="Retake Diagnostic"
+                                  className="min-h-9 px-2 text-[11px] font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
+                                >
+                                  <RotateCcw size={11} />
+                                  <span className="hidden sm:inline">Retake</span>
+                                </Link>
+
+                                <Link
+                                  href={`/tests/${category.toLowerCase()}/${test.testId}/results`}
+                                  className="min-h-9 px-2.5 bg-primary/10 border border-primary/20 text-xs font-semibold text-primary hover:bg-primary/20 inline-flex items-center gap-1 transition-colors"
+                                >
+                                  <span>Telemetry</span>
+                                  <ArrowRight size={12} />
+                                </Link>
+                              </div>
                             </div>
                           ) : isInProgress ? (
                             <Link
                               href={`/tests/${category.toLowerCase()}/${test.testId}/${targetSectionId}`}
-                              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 rounded-none transition-colors"
+                              className="w-full min-h-10 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 rounded-none transition-colors"
                             >
-                              <span>Resume Exam</span>
+                              <span>Resume Module {inProgressInfo!.completedCount + 1}</span>
                               <ArrowRight size={13} />
                             </Link>
                           ) : (
                             <Link
                               href={`/tests/${category.toLowerCase()}/${test.testId}/${targetSectionId}`}
-                              className="w-full py-2 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center justify-center gap-1.5 rounded-none transition-colors"
+                              className="w-full min-h-10 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center justify-center gap-1.5 rounded-none transition-colors"
                             >
                               <span>Start Diagnostic</span>
                               <ArrowRight size={13} />
@@ -256,10 +407,10 @@ async function TestsLibraryContent() {
 
 function TestsLibrarySkeleton() {
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8 animate-pulse min-h-[120vh]">
-      <div className="space-y-2">
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 animate-pulse">
+      <div className="space-y-2 border-b border-border pb-5">
         <div className="h-7 w-64 bg-card border border-border rounded-none" />
-        <div className="h-4 w-96 bg-card border border-border rounded-none" />
+        <div className="h-4 w-full max-w-md bg-card border border-border rounded-none" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

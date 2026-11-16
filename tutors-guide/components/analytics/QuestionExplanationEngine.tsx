@@ -393,7 +393,7 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
 
         return (
           <figure className="my-4 flex flex-col items-center w-full not-prose">
-            <div className="p-3 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs max-w-full flex items-center justify-center">
+            <div className="p-2.5 sm:p-3 rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs max-w-full flex items-center justify-center">
               <img
                 src={resolvedSrc}
                 alt={alt || "Explanation diagram"}
@@ -416,13 +416,13 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
 
       h3: ({ children }: any) => (
         <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200 mt-6 mb-3 flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-1.5 not-prose">
-          <Workflow className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          {children}
+          <Workflow className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span>{children}</span>
         </h3>
       ),
 
       blockquote: ({ children }: any) => (
-        <blockquote className="my-4 border-l-3 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 px-4 py-3 rounded-r-sm text-neutral-800 dark:text-neutral-200 text-[13.5px] leading-relaxed not-italic">
+        <blockquote className="my-4 border-l-3 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 px-3.5 sm:px-4 py-3 rounded-r-sm text-neutral-800 dark:text-neutral-200 text-[13.5px] leading-relaxed not-italic">
           {children}
         </blockquote>
       ),
@@ -512,25 +512,25 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
   );
 
   return (
-    <div className="mt-2 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden font-sans">
+    <div className="mt-4 sm:mt-6 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden font-sans">
       {/* Header Banner */}
-      <div className="px-5 py-3.5 bg-linear-to-r from-blue-50 via-slate-50 to-white dark:from-blue-950/40 dark:via-neutral-900 dark:to-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center shadow-xs">
+      <div className="px-4 sm:px-5 py-3.5 bg-linear-to-r from-blue-50 via-slate-50 to-white dark:from-blue-950/40 dark:via-neutral-900 dark:to-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
             <Compass className="w-4 h-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
               Explanation
             </h2>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
               {domain ? `${domain} • ` : ""}
               {skill || "Methodology & Traps"}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300">
             <Sparkles className="w-3 h-3" /> dSAT Calibrated
           </span>
@@ -538,7 +538,7 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
       </div>
 
       {/* Main Body */}
-      <div className="p-6 md:p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         {/* Preface */}
         {preface && (
           <div className="prose prose-neutral dark:prose-invert max-w-none text-neutral-900 dark:text-neutral-100 font-sans">
@@ -567,7 +567,7 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
         {hasTabs && tabs.length > 0 && (
           <div className="my-6 border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/40">
             {/* Tab Headers */}
-            <div className="flex items-center border-b border-neutral-200 dark:border-neutral-800 bg-neutral-100/70 dark:bg-neutral-900 px-3 pt-2 gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center border-b border-neutral-200 dark:border-neutral-800 bg-neutral-100/70 dark:bg-neutral-900 px-2 sm:px-3 pt-2 gap-1 overflow-x-auto no-scrollbar">
               {tabs.map((tab, idx) => {
                 const isActive = activeTabIdx === idx;
                 const isDesmos = tab.title.toLowerCase().includes("desmos");
@@ -576,16 +576,16 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTabIdx(idx)}
-                    className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-all border-b-2 rounded-t-sm whitespace-nowrap cursor-pointer ${
+                    className={`min-h-10 flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-bold transition-all border-b-2 rounded-t-sm whitespace-nowrap cursor-pointer ${
                       isActive
                         ? "border-blue-600 bg-white dark:bg-neutral-800 text-blue-600 dark:text-blue-400 shadow-xs"
                         : "border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
                     }`}
                   >
                     {isDesmos ? (
-                      <Calculator className="w-3.5 h-3.5" />
+                      <Calculator className="w-3.5 h-3.5 shrink-0" />
                     ) : (
-                      <Workflow className="w-3.5 h-3.5" />
+                      <Workflow className="w-3.5 h-3.5 shrink-0" />
                     )}
                     {tab.title}
                   </button>
@@ -594,7 +594,7 @@ export const QuestionExplanationEngine: React.FC<QuestionExplanationEngineProps>
             </div>
 
             {/* Tab Body */}
-            <div className="p-5 md:p-6 bg-white dark:bg-neutral-900">
+            <div className="p-4 sm:p-5 md:p-6 bg-white dark:bg-neutral-900">
               {activeTab && (
                 <div className="prose prose-neutral dark:prose-invert max-w-none font-sans">
                   <ReactMarkdown

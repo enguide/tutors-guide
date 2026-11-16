@@ -14,6 +14,7 @@ import {
   LineChart,
   Tooltip,
   ReferenceLine,
+  ReferenceArea,
 } from "recharts";
 import {
   Card,
@@ -59,6 +60,48 @@ const DIFFICULTY_ORDER: Record<string, number> = {
   Unrated: 99,
 };
 
+const OUTCOME_COLORS = {
+  correct: "#444444",
+  incorrect: "#ff9999",
+  target: "#2563eb",
+};
+
+function formatOrdinalPercentile(percentile?: number | string | null): string | null {
+  if (percentile === null || percentile === undefined) {
+    return null;
+  }
+
+  const raw = String(percentile).trim();
+  if (!raw) return null;
+
+  if (raw.endsWith("+")) {
+    return `${raw} Percentile`;
+  }
+
+  const numeric = Number(raw);
+  if (Number.isNaN(numeric)) {
+    return raw.toLowerCase().includes("percentile") ? raw : `${raw} Percentile`;
+  }
+
+  const rounded = Math.round(numeric);
+  const mod100 = rounded % 100;
+  let suffix = "th";
+  if (mod100 < 11 || mod100 > 13) {
+    switch (rounded % 10) {
+      case 1:
+        suffix = "st";
+        break;
+      case 2:
+        suffix = "nd";
+        break;
+      case 3:
+        suffix = "rd";
+        break;
+    }
+  }
+  return `${rounded}${suffix} Percentile`;
+}
+
 const useWindowDimensions = () => {
   const [state, setState] = React.useState({
     fontSize: 11,
@@ -84,9 +127,9 @@ const useWindowDimensions = () => {
 };
 
 const topBarConfig = {
-  Time: {
+  plottedTime: {
     label: "Time (s)",
-    color: "#444444",
+    color: OUTCOME_COLORS.correct,
   },
 } satisfies ChartConfig;
 
@@ -98,8 +141,8 @@ const navChartConfig = {
 } satisfies ChartConfig;
 
 const accuracyChartConfig = {
-  correct: { label: "Correct", color: "#444444" },
-  incorrect: { label: "Incorrect", color: "#ff9999" },
+  correct: { label: "Correct", color: OUTCOME_COLORS.correct },
+  incorrect: { label: "Incorrect", color: OUTCOME_COLORS.incorrect },
 } satisfies ChartConfig;
 
 interface UnifiedAnalyticsDashboardProps {
@@ -140,7 +183,7 @@ export default function UnifiedAnalyticsDashboard({
       .sort((a, b) => a.responseOrder - b.responseOrder);
   }, [responses, activeSectionId]);
 
-  // Dynamically compute the student's target pacing per question for this section
+  // Dynamically compute target pacing per question (with accommodation multiplier)
   const targetPacingSeconds = React.useMemo(() => {
     if (!activeSectionResult) return null;
 
@@ -165,14 +208,35 @@ export default function UnifiedAnalyticsDashboard({
     return Math.round(totalAllotted / questionCount);
   }, [activeSectionResult, activeResponses.length, metadata.sections, activeSectionId]);
 
+  // Dynamic 0.65x–1.5x pacing corridor and 2.5x Y/X-axis ceiling rounded to nearest 10s
+  const { rushedFloorSec, timeSinkCeilingSec, timeAxisCap } = React.useMemo(() => {
+    const baseTarget = targetPacingSeconds ?? 80;
+    return {
+      rushedFloorSec: Math.round(baseTarget * 0.65),
+      timeSinkCeilingSec: Math.round(baseTarget * 1.5),
+      timeAxisCap: Math.max(60, Math.round((baseTarget * 2.5) / 10) * 10),
+    };
+  }, [targetPacingSeconds]);
+
   const topChartData = React.useMemo(() => {
-    return activeResponses.map((r, index) => ({
-      question: `${index + 1}`,
-      Time: r.timeSpentOnResponse || 0,
-      fill: r.isCorrect ? "#444444" : "#ff9999",
-      isCorrect: r.isCorrect,
-    }));
-  }, [activeResponses]);
+    return activeResponses.map((r, index) => {
+      const trueTime = r.timeSpentOnResponse || 0;
+      const isClamped = trueTime > timeAxisCap;
+      return {
+        question: `${index + 1}`,
+        trueTime,
+        plottedTime: isClamped ? timeAxisCap : trueTime,
+        isClamped,
+        fill: r.isCorrect ? OUTCOME_COLORS.correct : OUTCOME_COLORS.incorrect,
+        isCorrect: r.isCorrect,
+      };
+    });
+  }, [activeResponses, timeAxisCap]);
+
+  const clampedBarCount = React.useMemo(
+    () => topChartData.filter((d) => d.isClamped).length,
+    [topChartData]
+  );
 
   const sectionStats = React.useMemo(() => {
     const stats: Record<
@@ -208,19 +272,20 @@ export default function UnifiedAnalyticsDashboard({
 
   const scoreCard = React.useMemo(() => {
     const category = metadata.category.toUpperCase();
+    const percentileLabel = formatOrdinalPercentile(testSummary?.percentile);
 
-    // Collegiate Academic / Chapter Tests: Pure Percentage
     if (category === "ACADEMIC" || (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE") {
       const totalEarned = sectionResults.reduce((acc, sr) => acc + (sr.rawScore || 0), 0);
       const totalPossible = sectionResults.reduce((acc, sr) => acc + (sr.totalQuestions || 0), 0);
       const calcPct = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
       const displayScore = testSummary?.compositeScore ?? calcPct;
+      const ptsText = `${totalEarned}/${totalPossible} pts earned`;
 
       return {
-        label: "Mastery Score",
+        label: "Overall Score",
         score: `${displayScore}%`,
         maxScore: null,
-        subtext: `${totalEarned}/${totalPossible} pts earned`,
+        subtext: percentileLabel ? `${ptsText} • ${percentileLabel}` : ptsText,
       };
     }
 
@@ -230,7 +295,7 @@ export default function UnifiedAnalyticsDashboard({
           label: "Total Score",
           score: adaptiveTrajectory.compositeScore,
           maxScore: 1600,
-          subtext: null,
+          subtext: percentileLabel,
         };
       }
 
@@ -256,7 +321,7 @@ export default function UnifiedAnalyticsDashboard({
         label: "Total Score",
         score: totalScore,
         maxScore: 1600,
-        subtext: null,
+        subtext: percentileLabel,
       };
     }
 
@@ -265,17 +330,18 @@ export default function UnifiedAnalyticsDashboard({
         label: "Composite",
         score: testSummary?.compositeScore ?? null,
         maxScore: 36,
-        subtext: null,
+        subtext: percentileLabel,
       };
     }
 
     if (category === "AP_CALC") {
       const compositeRaw = sectionResults.reduce((acc, sr) => acc + (sr.rawScore || 0), 0);
+      const ptsText = `${compositeRaw}/108 pts`;
       return {
-        label: "AP Grade",
+        label: "AP Score",
         score: testSummary?.compositeScore ?? null,
         maxScore: 5,
-        subtext: `${compositeRaw}/108 pts`,
+        subtext: percentileLabel ? `${ptsText} • ${percentileLabel}` : ptsText,
       };
     }
 
@@ -284,7 +350,7 @@ export default function UnifiedAnalyticsDashboard({
         label: "Total (V+Q)",
         score: testSummary?.compositeScore ?? null,
         maxScore: 340,
-        subtext: null,
+        subtext: percentileLabel,
       };
     }
 
@@ -292,7 +358,7 @@ export default function UnifiedAnalyticsDashboard({
       label: "Raw Score",
       score: testSummary?.compositeScore ?? null,
       maxScore: null,
-      subtext: null,
+      subtext: percentileLabel,
     };
   }, [metadata, sectionResults, testSummary, adaptiveTrajectory]);
 
@@ -309,16 +375,25 @@ export default function UnifiedAnalyticsDashboard({
     return activeSectionResult?.navigationHistory || [];
   }, [activeSectionResult?.navigationHistory]);
 
+  const maxNavQuestionIdx = React.useMemo(() => {
+    const totalQuestions =
+      activeSectionResult?.totalQuestions || activeResponses.length || 0;
+    const maxVisitedIdx = navData.reduce(
+      (max, entry) => Math.max(max, entry.qIdx),
+      0
+    );
+    return Math.max(totalQuestions > 0 ? totalQuestions - 1 : 0, maxVisitedIdx);
+  }, [activeSectionResult?.totalQuestions, activeResponses.length, navData]);
+
   const yAxisTicks = React.useMemo(() => {
-    if (!navData || navData.length === 0) return [0];
-    const maxIdx = navData[navData.length - 1].qIdx;
-    const tickCount = 6;
+    if (maxNavQuestionIdx <= 0) return [0];
+    const tickCount = Math.min(6, maxNavQuestionIdx + 1);
     const ticks: number[] = [];
     for (let i = 0; i < tickCount; i++) {
-      ticks.push(Math.floor((maxIdx / (tickCount - 1)) * i));
+      ticks.push(Math.floor((maxNavQuestionIdx / (tickCount - 1)) * i));
     }
     return Array.from(new Set(ticks));
-  }, [navData]);
+  }, [maxNavQuestionIdx]);
 
   const accuracyData = React.useMemo(() => {
     const grouped = {
@@ -404,38 +479,56 @@ export default function UnifiedAnalyticsDashboard({
   };
 
   return (
-    <div className="flex flex-col items-center align-middle mx-1 sm:mx-8 gap-4 w-full min-w-0">
+    <div className="flex flex-col items-center gap-4 w-full min-w-0">
       <Card
         key={`chart-${activeSectionId}`}
-        className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 border border-slate-200 dark:border-slate-800 shadow-sm"
+        className="rounded-none w-full border border-slate-200 dark:border-slate-800 shadow-sm min-w-0"
       >
         <CardHeader className="flex flex-col items-stretch justify-between space-y-0 border-b border-slate-200 dark:border-slate-800 p-0 md:flex-row">
-          <div className="flex md:flex-col flex-row justify-between md:justify-center items-center md:items-start gap-1 px-4 py-3">
+          <div className="flex md:flex-col flex-row flex-wrap justify-between md:justify-center items-center md:items-start gap-2 px-4 py-3">
             <CardTitle>{metadata.title || "Exam Results"}</CardTitle>
             <CardDescription className="hidden md:block">
-              Total time spent on each question
+              Time spent per question in the selected section
             </CardDescription>
 
-            <div className="flex flex-row items-center gap-4 mt-1">
-              <div className="flex items-center gap-1">
+            <div className="flex flex-row flex-wrap items-center gap-3 sm:gap-4 mt-1">
+              <div className="flex items-center gap-1.5">
                 <span
                   className="w-3 h-3 rounded-xs"
-                  style={{ backgroundColor: "#444444" }}
-                ></span>
-                <span className="text-[10px] sm:text-sm">Correct</span>
+                  style={{ backgroundColor: OUTCOME_COLORS.correct }}
+                />
+                <span className="text-[10px] sm:text-xs font-medium">Correct</span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span
                   className="w-3 h-3 rounded-xs"
-                  style={{ backgroundColor: "#ff9999" }}
-                ></span>
-                <span className="text-[10px] sm:text-sm">Incorrect</span>
+                  style={{ backgroundColor: OUTCOME_COLORS.incorrect }}
+                />
+                <span className="text-[10px] sm:text-xs font-medium">Missed</span>
               </div>
               {targetPacingSeconds !== null && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-4 h-0 border-t-2 border-dashed border-[#2563eb]"></span>
-                  <span className="text-[10px] sm:text-sm">Target Pace</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="w-4 h-0 border-t-2 border-dashed"
+                      style={{ borderColor: OUTCOME_COLORS.target }}
+                    />
+                    <span className="text-[10px] sm:text-xs font-medium">
+                      Target Pace ({targetPacingSeconds}s)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-2.5 inline-block bg-blue-500/10 border-y border-dashed border-blue-500/40" />
+                    <span className="text-[10px] sm:text-xs font-medium">
+                      Target Zone ({rushedFloorSec}s–{timeSinkCeilingSec}s)
+                    </span>
+                  </div>
+                </>
+              )}
+              {clampedBarCount > 0 && (
+                <span className="text-[10px] sm:text-xs font-mono text-muted-foreground">
+                  ({clampedBarCount} capped at {timeAxisCap}s+)
+                </span>
               )}
             </div>
           </div>
@@ -461,18 +554,19 @@ export default function UnifiedAnalyticsDashboard({
                 return (
                   <button
                     key={sr.sectionId}
+                    type="button"
                     data-active={isCurrent ? "true" : "false"}
-                    className={`flex flex-1 flex-col items-center justify-center gap-1 border-r border-t border-slate-200 dark:border-slate-800 transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l ${
+                    className={`min-h-14 flex flex-1 flex-col items-center justify-center gap-1 border-r last:border-r-0 md:last:border-r border-t border-slate-200 dark:border-slate-800 transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l ${
                       isSatCategory
-                        ? "px-3 py-2.5 md:min-w-16 lg:min-w-20 lg:px-6"
-                        : "px-4 py-2.5 md:min-w-28 lg:px-6"
+                        ? "px-2.5 sm:px-3 py-2.5 md:min-w-16 lg:min-w-20 lg:px-6"
+                        : "px-3 sm:px-4 py-2.5 md:min-w-28 lg:px-6"
                     }`}
                     onClick={() => setSelectedSectionId(sr.sectionId)}
                   >
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight line-clamp-1">
                       {sectionTitle}
                     </span>
-                    <span className="text-xl md:text-2xl font-bold leading-none">
+                    <span className="text-lg sm:text-xl md:text-2xl font-bold leading-none">
                       {displayScore}
                     </span>
                     {stats?.formattedTime && (
@@ -492,17 +586,17 @@ export default function UnifiedAnalyticsDashboard({
                   const domainTitle =
                     summary.stageIndex === 1 ? "Reading & Writing" : "Mathematics";
                   const tierLabel =
-                    summary.routedTier === "easy" ? "Standard Tier" : "Hard Tier";
+                    summary.routedTier === "easy" ? "Standard Module" : "Higher-Difficulty Module";
 
                   return (
                     <div
                       key={summary.stageIndex}
-                      className="flex flex-1 flex-col gap-1 justify-center items-center px-6 py-2.5 text-center border-r md:border-r border-slate-200 dark:border-slate-800 md:min-w-32 lg:min-w-34 shrink-0"
+                      className="flex flex-1 flex-col gap-1 justify-center items-center px-3 sm:px-6 py-2.5 text-center border-r last:border-r-0 md:last:border-r border-slate-200 dark:border-slate-800 md:min-w-32 lg:min-w-34"
                     >
                       <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight line-clamp-1">
                         {domainTitle}
                       </span>
-                      <span className="text-xl md:text-2xl font-black leading-none text-foreground">
+                      <span className="text-lg sm:text-xl md:text-2xl font-black leading-none text-foreground">
                         {summary.domainScore}
                         <span className="text-[10px] text-muted-foreground font-normal ml-0.5">
                           /800
@@ -518,7 +612,7 @@ export default function UnifiedAnalyticsDashboard({
             )}
 
             {scoreCard.score !== null && (
-              <div className="flex flex-col gap-1 justify-center items-center px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 lg:min-w-36 shrink-0">
+              <div className="flex flex-col gap-1 justify-center items-center px-4 sm:px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 lg:min-w-36 shrink-0">
                 <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
                   {scoreCard.label}
                 </span>
@@ -554,15 +648,17 @@ export default function UnifiedAnalyticsDashboard({
                   <BarChart
                     data={topChartData}
                     layout="vertical"
-                    margin={{ left: 0, right: 10, top: 10, bottom: 0 }}
+                    margin={{ left: 0, right: 12, top: 10, bottom: 0 }}
                   >
                     <CartesianGrid vertical={true} horizontal={false} />
                     <XAxis
                       type="number"
                       orientation="top"
                       height={40}
+                      domain={[0, timeAxisCap]}
+                      tickFormatter={(v) => (v === timeAxisCap ? `${v}s+` : `${v}s`)}
                       label={{
-                        value: "Time (s)",
+                        value: "Time Spent (s)",
                         fontSize: 10,
                         fontWeight: "bold",
                         position: "insideTop",
@@ -584,27 +680,58 @@ export default function UnifiedAnalyticsDashboard({
                         <ChartTooltipContent
                           hideLabel
                           labelFormatter={(value) => `Question ${value}`}
+                          formatter={(_val, _name, item) => {
+                            const payload = item?.payload;
+                            if (!payload) return null;
+                            return (
+                              <span className="font-mono text-xs">
+                                <strong>{payload.trueTime}s</strong>
+                                {payload.isClamped ? ` (capped at ${timeAxisCap}s+)` : ""}
+                              </span>
+                            );
+                          }}
                         />
                       }
                     />
 
                     {targetPacingSeconds !== null && (
-                      <ReferenceLine
-                        x={targetPacingSeconds}
-                        stroke="#2563eb"
-                        strokeDasharray="4 4"
-                        strokeWidth={1.5}
-                        label={{
-                          value: `Target: ${targetPacingSeconds}s`,
-                          position: "insideTopRight",
-                          fontSize: 10,
-                          fontWeight: "bold",
-                          fill: "#2563eb",
-                        }}
-                      />
+                      <>
+                        <ReferenceArea
+                          x1={rushedFloorSec}
+                          x2={timeSinkCeilingSec}
+                          fill="#2563eb"
+                          fillOpacity={0.06}
+                          ifOverflow="extendDomain"
+                        />
+                        <ReferenceLine
+                          x={rushedFloorSec}
+                          stroke="#2563eb"
+                          strokeDasharray="3 3"
+                          strokeOpacity={0.35}
+                        />
+                        <ReferenceLine
+                          x={targetPacingSeconds}
+                          stroke={OUTCOME_COLORS.target}
+                          strokeDasharray="4 4"
+                          strokeWidth={1.5}
+                          label={{
+                            value: `Target: ${targetPacingSeconds}s`,
+                            position: "insideTopRight",
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            fill: OUTCOME_COLORS.target,
+                          }}
+                        />
+                        <ReferenceLine
+                          x={timeSinkCeilingSec}
+                          stroke="#2563eb"
+                          strokeDasharray="3 3"
+                          strokeOpacity={0.35}
+                        />
+                      </>
                     )}
 
-                    <Bar dataKey="Time" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="plottedTime" radius={[0, 4, 4, 0]}>
                       {topChartData.map((entry, index) => (
                         <Cell
                           key={`cell-mobile-${index}`}
@@ -619,13 +746,13 @@ export default function UnifiedAnalyticsDashboard({
               <div className="w-full min-w-0">
                 <ChartContainer
                   config={topBarConfig}
-                  className="aspect-auto h-31.25 pt-2 w-full min-w-0"
+                  className="aspect-auto h-36 pt-2 w-full min-w-0"
                 >
                   <BarChart
                     accessibilityLayer
                     data={topChartData}
                     layout="horizontal"
-                    margin={{ left: 12, right: 12 }}
+                    margin={{ left: 12, right: 12, top: 14 }}
                   >
                     <CartesianGrid vertical={false} />
                     <XAxis
@@ -640,6 +767,8 @@ export default function UnifiedAnalyticsDashboard({
                       tickMargin={5}
                       fontSize={12}
                       axisLine={false}
+                      domain={[0, timeAxisCap]}
+                      tickFormatter={(v) => (v === timeAxisCap ? `${v}s+` : `${v}s`)}
                       label={{
                         value: "Time (s)",
                         angle: -90,
@@ -652,30 +781,60 @@ export default function UnifiedAnalyticsDashboard({
                     <ChartTooltip
                       content={
                         <ChartTooltipContent
-                          className="w-37.5"
-                          nameKey="Time"
+                          className="w-44"
                           labelFormatter={(value) => `Question ${value}`}
+                          formatter={(_val, _name, item) => {
+                            const payload = item?.payload;
+                            if (!payload) return null;
+                            return (
+                              <span className="font-mono text-xs">
+                                Time: <strong>{payload.trueTime}s</strong>
+                                {payload.isClamped ? ` (${timeAxisCap}s+ cap)` : ""}
+                              </span>
+                            );
+                          }}
                         />
                       }
                     />
 
                     {targetPacingSeconds !== null && (
-                      <ReferenceLine
-                        y={targetPacingSeconds}
-                        stroke="#2563eb"
-                        strokeDasharray="4 4"
-                        strokeWidth={1.5}
-                        label={{
-                          value: `Target: ${targetPacingSeconds}s`,
-                          position: "top",
-                          fontSize: 10,
-                          fontWeight: "bold",
-                          fill: "#2563eb",
-                        }}
-                      />
+                      <>
+                        <ReferenceArea
+                          y1={rushedFloorSec}
+                          y2={timeSinkCeilingSec}
+                          fill="#2563eb"
+                          fillOpacity={0.06}
+                          ifOverflow="extendDomain"
+                        />
+                        <ReferenceLine
+                          y={rushedFloorSec}
+                          stroke="#2563eb"
+                          strokeDasharray="3 3"
+                          strokeOpacity={0.35}
+                        />
+                        <ReferenceLine
+                          y={targetPacingSeconds}
+                          stroke={OUTCOME_COLORS.target}
+                          strokeDasharray="4 4"
+                          strokeWidth={1.5}
+                          label={{
+                            value: `Target: ${targetPacingSeconds}s`,
+                            position: "insideTopRight",
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            fill: OUTCOME_COLORS.target,
+                          }}
+                        />
+                        <ReferenceLine
+                          y={timeSinkCeilingSec}
+                          stroke="#2563eb"
+                          strokeDasharray="3 3"
+                          strokeOpacity={0.35}
+                        />
+                      </>
                     )}
 
-                    <Bar dataKey="Time" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="plottedTime" radius={[4, 4, 0, 0]}>
                       {topChartData.map((entry, index) => (
                         <Cell
                           key={`cell-desktop-${index}`}
@@ -696,20 +855,23 @@ export default function UnifiedAnalyticsDashboard({
       </Card>
 
       {activeSectionResult && (
-        <Card className="rounded-none w-full xl:w-337.5 xl:min-w-337.5 min-w-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b h-16 px-5 py-3.5">
+        <Card className="rounded-none w-full min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 border-b min-h-16 px-4 sm:px-5 py-3">
             <div className="flex flex-col gap-1">
-              <CardTitle className="text-base font-bold">
-                Section Navigation
+              <CardTitle className="text-sm sm:text-base font-bold">
+                Question Navigation Timeline
               </CardTitle>
+              <CardDescription className="text-xs hidden sm:block">
+                Shows the order in which you moved through questions during the section
+              </CardDescription>
             </div>
 
-            <div className="flex flex-row items-center gap-1">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+            <div className="flex flex-row items-center gap-1.5 shrink-0">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold hidden xs:inline sm:inline">
                 Time Remaining
               </span>
-              <div className="flex items-center gap-2 text-blue-500 text-base sm:text-sm bg-blue-500/10 px-2 py-1 rounded-none border border-blue-500/20">
-                <Clock className="w-5 h-5" />
+              <div className="flex items-center gap-1.5 text-blue-500 text-sm bg-blue-500/10 px-2 py-1 rounded-none border border-blue-500/20 font-mono font-semibold">
+                <Clock className="w-4 h-4 shrink-0" />
                 {formatNavTime(activeSectionResult.timeRemainingSeconds)}
               </div>
             </div>
@@ -725,7 +887,7 @@ export default function UnifiedAnalyticsDashboard({
               >
                 <LineChart
                   data={navData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  margin={{ top: 20, right: 20, left: 10, bottom: 20 }}
                 >
                   <CartesianGrid horizontal={true} vertical={false} />
                   <XAxis
@@ -738,7 +900,7 @@ export default function UnifiedAnalyticsDashboard({
                     tickLine={false}
                     axisLine={true}
                     label={{
-                      value: "Test Elapsed Time",
+                      value: "Elapsed Section Time",
                       position: "bottom",
                       offset: 0,
                       className:
@@ -750,7 +912,7 @@ export default function UnifiedAnalyticsDashboard({
                     stroke="#888888"
                     fontSize={12}
                     allowDecimals={false}
-                    domain={[0, navData[navData.length - 1].qIdx]}
+                    domain={[0, maxNavQuestionIdx]}
                     ticks={yAxisTicks}
                     tickLine={true}
                     axisLine={true}
@@ -780,14 +942,14 @@ export default function UnifiedAnalyticsDashboard({
               </ChartContainer>
             ) : (
               <div className="p-8 text-center text-muted-foreground">
-                No navigation data available for this section.
+                No navigation history recorded for this section.
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-337.5 xl:min-w-337.5 min-w-0">
+      <div className="flex flex-col lg:flex-row gap-4 w-full min-w-0">
         <div className="w-full lg:w-2/3 min-w-0">
           <TopicSkillAccuracyAccordion responses={activeResponses} />
         </div>
@@ -795,9 +957,9 @@ export default function UnifiedAnalyticsDashboard({
         <div className="w-full lg:w-1/3 flex flex-col gap-4 min-w-0">
           <Card className="rounded-none w-full h-fit min-w-0">
             <CardHeader className="border-b">
-              <CardTitle>By Difficulty</CardTitle>
+              <CardTitle>Accuracy by Difficulty</CardTitle>
               <CardDescription>
-                Performance across difficulty levels.
+                Breakdown of correct vs. missed questions by difficulty tier.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 min-w-0">
@@ -837,13 +999,13 @@ export default function UnifiedAnalyticsDashboard({
                     />
                     <Bar
                       dataKey="correct"
-                      fill="#444444"
+                      fill={OUTCOME_COLORS.correct}
                       stackId="a"
                       radius={0}
                     />
                     <Bar
                       dataKey="incorrect"
-                      fill="#ff9999"
+                      fill={OUTCOME_COLORS.incorrect}
                       stackId="a"
                       radius={0}
                     />

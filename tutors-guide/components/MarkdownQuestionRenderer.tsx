@@ -32,6 +32,7 @@ interface LightboxState {
 
 /**
  * College Board (SAT & AP) Authentic Diagram Viewer
+ * - Responsive to parent container width on narrow mobile viewports (caps at 432x432 on desktop)
  * - Completely stable box dimensions (never grows/shrinks on zoom)
  * - True zoom with zero clipping on left/top
  * - Click-and-drag panning synchronized with native scrollbars
@@ -42,6 +43,8 @@ const CollegeBoardFigureViewer: React.FC<{
   onExpand?: () => void;
 }> = React.memo(({ src, alt, onExpand }) => {
   const [zoom, setZoom] = useState(1);
+  const [viewportSize, setViewportSize] = useState(432);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Drag-to-pan state
@@ -52,9 +55,29 @@ const CollegeBoardFigureViewer: React.FC<{
   const scrollTopRef = useRef(0);
   const [isGrabbing, setIsGrabbing] = useState(false);
 
-  // Base fixed display frame (120% / 1.2x scale)
-  const VIEWPORT_WIDTH = 432;
-  const VIEWPORT_HEIGHT = 432;
+  // Measure available parent width so the 432px viewer scales cleanly on < 460px phones
+  useEffect(() => {
+    const parent = wrapperRef.current?.parentElement;
+    if (!parent) return;
+
+    const updateSize = () => {
+      const available = parent.clientWidth;
+      if (available > 0) {
+        setViewportSize(Math.max(240, Math.min(432, Math.floor(available))));
+      }
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateSize);
+      observer.observe(parent);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -107,18 +130,19 @@ const CollegeBoardFigureViewer: React.FC<{
 
   return (
     <div
-      style={{ width: `${VIEWPORT_WIDTH}px` }}
+      ref={wrapperRef}
+      style={{ width: `${viewportSize}px`, maxWidth: "100%" }}
       className="border border-neutral-300 dark:border-neutral-700 rounded-lg overflow-hidden bg-white dark:bg-neutral-900 shadow-xs select-none"
     >
       {/* College Board Header Toolbar */}
-      <div className="h-8 bg-neutral-100 dark:bg-neutral-800/90 border-b border-neutral-200 dark:border-neutral-700/80 px-2.5 flex items-center justify-end gap-2.5 text-xs font-sans text-neutral-800 dark:text-neutral-200">
+      <div className="h-9 sm:h-8 bg-neutral-100 dark:bg-neutral-800/90 border-b border-neutral-200 dark:border-neutral-700/80 px-2.5 flex items-center justify-end gap-2 sm:gap-2.5 text-xs font-sans text-neutral-800 dark:text-neutral-200">
         <button
           type="button"
           onClick={handleZoomIn}
           disabled={zoom >= 2.5}
           title="Zoom In"
           aria-label="Zoom In"
-          className="p-1 hover:text-[#2050c8] dark:hover:text-blue-400 disabled:opacity-30 transition-colors cursor-pointer"
+          className="p-1.5 sm:p-1 hover:text-[#2050c8] dark:hover:text-blue-400 disabled:opacity-30 transition-colors cursor-pointer"
         >
           <ZoomIn className="w-3.5 h-3.5 stroke-[2]" />
         </button>
@@ -129,7 +153,7 @@ const CollegeBoardFigureViewer: React.FC<{
           disabled={zoom <= 0.5}
           title="Zoom Out"
           aria-label="Zoom Out"
-          className="p-1 hover:text-[#2050c8] dark:hover:text-blue-400 disabled:opacity-30 transition-colors cursor-pointer"
+          className="p-1.5 sm:p-1 hover:text-[#2050c8] dark:hover:text-blue-400 disabled:opacity-30 transition-colors cursor-pointer"
         >
           <ZoomOut className="w-3.5 h-3.5 stroke-[2]" />
         </button>
@@ -141,7 +165,7 @@ const CollegeBoardFigureViewer: React.FC<{
         <button
           type="button"
           onClick={handleReset}
-          className="font-medium hover:text-[#2050c8] dark:hover:text-blue-400 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer text-xs"
+          className="px-1 py-1 font-medium hover:text-[#2050c8] dark:hover:text-blue-400 text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer text-xs"
         >
           Reset
         </button>
@@ -156,13 +180,13 @@ const CollegeBoardFigureViewer: React.FC<{
           }}
           title="Expand Figure"
           aria-label="Expand Figure"
-          className="p-1 hover:text-[#2050c8] dark:hover:text-blue-400 transition-colors cursor-pointer"
+          className="p-1.5 sm:p-1 hover:text-[#2050c8] dark:hover:text-blue-400 transition-colors cursor-pointer"
         >
           <Maximize2 className="w-3.5 h-3.5 stroke-[2.2]" />
         </button>
       </div>
 
-      {/* Viewport: Strictly locked to VIEWPORT_WIDTH x VIEWPORT_HEIGHT */}
+      {/* Viewport: Strictly locked to viewportSize x viewportSize */}
       <div
         ref={scrollContainerRef}
         onMouseDown={handleMouseDown}
@@ -170,8 +194,9 @@ const CollegeBoardFigureViewer: React.FC<{
         onMouseUp={handleMouseUpOrLeave}
         onMouseLeave={handleMouseUpOrLeave}
         style={{
-          width: `${VIEWPORT_WIDTH}px`,
-          height: `${VIEWPORT_HEIGHT}px`,
+          width: `${viewportSize}px`,
+          height: `${viewportSize}px`,
+          maxWidth: "100%",
         }}
         className={`relative bg-white dark:bg-neutral-900 ${
           isZoomed
@@ -181,8 +206,8 @@ const CollegeBoardFigureViewer: React.FC<{
       >
         <div
           style={{
-            width: `${VIEWPORT_WIDTH * zoom}px`,
-            height: `${VIEWPORT_HEIGHT * zoom}px`,
+            width: `${viewportSize * zoom}px`,
+            height: `${viewportSize * zoom}px`,
             transition: isGrabbing ? "none" : "width 0.12s ease-out, height 0.12s ease-out",
           }}
           className="relative shrink-0 flex items-center justify-center p-2"
@@ -192,8 +217,8 @@ const CollegeBoardFigureViewer: React.FC<{
             alt={alt}
             draggable={false}
             style={{
-              width: `${(VIEWPORT_WIDTH - 16) * zoom}px`,
-              height: `${(VIEWPORT_HEIGHT - 16) * zoom}px`,
+              width: `${(viewportSize - 16) * zoom}px`,
+              height: `${(viewportSize - 16) * zoom}px`,
               transition: isGrabbing ? "none" : "width 0.12s ease-out, height 0.12s ease-out",
             }}
             className="block object-contain select-none pointer-events-none dark:invert dark:contrast-200 dark:brightness-90 transition-[filter] duration-200"
@@ -231,24 +256,24 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
     });
 
     text = text.replace(
-    /\[\[blank\]\]/g,
-    '<span data-rw-blank="true" aria-label="blank"></span>'
-  );
+      /\[\[blank\]\]/g,
+      '<span data-rw-blank="true" aria-label="blank"></span>'
+    );
 
-  text = text.replace(
-    /\[\[predict\]\]([\s\S]*?)\[\[\/predict\]\]/g,
-    '<div data-rw-predict="true">$1</div>'
-  );
+    text = text.replace(
+      /\[\[predict\]\]([\s\S]*?)\[\[\/predict\]\]/g,
+      '<div data-rw-predict="true">$1</div>'
+    );
 
-  text = text.replace(
-    /\[\[insight\]\]([\s\S]*?)\[\[\/insight\]\]/g,
-    '<div data-rw-insight="true">$1</div>'
-  );
+    text = text.replace(
+      /\[\[insight\]\]([\s\S]*?)\[\[\/insight\]\]/g,
+      '<div data-rw-insight="true">$1</div>'
+    );
 
-  text = text.replace(
-    /\[\[ans\]\]([\s\S]*?)\[\[\/ans\]\]/g,
-    '<span data-rw-ans="true">$1</span>'
-  );
+    text = text.replace(
+      /\[\[ans\]\]([\s\S]*?)\[\[\/ans\]\]/g,
+      '<span data-rw-ans="true">$1</span>'
+    );
 
     text = text.replace(
       /\[\[\[([A-D])\]:(\d+)\]\]/g,
@@ -517,7 +542,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       blockquote: ({ children }: any) => {
         if (isCollegeBoard) {
           return (
-            <blockquote className="pl-6 sm:pl-8 my-3 border-none not-italic font-normal font-serif text-neutral-900 dark:text-neutral-100">
+            <blockquote className="pl-5 sm:pl-8 my-3 border-none not-italic font-normal font-serif text-neutral-900 dark:text-neutral-100">
               {children}
             </blockquote>
           );
@@ -563,7 +588,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
         <h3 className="text-sm font-medium mb-2">{children}</h3>
       ),
       ul: ({ children }: any) => (
-        <ul className="list-none my-3 pl-6 sm:pl-8 space-y-2 not-prose">{children}</ul>
+        <ul className="list-none my-3 pl-5 sm:pl-8 space-y-2 not-prose">{children}</ul>
       ),
 
       // 2. Adaptive Bullets that match body text color across light/dark mode
@@ -612,15 +637,15 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
       table: ({ children }: any) => {
         if (isCollegeBoard) {
           return (
-            <div className="my-5 w-full flex justify-center overflow-x-auto not-prose">
-              <table className="border-collapse border border-neutral-700 dark:border-neutral-300 text-[14.5px] font-serif text-neutral-900 dark:text-neutral-100 mx-auto">
+            <div className="my-5 w-full flex justify-start sm:justify-center overflow-x-auto not-prose">
+              <table className="border-collapse border border-neutral-700 dark:border-neutral-300 text-[13.5px] sm:text-[14.5px] font-serif text-neutral-900 dark:text-neutral-100 mx-auto">
                 {children}
               </table>
             </div>
           );
         }
         return (
-          <div className="my-6 w-full flex justify-center overflow-x-auto not-prose">
+          <div className="my-6 w-full flex justify-start sm:justify-center overflow-x-auto not-prose">
             <table className="border-collapse text-[14px] font-sans text-neutral-900 dark:text-neutral-100 min-w-[260px] max-w-full">
               {children}
             </table>
@@ -662,7 +687,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
           return (
             <th
               style={style}
-              className="border-r border-neutral-700 dark:border-neutral-300 last:border-r-0 px-3.5 py-2 font-normal text-center align-middle whitespace-normal leading-snug"
+              className="border-r border-neutral-700 dark:border-neutral-300 last:border-r-0 px-3 sm:px-3.5 py-2 font-normal text-center align-middle whitespace-normal leading-snug"
             >
               {children}
             </th>
@@ -683,7 +708,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
           return (
             <td
               style={style}
-              className="border-r border-neutral-700 dark:border-neutral-300 last:border-r-0 px-3.5 py-2.5 text-center align-middle whitespace-nowrap"
+              className="border-r border-neutral-700 dark:border-neutral-300 last:border-r-0 px-3 sm:px-3.5 py-2.5 text-center align-middle whitespace-nowrap"
             >
               {children}
             </td>
@@ -790,7 +815,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
                     })
                   }
                   aria-label="Expand image"
-                  className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-neutral-800/90 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-[4px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-xs"
+                  className="absolute top-2 right-2 p-1.5 bg-white/90 dark:bg-neutral-800/90 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-[4px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 shadow-xs"
                 >
                   <Maximize2 className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
                 </button>
@@ -852,7 +877,7 @@ export const MarkdownQuestionRenderer: React.FC<MarkdownQuestionRendererProps> =
           onClick={closeLightbox}
         >
           <div
-            className="w-[min(900px,85vw,80vh)] aspect-square rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 sm:p-5 shadow-2xl flex items-center justify-center cursor-default shrink-0"
+            className="w-[min(900px,92vw,80vh)] aspect-square rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 sm:p-5 shadow-2xl flex items-center justify-center cursor-default shrink-0"
             onClick={(e) => e.stopPropagation()}
           >
             {lightbox.isSvg ? (

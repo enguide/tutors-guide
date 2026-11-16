@@ -17,7 +17,11 @@ import {
   ChevronRight,
   ChevronLeft,
   RotateCcw,
+  Lightbulb,
+  X,
+  Filter,
 } from "lucide-react";
+import { ActionableDiagnosticsPanel } from "./ActionableDiagnosticPanel";
 
 interface TestAnalyticsClientProps {
   metadata: TestMetadata;
@@ -25,6 +29,7 @@ interface TestAnalyticsClientProps {
   sectionResults: SectionResultData[];
   responses: EnrichedResponseItem[];
   adaptiveTrajectory?: AdaptiveTrajectoryData | null;
+  stickyTopClass?: string;
 }
 
 export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
@@ -33,11 +38,20 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
   sectionResults,
   responses,
   adaptiveTrajectory,
+  stickyTopClass = "top-16",
 }) => {
-  const [activeTab, setActiveTab] = useState<"analytics" | "review">("analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "action-plan" | "review">(
+    "analytics"
+  );
   const [selectedSectionId, setSelectedSectionId] = useState<string>("all");
 
-  // Filters for the triage review tab
+  // Filter injected when jumping from Study Action Plan -> Question Review
+  const [flaggedCohort, setFlaggedCohort] = useState<{
+    ids: Set<string>;
+    label: string;
+  } | null>(null);
+
+  // Filters for the question review tab
   const [statusFilter, setStatusFilter] = useState<"All" | "Correct" | "Incorrect">("All");
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("All");
   const [selectedDomain, setSelectedDomain] = useState<string>("All");
@@ -62,6 +76,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
 
   const filteredReviewItems = useMemo(() => {
     return currentSectionResponses.filter((item) => {
+      if (flaggedCohort && !flaggedCohort.ids.has(item.questionId)) return false;
       if (statusFilter === "Correct" && !item.isCorrect) return false;
       if (statusFilter === "Incorrect" && item.isCorrect) return false;
       if (selectedDifficulty !== "All" && item.difficulty !== selectedDifficulty) return false;
@@ -72,6 +87,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
     });
   }, [
     currentSectionResponses,
+    flaggedCohort,
     statusFilter,
     selectedDifficulty,
     selectedDomain,
@@ -83,6 +99,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
     filteredReviewItems[reviewIndex] || filteredReviewItems[0];
 
   const handleResetFilters = () => {
+    setFlaggedCohort(null);
     setStatusFilter("All");
     setSelectedDifficulty("All");
     setSelectedDomain("All");
@@ -92,35 +109,54 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-foreground pb-20">
-      {/* Top Controller Bar */}
-      <div className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md sticky top-0 z-30 mb-6">
-        <div className="max-w-337.5 mx-auto px-4 sm:px-8 flex items-center justify-between h-14">
-          <div className="flex items-center gap-2">
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 text-foreground pb-20">
+      {/* Top Controller Bar (Docks directly below StudentNavbar or StaffInspectionBar) */}
+      <div
+        className={`w-full border-b border-slate-200 dark:border-slate-800 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md sticky ${stickyTopClass} z-30 mb-6`}
+      >
+        <div className="max-w-337.5 mx-auto px-3 sm:px-8 flex items-center justify-between gap-2 h-14">
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
             <button
+              type="button"
               onClick={() => setActiveTab("analytics")}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-all border-b-2 ${
+              className={`min-h-11 flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
                 activeTab === "analytics"
                   ? "border-blue-600 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <BarChart3 size={15} /> Diagnostic Telemetry
+              <BarChart3 size={15} className="shrink-0" />
+              <span>Score & Pacing Overview</span>
             </button>
 
             <button
+              type="button"
+              onClick={() => setActiveTab("action-plan")}
+              className={`min-h-11 flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
+                activeTab === "action-plan"
+                  ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Lightbulb size={15} className="shrink-0" />
+              <span>Study Action Plan</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("review")}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-all border-b-2 ${
+              className={`min-h-11 flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
                 activeTab === "review"
                   ? "border-blue-600 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Search size={15} /> Question Triage Review
+              <Search size={15} className="shrink-0" />
+              <span>Question Review</span>
             </button>
           </div>
 
-          <span className="text-xs font-medium text-muted-foreground hidden sm:inline-block">
+          <span className="text-xs font-medium text-muted-foreground hidden md:inline-block truncate max-w-xs lg:max-w-md">
             {metadata.title}
           </span>
         </div>
@@ -128,8 +164,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
 
       {/* Main Container */}
       <div className="max-w-337.5 mx-auto px-4 sm:px-8">
-
-        {/* TAB 1: Unified Analytics Dashboard */}
+        {/* TAB 1: Score & Pacing Overview */}
         {activeTab === "analytics" && (
           <div className="animate-in fade-in duration-200">
             <UnifiedAnalyticsDashboard
@@ -142,23 +177,71 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
           </div>
         )}
 
-        {/* TAB 2: Question Triage Review */}
+        {/* TAB 2: Study Action Plan */}
+        {activeTab === "action-plan" && (
+          <div className="animate-in fade-in duration-200">
+            <ActionableDiagnosticsPanel
+              metadata={metadata}
+              sectionResults={sectionResults}
+              responses={responses}
+              onInspectQuestions={(questionIds: string[], label: string) => {
+                setSelectedSectionId("all");
+                handleResetFilters();
+                setFlaggedCohort({ ids: new Set(questionIds), label });
+                setReviewIndex(0);
+                setActiveTab("review");
+              }}
+            />
+          </div>
+        )}
+
+        {/* TAB 3: Question Review */}
         {activeTab === "review" && (
           <div
             ref={reviewContainerRef}
             className="space-y-6 animate-in fade-in duration-200"
           >
+            {/* Active Action-Plan Focus Banner (shown when deep-linked from Study Action Plan) */}
+            {flaggedCohort && (
+              <div className="bg-primary/10 border border-primary/30 px-4 py-3 rounded-none flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <Filter size={14} className="text-primary shrink-0" />
+                  <span>
+                    <strong className="font-bold text-primary">Focus Area:</strong>{" "}
+                    <span className="text-foreground font-medium">{flaggedCohort.label}</span>{" "}
+                    <span className="text-muted-foreground font-mono">
+                      ({filteredReviewItems.length} question
+                      {filteredReviewItems.length === 1 ? "" : "s"})
+                    </span>
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFlaggedCohort(null);
+                    setReviewIndex(0);
+                  }}
+                  className="min-h-8 px-2.5 py-1 bg-card border border-border hover:bg-muted text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                >
+                  <X size={13} />
+                  <span>Show All Questions</span>
+                </button>
+              </div>
+            )}
+
             {/* Module Selector Chips */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">
-                Modules:
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1 shrink-0">
+                Sections:
               </span>
               <button
+                type="button"
                 onClick={() => {
                   setSelectedSectionId("all");
                   setReviewIndex(0);
                 }}
-                className={`px-3 py-1.5 rounded-none text-xs font-bold transition-all whitespace-nowrap border ${
+                className={`min-h-9 px-3 py-1.5 rounded-none text-xs font-bold transition-all whitespace-nowrap border ${
                   selectedSectionId === "all"
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card text-muted-foreground border-border hover:bg-muted"
@@ -172,11 +255,12 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                 return (
                   <button
                     key={sr.sectionId}
+                    type="button"
                     onClick={() => {
                       setSelectedSectionId(sr.sectionId);
                       setReviewIndex(0);
                     }}
-                    className={`px-3 py-1.5 rounded-none text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap border ${
+                    className={`min-h-9 px-3 py-1.5 rounded-none text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap border ${
                       isActive
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-card text-muted-foreground border-border hover:bg-muted"
@@ -199,12 +283,12 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
               })}
             </div>
 
-            {/* Triage Filter Drawer */}
+            {/* Filter Drawer */}
             <div className="bg-card border border-border rounded-none p-4 shadow-xs space-y-4">
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end gap-3 sm:gap-4">
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Status
+                    Outcome
                   </span>
                   <select
                     value={statusFilter}
@@ -212,10 +296,10 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                       setStatusFilter(e.target.value as "All" | "Correct" | "Incorrect");
                       setReviewIndex(0);
                     }}
-                    className="text-xs font-semibold p-2 rounded-none border border-input bg-background"
+                    className="w-full min-h-9 text-xs font-semibold p-2 rounded-none border border-input bg-background"
                   >
                     <option value="All">All Questions</option>
-                    <option value="Incorrect">Incorrect Only</option>
+                    <option value="Incorrect">Missed Only</option>
                     <option value="Correct">Correct Only</option>
                   </select>
                 </div>
@@ -230,7 +314,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                       setSelectedDifficulty(e.target.value);
                       setReviewIndex(0);
                     }}
-                    className="text-xs font-semibold p-2 rounded-none border border-input bg-background"
+                    className="w-full min-h-9 text-xs font-semibold p-2 rounded-none border border-input bg-background"
                   >
                     <option value="All">All Difficulties</option>
                     <option value="Easy">Easy</option>
@@ -239,7 +323,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Domain
                   </span>
@@ -249,7 +333,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                       setSelectedDomain(e.target.value);
                       setReviewIndex(0);
                     }}
-                    className="text-xs font-semibold p-2 rounded-none border border-input bg-background max-w-45 truncate"
+                    className="w-full lg:max-w-52 min-h-9 text-xs font-semibold p-2 rounded-none border border-input bg-background truncate"
                   >
                     {domainOptions.map((d) => (
                       <option key={d} value={d}>
@@ -259,8 +343,8 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                   </select>
                 </div>
 
-                <div className="flex items-center gap-4 pt-4 sm:pt-3">
-                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                <div className="flex flex-wrap items-center gap-4 min-h-9 sm:col-span-2 lg:col-span-1">
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer min-h-8">
                     <input
                       type="checkbox"
                       checked={onlyChanged}
@@ -268,11 +352,11 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                         setOnlyChanged(e.target.checked);
                         setReviewIndex(0);
                       }}
-                      className="rounded-none"
+                      className="rounded-none w-4 h-4"
                     />
-                    Changed Answer
+                    <span>Changed Answer</span>
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer min-h-8">
                     <input
                       type="checkbox"
                       checked={onlyCalculator}
@@ -280,20 +364,21 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                         setOnlyCalculator(e.target.checked);
                         setReviewIndex(0);
                       }}
-                      className="rounded-none"
+                      className="rounded-none w-4 h-4"
                     />
-                    Used Calculator
+                    <span>Used Calculator</span>
                   </label>
                 </div>
 
-                <div className="ml-auto flex items-center gap-3 pt-3">
+                <div className="sm:col-span-2 lg:ml-auto flex items-center justify-between lg:justify-end gap-3 min-h-9 border-t lg:border-t-0 border-border/60 pt-3 lg:pt-0">
                   <span className="text-xs font-bold text-muted-foreground">
                     {filteredReviewItems.length} Matching Question
                     {filteredReviewItems.length === 1 ? "" : "s"}
                   </span>
                   <button
+                    type="button"
                     onClick={handleResetFilters}
-                    className="text-[11px] font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                    className="min-h-8 px-2 text-[11px] font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                   >
                     <RotateCcw size={12} /> Reset
                   </button>
@@ -302,28 +387,28 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
             </div>
 
             {/* =========================================================================
-                QUESTION INDEX NAVIGATOR (PALETTE)
+                QUESTION INDEX NAVIGATOR
                ========================================================================= */}
             {filteredReviewItems.length > 0 && (
               <div className="bg-card border border-border rounded-none p-4 shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border/60">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Question Index ({filteredReviewItems.length} filtered)
+                    Question Navigator ({filteredReviewItems.length} shown)
                   </span>
-                  
+
                   {/* Micro Legend */}
-                  <div className="flex items-center gap-4 text-[10px] text-muted-foreground select-none">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground select-none">
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 border-2 border-slate-700 dark:border-slate-300 inline-block" />
                       Correct
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 border-2 border-[#ff9999] inline-block" />
-                      Incorrect
+                      Missed
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 bg-slate-800 text-white ring-1 ring-blue-500 inline-block" />
-                      Selected
+                      Active
                     </span>
                   </div>
                 </div>
@@ -349,15 +434,13 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                     return (
                       <div
                         key={sectionId}
-                        className="flex items-center gap-3 flex-wrap"
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"
                       >
-                        {/* Section Identifier Label */}
-                        <span className="text-xs font-semibold text-muted-foreground min-w-20 shrink-0">
+                        <span className="text-xs font-semibold text-muted-foreground sm:min-w-28 shrink-0">
                           {sectionTitle}:
                         </span>
 
-                        {/* Interactive Question Number Squares */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-2 sm:gap-1.5 flex-wrap">
                           {sectionQuestions.map(({ item, indexInFiltered }) => {
                             const isCurrent = reviewIndex === indexInFiltered;
                             const isCorrect = item.isCorrect;
@@ -379,9 +462,9 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                                 type="button"
                                 onClick={() => setReviewIndex(indexInFiltered)}
                                 title={`Q${item.responseOrder} - ${
-                                  isCorrect ? "Correct" : "Incorrect"
+                                  isCorrect ? "Correct" : "Missed"
                                 } (${item.skill})`}
-                                className={`w-8 h-8 text-xs flex items-center justify-center transition-all rounded-none select-none ${buttonStyle}`}
+                                className={`w-9 h-9 sm:w-8 sm:h-8 text-xs flex items-center justify-center transition-all rounded-none select-none ${buttonStyle}`}
                               >
                                 {item.responseOrder}
                               </button>
@@ -400,24 +483,28 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-muted-foreground">
-                    Viewing {reviewIndex + 1} of {filteredReviewItems.length}
+                    Question {reviewIndex + 1} of {filteredReviewItems.length}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
+                      type="button"
+                      aria-label="Previous matching question"
                       disabled={reviewIndex === 0}
                       onClick={() => setReviewIndex((i) => Math.max(0, i - 1))}
-                      className="p-1.5 rounded-none border border-border bg-card hover:bg-accent disabled:opacity-30"
+                      className="min-h-10 min-w-10 flex items-center justify-center p-2 rounded-none border border-border bg-card hover:bg-accent disabled:opacity-30"
                     >
                       <ChevronLeft size={16} />
                     </button>
                     <button
+                      type="button"
+                      aria-label="Next matching question"
                       disabled={reviewIndex >= filteredReviewItems.length - 1}
                       onClick={() =>
                         setReviewIndex((i) =>
                           Math.min(filteredReviewItems.length - 1, i + 1)
                         )
                       }
-                      className="p-1.5 rounded-none border border-border bg-card hover:bg-accent disabled:opacity-30"
+                      className="min-h-10 min-w-10 flex items-center justify-center p-2 rounded-none border border-border bg-card hover:bg-accent disabled:opacity-30"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -433,7 +520,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
               </div>
             ) : (
               <div className="p-12 text-center border border-dashed rounded-none bg-card text-muted-foreground">
-                No questions match the selected filters.
+                No questions match your current filters.
               </div>
             )}
           </div>

@@ -18,18 +18,18 @@ interface ExamCountdownWidgetProps {
 
 const PRESET_DATES: Record<string, { label: string; date: string }[]> = {
   SAT: [
-    { label: "SAT — Nov 2026", date: "2026-11-07" },
-    { label: "SAT — Dec 2026", date: "2026-12-05" },
-    { label: "SAT — Mar 2027", date: "2027-03-14" },
+    { label: "Nov 2026", date: "2026-11-07" },
+    { label: "Dec 2026", date: "2026-12-05" },
+    { label: "Mar 2027", date: "2027-03-14" },
   ],
   ACT: [
-    { label: "ACT — Dec 2026", date: "2026-12-12" },
-    { label: "ACT — Feb 2027", date: "2027-02-07" },
-    { label: "ACT — Apr 2027", date: "2027-04-10" },
+    { label: "Dec 2026", date: "2026-12-12" },
+    { label: "Feb 2027", date: "2027-02-07" },
+    { label: "Apr 2027", date: "2027-04-10" },
   ],
   GRE: [
-    { label: "GRE — Dec 2026", date: "2026-12-15" },
-    { label: "GRE — Mar 2027", date: "2027-03-01" },
+    { label: "Dec 2026", date: "2026-12-15" },
+    { label: "Mar 2027", date: "2027-03-01" },
   ],
 };
 
@@ -46,7 +46,10 @@ function getStoredValue(key: string, fallback: string): string {
   }
 }
 
-export function ExamCountdownWidget({ categories, activeProgram: propActiveProgram }: ExamCountdownWidgetProps) {
+export function ExamCountdownWidget({
+  categories,
+  activeProgram: propActiveProgram,
+}: ExamCountdownWidgetProps) {
   const activeProgram = propActiveProgram || categories?.[0] || "SAT";
 
   const defaultDate = React.useMemo(() => {
@@ -77,7 +80,6 @@ export function ExamCountdownWidget({ categories, activeProgram: propActiveProgr
 
   const [isEditing, setIsEditing] = useState(false);
   const [formDate, setFormDate] = useState(storedDate);
-  const [formScore, setFormScore] = useState(storedScore);
 
   const { daysRemaining, weeksRemaining, isPast, formattedTargetDate } = React.useMemo(() => {
     if (!storedDate) {
@@ -119,13 +121,11 @@ export function ExamCountdownWidget({ categories, activeProgram: propActiveProgr
 
   const handleOpenEdit = () => {
     setFormDate(storedDate);
-    setFormScore(storedScore);
     setIsEditing(true);
   };
 
   const handleSave = () => {
     localStorage.setItem(`target_exam_date_${activeProgram}`, formDate);
-    localStorage.setItem(`target_exam_score_${activeProgram}`, formScore);
     window.dispatchEvent(new Event("storage"));
     setIsEditing(false);
   };
@@ -133,74 +133,59 @@ export function ExamCountdownWidget({ categories, activeProgram: propActiveProgr
   const presets = PRESET_DATES[activeProgram] || [];
 
   if (!isHydrated) {
-    return (
-      <div className="w-full bg-card border border-border rounded-none animate-pulse" />
-    );
+    return <div className="w-full bg-card border border-border rounded-none h-52 animate-pulse" />;
   }
 
   return (
-    <div className="w-full bg-card border border-border rounded-none p-6 flex flex-col justify-between">
-      {/* Top Header Row matching your exact updated layout */}
-      <div className="flex flex-col items-start border-b border-border pb-3">
-        <div className="flex flex-row items-center justify-between w-full">
+    <div className="w-full h-full bg-card border border-border rounded-none p-5 sm:p-6 flex flex-col justify-between">
+      {/* Header Row */}
+      <div className="flex flex-col gap-2 border-b border-border pb-3">
+        <div className="flex items-center justify-between w-full">
           <span className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5 font-mono">
             <Sparkles size={12} /> Target Exam Runway
           </span>
           <button
             onClick={isEditing ? () => setIsEditing(false) : handleOpenEdit}
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1 border border-border px-2.5 py-1.5 hover:bg-muted transition-colors rounded-none"
+            className="min-h-8 text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1 border border-border px-2.5 py-1.5 hover:bg-muted transition-colors rounded-none"
           >
             {isEditing ? <X size={13} /> : <SlidersHorizontal size={13} />}
-            <span>{isEditing ? "Close" : "Configure"}</span>
+            <span>{isEditing ? "Close" : "Date"}</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 space-y-6 justify-between w-full">
-          <h2 className="text-xl font-black text-foreground">{activeProgram} Test Date</h2>
-          <span className="text-[14px] px-2 py-0.5 bg-muted/60 border border-border font-semibold">
+        <div className="flex items-center justify-between gap-2 w-full">
+          <h2 className="text-lg sm:text-xl font-black text-foreground">
+            {activeProgram} Sitting
+          </h2>
+          <span className="text-xs font-mono px-2 py-0.5 bg-muted/60 border border-border font-semibold">
             {formattedTargetDate || "Date Unset"}
           </span>
         </div>
       </div>
 
-      {/* Main Center Area */}
+      {/* Center Content */}
       {isEditing ? (
-        <div className="bg-muted/40 border border-input p-3 rounded-none space-y-2.5 animate-in fade-in duration-150 flex-1 overflow-y-auto my-1.5">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                Official Exam Date
-              </label>
-              <input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-                className="w-full text-xs font-semibold p-1.5 border border-input bg-background rounded-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                Score Goal
-              </label>
-              <input
-                type="text"
-                placeholder={activeProgram === "ACT" ? "e.g. 34" : "e.g. 1500"}
-                value={formScore}
-                onChange={(e) => setFormScore(e.target.value)}
-                className="w-full text-xs font-semibold p-1.5 border border-input bg-background rounded-none"
-              />
-            </div>
+        <div className="bg-muted/40 border border-input p-3 rounded-none space-y-2.5 animate-in fade-in duration-150 my-2">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+              Official Exam Date ({activeProgram})
+            </label>
+            <input
+              type="date"
+              value={formDate}
+              onChange={(e) => setFormDate(e.target.value)}
+              className="w-full min-h-9 text-xs font-semibold p-2 border border-input bg-background rounded-none"
+            />
           </div>
 
-          <div className="flex items-center justify-between pt-1 border-t border-border">
-            <div className="flex gap-1 flex-wrap">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+            <div className="flex gap-1.5 flex-wrap">
               {presets.map((preset) => (
                 <button
                   key={preset.label}
                   type="button"
                   onClick={() => setFormDate(preset.date)}
-                  className="text-[10px] font-mono px-1.5 py-0.5 border border-border bg-card text-muted-foreground hover:text-foreground"
+                  className="min-h-7 text-[10px] font-mono px-2 py-1 border border-border bg-card text-muted-foreground hover:text-foreground"
                 >
                   {preset.label}
                 </button>
@@ -209,7 +194,7 @@ export function ExamCountdownWidget({ categories, activeProgram: propActiveProgr
 
             <button
               onClick={handleSave}
-              className="px-3 py-1 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center gap-1 rounded-none transition-colors"
+              className="min-h-8 px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center gap-1 rounded-none transition-colors"
             >
               <Check size={12} />
               <span>Save</span>
@@ -217,57 +202,51 @@ export function ExamCountdownWidget({ categories, activeProgram: propActiveProgr
           </div>
         </div>
       ) : isPast ? (
-        <div className="py-6 border border-dashed border-border text-center space-y-1 my-auto">
-          <h3 className="text-base font-bold text-foreground">Target Exam Date Reached</h3>
+        <div className="py-5 px-3 border border-dashed border-border text-center space-y-1 my-auto">
+          <h3 className="text-sm font-bold text-foreground">Target Exam Date Reached</h3>
           <p className="text-xs text-muted-foreground">
             Configure your next official sitting above to recalibrate your prep horizon.
           </p>
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-6 py-2">
-          {/* Phase Narrative matching your updated typography */}
-          <div className="text-left space-y-1 max-w-[210px]">
+        <div className="flex items-center justify-between gap-4 py-3">
+          <div className="text-left space-y-1 min-w-0 flex-1">
             <div className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider">
               T-{weeksRemaining} Week{weeksRemaining === 1 ? "" : "s"} to go
             </div>
-            <div className="text-sm font-bold text-foreground">
-              {phase.phase}
-            </div>
+            <div className="text-sm font-bold text-foreground">{phase.phase}</div>
             <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
               {phase.desc}
             </p>
           </div>
 
-          {/* Days Callout matching your metric layout */}
-          <div className="flex items-baseline gap-3">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                Days Remaining
-              </span>
-              <div className="text-4xl sm:text-5xl font-black text-primary leading-none pt-1">
-                {daysRemaining}
-              </div>
+          <div className="text-right shrink-0">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+              Days Left
+            </span>
+            <div className="text-4xl sm:text-5xl font-black text-primary leading-none pt-1">
+              {daysRemaining}
             </div>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Calendar size={13} className="text-primary" />
+      <div className="pt-3 border-t border-border flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Calendar size={13} className="text-primary shrink-0" />
           <span className="text-xs font-semibold text-muted-foreground">
-            Target Cadence: <strong className="text-foreground">1 exam / 2 wks</strong>
+            Cadence: <strong className="text-foreground">1 exam / 2 wks</strong>
           </span>
         </div>
 
         {storedScore ? (
-          <div className="flex items-center gap-1 text-xs font-semibold text-primary font-mono">
+          <div className="flex items-center gap-1 text-xs font-semibold text-primary font-mono shrink-0">
             <Target size={13} />
             <span>Goal: {storedScore}</span>
           </div>
         ) : (
-          <span className="text-[10px] font-mono text-muted-foreground">
+          <span className="text-[10px] font-mono text-muted-foreground shrink-0">
             No Goal Set
           </span>
         )}
