@@ -20,6 +20,7 @@ interface QuestionOptionsProps {
   manifestBasePath?: string;
   onSelectOption: (optionId: string) => void;
   onSetFrqAnswer: (value: string) => void;
+  onCommitFrqAnswer?: () => void;
   onToggleEliminate: (optionId: string) => void;
 }
 
@@ -36,6 +37,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   manifestBasePath,
   onSelectOption,
   onSetFrqAnswer,
+  onCommitFrqAnswer,
   onToggleEliminate,
 }) => {
   // -------------------------------------------------------------
@@ -94,6 +96,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
             type="text"
             value={frqAnswer}
             onChange={(e) => onSetFrqAnswer(e.target.value)}
+            onBlur={() => onCommitFrqAnswer?.()}
             placeholder="Enter answer"
             className="w-full px-4 py-2.5 rounded-sm border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 font-mono text-base focus:outline-hidden focus:border-neutral-900 dark:focus:border-neutral-100"
           />
@@ -153,7 +156,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                         category={category}
                         testId={testId}
                         manifestBasePath={manifestBasePath}
-                        disableFigureViewer={true} // <-- Add here
+                        disableFigureViewer={true}
                         className={`inline prose-p:inline prose-p:m-0 ${optionImageStyles}`}
                       />
                     </span>
@@ -252,7 +255,7 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                     category={category}
                     testId={testId}
                     manifestBasePath={manifestBasePath}
-                    disableFigureViewer={true} // <-- Add here
+                    disableFigureViewer={true}
                     className={
                       isAcademicSerif
                         ? `font-serif prose-p:font-serif text-[15.5px] leading-[1.6] prose-p:mb-0 ${optionImageStyles}`

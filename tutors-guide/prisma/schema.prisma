@@ -54,7 +54,9 @@ enum LinkStatus {
 enum FrqSubmissionStatus {
   PENDING_INGESTION
   UPLOADED
+  PROCESSING
   CROPPED
+  NEEDS_RETAKE
   PENDING_AUDIT
   EVALUATED
   FAILED
@@ -357,6 +359,8 @@ model FrqSubmission {
   storageKey       String?
   mimeType         String?
   fileSizeBytes    Int?
+  deskewedSheetUrl String?
+  processingError  String?
 
   // Physical document geometry from APCalculusABFRQPDF.tex
   // pageNumber: 1 = Parts A & B; 2 = Parts C & D
@@ -434,6 +438,7 @@ model CaptureSession {
   id              String               @id @default(cuid())
   sessionToken    String               @unique
   status          CaptureSessionStatus @default(ACTIVE)
+  manifestSnapshot Json?
 
   profileId       String
   profile         Profile              @relation("ProfileCaptureSessions", fields: [profileId], references: [id], onDelete: Cascade)

@@ -18,6 +18,7 @@ export interface AutosavePayload {
   correctAnswerKey: string | number;
   timeSpentOnResponse?: number;
   usedCalculator?: boolean;
+  changedAnswer?: boolean;
 }
 
 export interface CheckpointPayload {
@@ -109,14 +110,23 @@ export async function POST(req: Request) {
           selectedOptionId: true,
           frqUserAnswer: true,
           timeSpentOnResponse: true,
+          changedAnswer: true,
         },
       });
 
-      const hasChangedAnswer = existingResponse
-        ? responsePayload.responseType === "MC"
-          ? existingResponse.selectedOptionId !== responsePayload.selectedOptionId
-          : existingResponse.frqUserAnswer !== responsePayload.frqUserAnswer
-        : false;
+      // Trust client intent-aware changedAnswer flag when provided; fall back to
+      // MC option diff only for legacy payloads lacking changedAnswer.
+      const clientFlaggedChange = Boolean(responsePayload.changedAnswer);
+      const legacyMcChange =
+        responsePayload.changedAnswer === undefined &&
+        existingResponse !== null &&
+        responsePayload.responseType === "MC" &&
+        Boolean(existingResponse.selectedOptionId) &&
+        Boolean(responsePayload.selectedOptionId) &&
+        existingResponse.selectedOptionId !== responsePayload.selectedOptionId;
+
+      const resolvedChangedAnswer =
+        Boolean(existingResponse?.changedAnswer) || clientFlaggedChange || legacyMcChange;
 
       // Preserve monotonic time increments across queued or out-of-order network calls
       const incomingTimeSpent = responsePayload.timeSpentOnResponse ?? 0;
@@ -146,7 +156,7 @@ export async function POST(req: Request) {
             isCorrect,
             timeSpentOnResponse: resolvedTimeSpent,
             usedCalculator: responsePayload.usedCalculator ?? false,
-            changedAnswer: hasChangedAnswer,
+            changedAnswer: resolvedChangedAnswer,
           },
           update: {
             selectedOptionId: responsePayload.selectedOptionId ?? null,
@@ -155,7 +165,7 @@ export async function POST(req: Request) {
             isCorrect,
             timeSpentOnResponse: resolvedTimeSpent,
             usedCalculator: responsePayload.usedCalculator ?? undefined,
-            changedAnswer: hasChangedAnswer ? true : undefined,
+            changedAnswer: resolvedChangedAnswer ? true : undefined,
           },
         })
       );

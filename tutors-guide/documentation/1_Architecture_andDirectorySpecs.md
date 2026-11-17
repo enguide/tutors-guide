@@ -72,8 +72,8 @@ This document provides a comprehensive structural overview of the standardized t
 
 ### D. Deep Analytics & Telemetry Engine (`components/analytics/`, `lib/telemetry/`)
 
-* **Behavioral Pacing & Stamina:** Telemetry hooks capture question-by-question dwell time, answer-change events, review pass counts, and navigation sequences (`DynamicNavigationChart.tsx`, `NavigationTimelineChart.tsx`).
-* **Diagnostics Dashboard:** Surfaces aggregated data to the student via `ScoreOverviewBanner.tsx`, `TopicSkillAccuracyAccordion.tsx`, and predictive trajectory modules (`AdaptiveTrajectoryCard.tsx`).
+* **Behavioral Pacing & Stamina:** Telemetry hooks capture question-by-question dwell time, answer-change events, review pass counts, and navigation sequences (`UnifiedAnalyticsDashboard.tsx`, `SectionPacingTimeline.tsx`)[cite: 8].
+* **Diagnostics Dashboard (see `6_Analytics_and_UI_Components.md`):** Consolidates composite/section scorecards with synchronized **Question Bars** and **Domain Pacing** charts (`1024px` `matchMedia` responsive switch, `0.65×–1.5×` target pacing bands, `2.5×` outlier clamping), a 1/3–2/3 split bottom row pairing the `Question Navigation Timeline` with `TopicSkillAccuracyAccordion`, predictive adaptive trajectories, and a streamlined `Question Review` inspector[cite: 8].
 
 ### E. Administration, Mentorship & B2B Licensing (`app/tgadmin/`, `actions/institutional.ts`, `actions/mentorship.ts`)
 

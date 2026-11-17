@@ -13,7 +13,9 @@ export type SyncStatus = "synced" | "saving" | "offline" | "retrying";
 export interface StudentAnswers {
   [questionId: string]: {
     selectedOptionId?: string;
+    initialSelectedOptionId?: string;
     frqUserAnswer?: string;
+    committedFrqAnswer?: string;
     usedCalculator?: boolean;
     flagged?: boolean;
     eliminatedOptions?: string[];
@@ -75,6 +77,12 @@ function readStoredSnapshot(key: string): StoredCache | null {
   }
 }
 
+function normalizeFrqBaseline(val?: string | null): string | undefined {
+  if (val === null || val === undefined) return undefined;
+  const trimmed = val.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 // Pure helper function for initial state reconciliation
 function resolveInitialProgressState({
   storageKey,
@@ -98,20 +106,46 @@ function resolveInitialProgressState({
 
   const serverAnswersMap: StudentAnswers = {};
   for (const r of serverResponses) {
+    const selectedOpt = r.selectedOptionId || undefined;
+    const frqVal = r.frqUserAnswer || undefined;
+    const committedFrq = normalizeFrqBaseline(r.frqUserAnswer);
+
     serverAnswersMap[r.questionId] = {
-      selectedOptionId: r.selectedOptionId || undefined,
-      frqUserAnswer: r.frqUserAnswer || undefined,
+      selectedOptionId: selectedOpt,
+      initialSelectedOptionId: selectedOpt,
+      frqUserAnswer: frqVal,
+      committedFrqAnswer: committedFrq,
       usedCalculator: r.usedCalculator,
       changedAnswer: r.changedAnswer,
       timeSpent: r.timeSpentOnResponse || 0,
     };
   }
 
+  // Hydrate baselines for any local answers loaded from storage
+  const normalizedLocalAnswers: StudentAnswers = {};
+  if (local?.answers) {
+    for (const [qId, ans] of Object.entries(local.answers)) {
+      const serverBaseline = serverAnswersMap[qId];
+      normalizedLocalAnswers[qId] = {
+        ...ans,
+        initialSelectedOptionId:
+          ans.initialSelectedOptionId ??
+          serverBaseline?.initialSelectedOptionId ??
+          ans.selectedOptionId,
+        committedFrqAnswer:
+          ans.committedFrqAnswer ??
+          serverBaseline?.committedFrqAnswer ??
+          normalizeFrqBaseline(ans.frqUserAnswer),
+        changedAnswer: Boolean(ans.changedAnswer || serverBaseline?.changedAnswer),
+      };
+    }
+  }
+
   // CASE A: Server Checkpoint exists and is NEWER than local storage, OR local is empty
   if (serverCheckpoint && (!local || serverTimestamp > localTimestamp)) {
     const mergedAnswers = {
       ...serverAnswersMap,
-      ...(local?.answers || {}),
+      ...normalizedLocalAnswers,
     };
 
     const resolved = {
@@ -151,7 +185,7 @@ function resolveInitialProgressState({
   if (local) {
     const mergedAnswers = {
       ...serverAnswersMap,
-      ...(local.answers || {}),
+      ...normalizedLocalAnswers,
     };
 
     return {
@@ -467,6 +501,52 @@ export function useTestProgress({
     setSecondsRemaining(newTotalSeconds);
   }, []);
 
+  // Commits the active question's typed FRQ value as its baseline so subsequent edits
+  // (e.g., returning to the question and changing "120" to "145") register as changedAnswer.
+  const commitFrqAnswer = useCallback((questionIdOverride?: string) => {
+    const { currentIndex: idx, questions: qs } = latestRef.current;
+    const targetQId = questionIdOverride ?? qs[idx]?.id;
+    if (!targetQId) return;
+
+    setAnswers((prevAnswers) => {
+      const currentAnswer = prevAnswers[targetQId];
+      if (!currentAnswer || currentAnswer.frqUserAnswer === undefined) {
+        return prevAnswers;
+      }
+
+      const trimmed = currentAnswer.frqUserAnswer.trim();
+      if (!trimmed) {
+        return prevAnswers;
+      }
+
+      // If no baseline has been committed yet, lock in the initial completed entry
+      if (currentAnswer.committedFrqAnswer === undefined) {
+        return {
+          ...prevAnswers,
+          [targetQId]: {
+            ...currentAnswer,
+            committedFrqAnswer: trimmed,
+          },
+        };
+      }
+
+      // If a baseline already existed and the new committed value differs, mark changed
+      const didChange = trimmed !== currentAnswer.committedFrqAnswer;
+      if (!didChange && currentAnswer.committedFrqAnswer === trimmed) {
+        return prevAnswers;
+      }
+
+      return {
+        ...prevAnswers,
+        [targetQId]: {
+          ...currentAnswer,
+          committedFrqAnswer: trimmed,
+          changedAnswer: currentAnswer.changedAnswer || didChange,
+        },
+      };
+    });
+  }, []);
+
   const setCurrentIndex = useCallback(
     (updater: number | ((prev: number) => number)) => {
       setCurrentIndexState((prevIdx) => {
@@ -475,7 +555,15 @@ export function useTestProgress({
           const {
             totalAdjustedSeconds: totalSec,
             secondsRemaining: remSec,
+            questions: qs,
           } = latestRef.current;
+
+          // Commit any typed FRQ response on the question being navigated away from
+          const departingQuestion = qs[prevIdx];
+          if (departingQuestion) {
+            commitFrqAnswer(departingQuestion.id);
+          }
+
           const elapsed = Math.max(0, totalSec - remSec);
           const nextEntry: NavigationHistoryEntry = { time: elapsed, qIdx: nextIdx };
 
@@ -493,7 +581,7 @@ export function useTestProgress({
         return nextIdx;
       });
     },
-    [triggerCheckpointSync]
+    [commitFrqAnswer, triggerCheckpointSync]
   );
 
   // Wall-clock anchored countdown timer (250ms poll prevents drift or visual freezing)
@@ -571,6 +659,7 @@ export function useTestProgress({
         correctAnswerKey: targetQuestion.correctAnswer,
         timeSpentOnResponse: calculatedTimeSpent,
         usedCalculator: updatedAnswer.usedCalculator || false,
+        changedAnswer: updatedAnswer.changedAnswer || false,
       };
 
       autosaveTimeoutRef.current[questionId] = setTimeout(async () => {
@@ -640,16 +729,28 @@ export function useTestProgress({
           nextEliminated = nextEliminated.filter((id) => id !== optionId);
         }
 
+        const isDeselecting = currentAnswer.selectedOptionId === optionId;
+        const nextSelectedOptionId = isDeselecting ? undefined : optionId;
+
+        // Establish the first ever chosen option as the permanent baseline
+        const baselineOptionId =
+          currentAnswer.initialSelectedOptionId ??
+          currentAnswer.selectedOptionId ??
+          nextSelectedOptionId;
+
+        // Selecting a different option than the initial choice counts as changed,
+        // even if the student deselected or eliminated the first option in between.
         const isDivergent =
-          Boolean(currentAnswer.selectedOptionId) &&
-          currentAnswer.selectedOptionId !== optionId;
+          Boolean(baselineOptionId) &&
+          Boolean(nextSelectedOptionId) &&
+          nextSelectedOptionId !== baselineOptionId;
 
         const updatedQuestionAnswer: StudentAnswers[string] = {
           ...currentAnswer,
-          selectedOptionId:
-            currentAnswer.selectedOptionId === optionId ? undefined : optionId,
+          selectedOptionId: nextSelectedOptionId,
+          initialSelectedOptionId: baselineOptionId,
           eliminatedOptions: nextEliminated,
-          changedAnswer: currentAnswer.changedAnswer || isDivergent,
+          changedAnswer: Boolean(currentAnswer.changedAnswer || isDivergent),
         };
 
         scheduleAutosave(qId, updatedQuestionAnswer, idx, navHist, remSec);
@@ -679,13 +780,20 @@ export function useTestProgress({
 
       setAnswers((prevAnswers) => {
         const currentAnswer = prevAnswers[qId] || {};
+        const trimmedVal = val.trim();
+
+        // Only register a change if a previous response was already committed
+        // (via input blur or question navigation) and the new non-empty value differs.
+        const hasCommittedBaseline = currentAnswer.committedFrqAnswer !== undefined;
         const isDivergent =
-          Boolean(currentAnswer.frqUserAnswer) && currentAnswer.frqUserAnswer !== val;
+          hasCommittedBaseline &&
+          trimmedVal.length > 0 &&
+          trimmedVal !== currentAnswer.committedFrqAnswer;
 
         const updatedQuestionAnswer: StudentAnswers[string] = {
           ...currentAnswer,
           frqUserAnswer: val,
-          changedAnswer: currentAnswer.changedAnswer || isDivergent,
+          changedAnswer: Boolean(currentAnswer.changedAnswer || isDivergent),
         };
 
         scheduleAutosave(qId, updatedQuestionAnswer, idx, navHist, remSec);
@@ -710,6 +818,9 @@ export function useTestProgress({
       const currentAnswer = prevAnswers[qId] || {};
       const list = new Set(currentAnswer.eliminatedOptions || []);
       let nextSelectedOptionId = currentAnswer.selectedOptionId;
+      // Preserve initialSelectedOptionId even if the selected option is crossed out
+      const preservedInitial =
+        currentAnswer.initialSelectedOptionId ?? currentAnswer.selectedOptionId;
 
       if (list.has(optionId)) {
         list.delete(optionId);
@@ -725,6 +836,7 @@ export function useTestProgress({
         [qId]: {
           ...currentAnswer,
           selectedOptionId: nextSelectedOptionId,
+          initialSelectedOptionId: preservedInitial,
           eliminatedOptions: Array.from(list),
         },
       };
@@ -826,8 +938,17 @@ export function useTestProgress({
     const finalizedAnswers: StudentAnswers = { ...currentAnswers };
     qs.forEach((q, idx) => {
       const existing = finalizedAnswers[q.id] || {};
+      const trimmedFrq = existing.frqUserAnswer?.trim();
+      const finalChangedAnswer =
+        Boolean(existing.changedAnswer) ||
+        (existing.committedFrqAnswer !== undefined &&
+          Boolean(trimmedFrq) &&
+          trimmedFrq !== existing.committedFrqAnswer);
+
       finalizedAnswers[q.id] = {
         ...existing,
+        committedFrqAnswer: existing.committedFrqAnswer ?? (trimmedFrq || undefined),
+        changedAnswer: finalChangedAnswer,
         timeSpent: calculatedDwellTimes[idx] ?? 0,
       };
     });
@@ -853,6 +974,7 @@ export function useTestProgress({
     setIsFormulaSheetOpen,
     selectOption,
     setFrqAnswer,
+    commitFrqAnswer,
     toggleEliminateOption,
     toggleFlag,
     getFinalizedAnswers,

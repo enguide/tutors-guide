@@ -24,6 +24,7 @@ export interface QuestionFrontmatter {
   passage?: string;  // Alias for backward compatibility
   layout?: QuestionLayoutMode;
   options?: QuestionOption[];
+  subParts?: FrqSubPartDefinition[]; // Optional structured FRQ rubric sub-parts
   domain?: string;
   skill?: string;
   difficulty?: QuestionDifficulty | string;
@@ -149,4 +150,13 @@ export interface ExamScoringConfig {
     verbalCurves?: Record<string, LinearCurveMapping>;
     quantCurves?: Record<string, LinearCurveMapping>;
   };
+}
+
+export interface FrqSubPartDefinition {
+  /** Uppercase sub-part label matching printed sheet ("A", "B", "C", "D", etc.) */
+  label: string;
+  /** Maximum rubric points for this sub-part (defaults to 1.0 if omitted) */
+  points?: number;
+  /** Optional rubric summary or scoring notes for future AI grader */
+  rubricNotes?: string;
 }
