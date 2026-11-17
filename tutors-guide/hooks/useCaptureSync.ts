@@ -2,7 +2,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getOrCreateCaptureSession } from "@/actions/frqCapture";
+import {
+  getOrCreateCaptureSession,
+  getCaptureSessionStatus,
+} from "@/actions/frqCapture";
 import { SectionFrqManifest } from "@/lib/frq/manifest";
 import { FrqSubmissionStatus } from "@prisma/client";
 
@@ -110,7 +113,7 @@ export function useCaptureSync({
     };
   }, [enabled, testId, sectionId, questionId, refreshCount]);
 
-  // 2. Jittered short-polling against lightweight /status endpoint
+  // 2. Poll via POST Server Action (uncached under cacheComponents: true)
   useEffect(() => {
     if (!enabled || !token) return;
     let isCancelled = false;
@@ -125,28 +128,32 @@ export function useCaptureSync({
       }
 
       try {
-        const res = await fetch(`/api/capture/${token}/status`, {
-          cache: "no-store",
-          credentials: "same-origin",
-        });
+        const data = await getCaptureSessionStatus(token);
         if (isCancelled) return;
 
-        if (!res.ok) {
-          console.warn(`[Capture Sync] /status returned HTTP ${res.status}`);
-        } else {
-          const data = await res.json();
+        if (data.success) {
           if (data.isExpired) {
             setError("Capture session expired. Refresh to generate a new QR code.");
             return;
           }
 
           if (data.manifest && !manifestRef.current) {
-            manifestRef.current = data.manifest;
-            setManifest(data.manifest);
+            const parsedManifest = data.manifest as unknown as SectionFrqManifest;
+            manifestRef.current = parsedManifest;
+            setManifest(parsedManifest);
           }
 
           if (Array.isArray(data.submissions)) {
-            const incoming: CaptureSubmissionSummary[] = data.submissions;
+            const incoming: CaptureSubmissionSummary[] = data.submissions.map((sub) => ({
+              id: sub.id,
+              questionId: sub.questionId,
+              pageNumber: sub.pageNumber,
+              status: sub.status,
+              fullSheetUrl: sub.fullSheetUrl,
+              deskewedSheetUrl: sub.deskewedSheetUrl,
+              processingError: sub.processingError,
+              crops: sub.crops || [],
+            }));
             setSubmissions(incoming);
 
             for (const sub of incoming) {
@@ -160,7 +167,9 @@ export function useCaptureSync({
             }
 
             const expectedCount =
-              data.manifest?.totalSheets ?? manifestRef.current?.totalSheets ?? 0;
+              (data.manifest as SectionFrqManifest | null)?.totalSheets ??
+              manifestRef.current?.totalSheets ??
+              0;
             const completedCount = incoming.filter((s) =>
               TERMINAL_STATUSES.has(s.status)
             ).length;
@@ -180,7 +189,7 @@ export function useCaptureSync({
           }
         }
       } catch (err) {
-        console.warn("[Capture Sync] Status poll error:", err);
+        console.warn("[Capture Sync] Server Action poll error:", err);
       }
 
       if (!isCancelled) {
@@ -188,12 +197,24 @@ export function useCaptureSync({
       }
     };
 
-    // Run first poll immediately so desktop reflects any mobile uploads right away
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        if (timeoutId) clearTimeout(timeoutId);
+        pollStatus();
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    // Run first poll immediately
     pollStatus();
 
     return () => {
       isCancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
     };
   }, [enabled, token]);
 

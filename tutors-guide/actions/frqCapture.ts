@@ -154,6 +154,68 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
 }
 
 /**
+ * Lightweight, uncached status check invoked by desktop clients via POST Server Action
+ * (bypasses Next.js 16 cacheComponents GET caching completely).
+ */
+export async function getCaptureSessionStatus(sessionToken: string) {
+  if (!sessionToken) {
+    return { success: false, error: "Missing session token" };
+  }
+
+  try {
+    const session = await prisma.captureSession.findUnique({
+      where: { sessionToken },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+        manifestSnapshot: true,
+        frqSubmissions: {
+          orderBy: [{ questionId: "asc" }, { pageNumber: "asc" }],
+          select: {
+            id: true,
+            questionId: true,
+            pageNumber: true,
+            status: true,
+            fullSheetUrl: true,
+            deskewedSheetUrl: true,
+            processingError: true,
+            crops: {
+              orderBy: { subPartLabel: "asc" },
+              select: {
+                id: true,
+                subPartLabel: true,
+                cropUrl: true,
+                pointsPossible: true,
+                pointsAwarded: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      return { success: false, error: "Session not found" };
+    }
+
+    const isExpired =
+      session.expiresAt < new Date() ||
+      session.status === CaptureSessionStatus.EXPIRED;
+
+    return {
+      success: true,
+      isExpired,
+      manifest: session.manifestSnapshot,
+      submissions: session.frqSubmissions,
+    };
+  } catch (err) {
+    console.error("[getCaptureSessionStatus] Error:", err);
+    return { success: false, error: "Failed to fetch capture status" };
+  }
+}
+
+/**
  * Returns a pre-signed S3/R2 direct upload POST configuration scoped to this session.
  */
 export async function getPresignedUploadForSession(
