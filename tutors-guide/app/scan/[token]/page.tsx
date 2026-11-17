@@ -28,6 +28,7 @@ export default async function MobileScanPage({
       frqSubmissions: {
         select: {
           id: true,
+          sectionId: true,
           questionId: true,
           pageNumber: true,
           status: true,
@@ -57,6 +58,7 @@ export default async function MobileScanPage({
   const initialSubmissions: InitialMobileSubmission[] = session.frqSubmissions.map(
     (sub) => ({
       id: sub.id,
+      sectionId: sub.sectionId,
       questionId: sub.questionId,
       pageNumber: sub.pageNumber,
       status: sub.status,

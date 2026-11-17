@@ -10,64 +10,72 @@ import { getSectionById, getTestMetadata } from "@/lib/contentLoader";
 import {
   SectionFrqManifest,
   buildSectionFrqManifest,
+  buildTestFrqManifest,
 } from "@/lib/frq/manifest";
+import {
+  calculateSectionScaledScore,
+  synthesizeExamComposite,
+} from "@/lib/scoring/scoringEngine";
 import { processAndCropFrqSubmission } from "@/lib/frq/cropper";
-import { CaptureSessionStatus, FrqSubmissionStatus, Prisma } from "@prisma/client";
+import { CaptureSessionStatus, Category, FrqSubmissionStatus, Prisma } from "@prisma/client";
 
 export interface CreateCaptureSessionParams {
   testId: string;
-  sectionId: string;
+  /** Optional: omit for test-wide capture across all FRQ sections; pass for single-section sandbox */
+  sectionId?: string;
   questionId?: string;
 }
 
-/**
- * Resolves and caches the SectionFrqManifest so mobile & desktop clients
- * know the exact questions, sheet counts, and sub-part rubrics in a single DB lookup.
- */
-async function resolveManifestForSection(
+async function resolveManifest(
   testId: string,
-  sectionId: string
+  sectionId?: string
 ): Promise<SectionFrqManifest | null> {
-  // Look up test category in DB first
   const testRecord = await prisma.test.findUnique({
     where: { id: testId },
     select: { category: true },
   });
 
   const categorySlug = testRecord?.category?.toLowerCase() || "ap_calc";
-  const parsedSection = await getSectionById(categorySlug, testId, sectionId);
-  if (parsedSection?.frontmatter?.questions) {
-    return buildSectionFrqManifest(
-      testId,
-      sectionId,
-      parsedSection.frontmatter.questions
-    );
-  }
+  const metadata = await getTestMetadata(categorySlug, testId);
+  const resolvedCatSlug = metadata?.category?.toLowerCase() || categorySlug;
 
-  // Fallback: check metadata category if DB category wasn't populated
-  const meta = await getTestMetadata(categorySlug, testId);
-  if (meta) {
-    const fallbackSection = await getSectionById(
-      meta.category.toLowerCase(),
-      testId,
-      sectionId
-    );
-    if (fallbackSection?.frontmatter?.questions) {
+  // Single-section manifest (e.g., sandbox)
+  if (sectionId) {
+    const parsedSection = await getSectionById(resolvedCatSlug, testId, sectionId);
+    if (parsedSection?.frontmatter?.questions) {
       return buildSectionFrqManifest(
         testId,
         sectionId,
-        fallbackSection.frontmatter.questions
+        parsedSection.frontmatter.questions,
+        parsedSection.frontmatter.sectionTitle
       );
     }
+    return null;
   }
 
-  return null;
+  // Test-wide manifest across all sections in metadata
+  if (!metadata) return null;
+
+  const loadedSections = await Promise.all(
+    metadata.sections.map(async (sec) => {
+      const parsed = await getSectionById(resolvedCatSlug, testId, sec.id);
+      return parsed?.frontmatter?.questions
+        ? {
+            sectionId: sec.id,
+            sectionTitle: sec.title,
+            questions: parsed.frontmatter.questions,
+          }
+        : null;
+    })
+  );
+
+  const validSections = loadedSections.filter(
+    (s): s is NonNullable<typeof s> => s !== null
+  );
+
+  return buildTestFrqManifest(testId, validSections);
 }
 
-/**
- * Creates or reuses a tokenized capture session scoped to the whole section,
- * persisting a manifestSnapshot so 1,000+ concurrent scans require zero filesystem reads.
- */
 export async function getOrCreateCaptureSession(params: CreateCaptureSessionParams) {
   const session = await auth();
   const profileId = session?.user?.id;
@@ -84,7 +92,7 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
       where: {
         profileId,
         testId,
-        sectionId,
+        sectionId: sectionId ?? null,
         status: CaptureSessionStatus.ACTIVE,
         expiresAt: { gt: new Date(now.getTime() + 2 * 60 * 1000) },
       },
@@ -98,7 +106,7 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
     if (existingSession) {
       let manifest = existingSession.manifestSnapshot as unknown as SectionFrqManifest | null;
       if (!manifest) {
-        manifest = await resolveManifestForSection(testId, sectionId);
+        manifest = await resolveManifest(testId, sectionId);
         if (manifest) {
           await prisma.captureSession.update({
             where: { id: existingSession.id },
@@ -116,16 +124,16 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
       };
     }
 
-    const manifest = await resolveManifestForSection(testId, sectionId);
+    const manifest = await resolveManifest(testId, sectionId);
     const sessionToken = crypto.randomBytes(16).toString("hex");
-    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + 45 * 60 * 1000);
 
     const createdSession = await prisma.captureSession.create({
       data: {
         sessionToken,
         profileId,
         testId,
-        sectionId,
+        sectionId: sectionId ?? null,
         questionId: questionId || null,
         manifestSnapshot: manifest
           ? (manifest as unknown as Prisma.InputJsonValue)
@@ -153,10 +161,6 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
   }
 }
 
-/**
- * Lightweight, uncached status check invoked by desktop clients via POST Server Action
- * (bypasses Next.js 16 cacheComponents GET caching completely).
- */
 export async function getCaptureSessionStatus(sessionToken: string) {
   if (!sessionToken) {
     return { success: false, error: "Missing session token" };
@@ -171,9 +175,10 @@ export async function getCaptureSessionStatus(sessionToken: string) {
         expiresAt: true,
         manifestSnapshot: true,
         frqSubmissions: {
-          orderBy: [{ questionId: "asc" }, { pageNumber: "asc" }],
+          orderBy: [{ sectionId: "asc" }, { questionId: "asc" }, { pageNumber: "asc" }],
           select: {
             id: true,
+            sectionId: true,
             questionId: true,
             pageNumber: true,
             status: true,
@@ -215,14 +220,12 @@ export async function getCaptureSessionStatus(sessionToken: string) {
   }
 }
 
-/**
- * Returns a pre-signed S3/R2 direct upload POST configuration scoped to this session.
- */
 export async function getPresignedUploadForSession(
   sessionToken: string,
   contentType: string,
   targetQuestionId?: string,
-  pageNumber: number = 1
+  pageNumber: number = 1,
+  targetSectionId?: string
 ) {
   const session = await prisma.captureSession.findUnique({
     where: { sessionToken },
@@ -238,8 +241,9 @@ export async function getPresignedUploadForSession(
       : contentType.includes("webp")
       ? "webp"
       : "jpg";
-    const qId = targetQuestionId || session.questionId || "unassigned";
-    const storageKey = `submissions/${session.testId}/${session.sectionId}/${qId}/p${pageNumber}_${Date.now()}.${fileExt}`;
+    const secId = targetSectionId || session.sectionId || "unassigned-sec";
+    const qId = targetQuestionId || session.questionId || "unassigned-q";
+    const storageKey = `submissions/${session.testId}/${secId}/${qId}/p${pageNumber}_${Date.now()}.${fileExt}`;
 
     const presigned = await createPresignedUploadPost({
       storageKey,
@@ -252,7 +256,7 @@ export async function getPresignedUploadForSession(
       session: {
         profileId: session.profileId,
         testId: session.testId,
-        sectionId: session.sectionId,
+        sectionId: secId,
         questionId: qId,
       },
     };
@@ -262,16 +266,13 @@ export async function getPresignedUploadForSession(
   }
 }
 
-/**
- * Finalizes an upload, upserts the FrqSubmission, and schedules fiducial deskewing
- * & cropping inside Next.js `after()` so Vercel keeps the function alive until finished.
- */
 export async function finalizeSubmissionUpload({
   sessionToken,
   storageKey,
   publicUrl,
   mimeType,
   fileSizeBytes,
+  sectionId,
   questionId,
   pageNumber = 1,
 }: {
@@ -280,6 +281,7 @@ export async function finalizeSubmissionUpload({
   publicUrl: string;
   mimeType: string;
   fileSizeBytes?: number;
+  sectionId?: string;
   questionId?: string;
   pageNumber?: number;
 }) {
@@ -293,12 +295,18 @@ export async function finalizeSubmissionUpload({
     }
 
     const manifest = sessionRecord.manifestSnapshot as unknown as SectionFrqManifest | null;
-    const defaultFirstQuestionId = manifest?.questions[0]?.questionId;
-    const resolvedQuestionId =
-      questionId || sessionRecord.questionId || defaultFirstQuestionId;
+    const defaultSheet = manifest?.sheets[0];
 
-    if (!resolvedQuestionId) {
-      return { success: false, error: "Question identifier is required." };
+    const resolvedQuestionId =
+      questionId || sessionRecord.questionId || defaultSheet?.questionId;
+    const resolvedSectionId =
+      sectionId ||
+      sessionRecord.sectionId ||
+      manifest?.questions.find((q) => q.questionId === resolvedQuestionId)?.sectionId ||
+      defaultSheet?.sectionId;
+
+    if (!resolvedQuestionId || !resolvedSectionId) {
+      return { success: false, error: "Section and question identifiers are required." };
     }
 
     const submission = await prisma.frqSubmission.upsert({
@@ -306,7 +314,7 @@ export async function finalizeSubmissionUpload({
         profileId_testId_sectionId_questionId_pageNumber: {
           profileId: sessionRecord.profileId,
           testId: sessionRecord.testId,
-          sectionId: sessionRecord.sectionId,
+          sectionId: resolvedSectionId,
           questionId: resolvedQuestionId,
           pageNumber,
         },
@@ -314,7 +322,7 @@ export async function finalizeSubmissionUpload({
       create: {
         profileId: sessionRecord.profileId,
         testId: sessionRecord.testId,
-        sectionId: sessionRecord.sectionId,
+        sectionId: resolvedSectionId,
         questionId: resolvedQuestionId,
         pageNumber,
         captureSessionId: sessionRecord.id,
@@ -336,7 +344,6 @@ export async function finalizeSubmissionUpload({
       },
     });
 
-    // Next.js `after()` guarantees Vercel waits for cropping to finish after returning the response
     after(async () => {
       try {
         await processAndCropFrqSubmission(submission.id);
@@ -349,5 +356,133 @@ export async function finalizeSubmissionUpload({
   } catch (error) {
     console.error("Error finalizing submission upload:", error);
     return { success: false, error: "Finalizing upload failed." };
+  }
+}
+
+/**
+ * Called when the student clicks "Complete Section / View Results" at the end of an FRQ test.
+ * Re-aggregates FrqSubCrop scores into each FRQ section's Result & Response rows and
+ * updates TestSummary so the results dashboard reflects the uploaded sheets.
+ */
+export async function finalizeTestFrqCapture(testId: string, category: Category) {
+  const session = await auth();
+  const profileId = session?.user?.id;
+  if (!profileId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const metadata = await getTestMetadata(category.toLowerCase(), testId);
+    if (!metadata) {
+      return { success: false, error: "Test metadata not found." };
+    }
+
+    const frqSubmissions = await prisma.frqSubmission.findMany({
+      where: { profileId, testId },
+      include: { crops: true },
+    });
+
+    // Group earned points & transcriptions by sectionId -> questionId
+    const bySection = new Map<
+      string,
+      Map<string, { earned: number; possible: number; transcriptions: string[] }>
+    >();
+
+    for (const sub of frqSubmissions) {
+      if (!bySection.has(sub.sectionId)) {
+        bySection.set(sub.sectionId, new Map());
+      }
+      const qMap = bySection.get(sub.sectionId)!;
+      const earned = sub.crops.reduce((acc, c) => acc + (c.pointsAwarded || 0), 0);
+      const possible = sub.crops.reduce((acc, c) => acc + (c.pointsPossible || 1), 0);
+      const texts = sub.crops
+        .map((c) => (c.transcription ? `[Part ${c.subPartLabel}]: ${c.transcription}` : null))
+        .filter((t): t is string => Boolean(t));
+
+      const existing = qMap.get(sub.questionId);
+      if (existing) {
+        existing.earned += earned;
+        existing.possible += possible;
+        existing.transcriptions.push(...texts);
+      } else {
+        qMap.set(sub.questionId, { earned, possible, transcriptions: texts });
+      }
+    }
+
+    // Update Response and Result records for each FRQ section
+    for (const [secId, qMap] of bySection.entries()) {
+      let sectionRaw = 0;
+      let sectionNumCorrect = 0;
+
+      for (const [qId, data] of qMap.entries()) {
+        const isCorrect = data.possible > 0 && data.earned >= data.possible;
+        sectionRaw += data.earned;
+        if (isCorrect) sectionNumCorrect++;
+
+        await prisma.response.updateMany({
+          where: { profileId, testId, sectionId: secId, questionId: qId },
+          data: {
+            isCorrect,
+            frqUserAnswer:
+              data.transcriptions.length > 0
+                ? data.transcriptions.join(" | ")
+                : undefined,
+          },
+        });
+      }
+
+      const roundedRaw = Math.round(sectionRaw);
+      const scaledScore = calculateSectionScaledScore(secId, roundedRaw, metadata);
+
+      await prisma.result.updateMany({
+        where: { profileId, testId, sectionId: secId },
+        data: {
+          numCorrect: sectionNumCorrect,
+          rawScore: roundedRaw,
+          scaledScore,
+        },
+      });
+    }
+
+    // Re-synthesize overall TestSummary composite score across all sections
+    const allResults = await prisma.result.findMany({
+      where: { profileId, testId },
+      select: {
+        sectionId: true,
+        numCorrect: true,
+        totalQuestions: true,
+        rawScore: true,
+      },
+    });
+
+    if (allResults.length > 0) {
+      const synthesis = synthesizeExamComposite(metadata, allResults);
+      await prisma.testSummary.upsert({
+        where: { testId_profileId: { testId, profileId } },
+        create: {
+          profileId,
+          testId,
+          testTitle: metadata.title,
+          category,
+          compositeScore: synthesis.compositeScore,
+          percentile: synthesis.percentile,
+        },
+        update: {
+          compositeScore: synthesis.compositeScore,
+          percentile: synthesis.percentile,
+        },
+      });
+    }
+
+    // Mark active capture sessions for this test as CAPTURED
+    await prisma.captureSession.updateMany({
+      where: { profileId, testId, status: CaptureSessionStatus.ACTIVE },
+      data: { status: CaptureSessionStatus.CAPTURED },
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error("[finalizeTestFrqCapture] Error:", err);
+    return { success: false, error: "Failed to finalize FRQ scores." };
   }
 }

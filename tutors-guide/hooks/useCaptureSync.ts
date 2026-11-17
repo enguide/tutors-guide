@@ -19,6 +19,7 @@ export interface CropSummary {
 
 export interface CaptureSubmissionSummary {
   id: string;
+  sectionId: string;
   questionId: string;
   pageNumber: number;
   status: FrqSubmissionStatus;
@@ -42,7 +43,8 @@ export function useCaptureSync({
   onUploadSuccess,
 }: {
   testId: string;
-  sectionId: string;
+  /** Optional: omit for test-wide capture across all FRQ sections */
+  sectionId?: string;
   questionId?: string;
   enabled?: boolean;
   onUploadSuccess?: (submissionId: string) => void;
@@ -87,6 +89,7 @@ export function useCaptureSync({
         if (Array.isArray(res.submissions)) {
           const mapped: CaptureSubmissionSummary[] = res.submissions.map((sub) => ({
             id: sub.id,
+            sectionId: sub.sectionId,
             questionId: sub.questionId,
             pageNumber: sub.pageNumber,
             status: sub.status,
@@ -146,6 +149,7 @@ export function useCaptureSync({
           if (Array.isArray(data.submissions)) {
             const incoming: CaptureSubmissionSummary[] = data.submissions.map((sub) => ({
               id: sub.id,
+              sectionId: sub.sectionId,
               questionId: sub.questionId,
               pageNumber: sub.pageNumber,
               status: sub.status,
@@ -207,7 +211,6 @@ export function useCaptureSync({
     window.addEventListener("focus", handleVisibilityOrFocus);
     document.addEventListener("visibilitychange", handleVisibilityOrFocus);
 
-    // Run first poll immediately
     pollStatus();
 
     return () => {
@@ -224,6 +227,7 @@ export function useCaptureSync({
         const filtered = prev.filter(
           (s) =>
             !(
+              s.sectionId === incoming.sectionId &&
               s.questionId === incoming.questionId &&
               s.pageNumber === incoming.pageNumber
             )

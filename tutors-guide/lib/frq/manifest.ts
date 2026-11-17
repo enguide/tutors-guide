@@ -10,8 +10,10 @@ export interface ManifestSubPart {
 }
 
 export interface ManifestSheet {
-  /** Unique composite key e.g. "ap-calc-frq-q1::p1" */
+  /** Unique composite key e.g. "ap-calc-ab-t1-s2a::ap-calc-frq-q1::p1" */
   sheetKey: string;
+  sectionId: string;
+  sectionTitle?: string;
   questionId: string;
   questionNumber: number;
   pageNumber: number;
@@ -19,6 +21,8 @@ export interface ManifestSheet {
 }
 
 export interface ManifestQuestion {
+  sectionId: string;
+  sectionTitle?: string;
   questionId: string;
   questionNumber: number;
   totalSheets: number;
@@ -28,17 +32,24 @@ export interface ManifestQuestion {
 
 export interface SectionFrqManifest {
   testId: string;
-  sectionId: string;
+  /** Present when scoped to a single section (e.g. sandbox); undefined when test-wide */
+  sectionId?: string;
   totalQuestions: number;
   totalSheets: number;
   questions: ManifestQuestion[];
   sheets: ManifestSheet[];
 }
 
-/**
- * Extracts sub-part definitions either from explicit frontmatter `subParts`
- * or by parsing bold/parenthesized markers like **(a)**, (a), **Part A** from the prompt.
- */
+export interface DecodedSheetQr {
+  formId?: string;
+  examCode?: string;
+  sectionId?: string;
+  questionId?: string;
+  questionNumber: number;
+  pageNumber: number;
+  parts: string[];
+}
+
 export function resolveQuestionSubParts(question: QuestionFrontmatter): FrqSubPartDefinition[] {
   if (Array.isArray(question.subParts) && question.subParts.length > 0) {
     return question.subParts.map((sp) => ({
@@ -50,8 +61,6 @@ export function resolveQuestionSubParts(question: QuestionFrontmatter): FrqSubPa
 
   const prompt = question.prompt || "";
   const detectedLabels = new Set<string>();
-
-  // Match patterns like **(a)**, **(b)**, (a), (b), or **Part A** at line starts or after whitespace
   const markerRegex = /(?:^|\n|\s)\*{0,2}\(([a-fA-F])\)\*{0,2}/g;
   let match: RegExpExecArray | null;
   while ((match = markerRegex.exec(prompt)) !== null) {
@@ -59,27 +68,19 @@ export function resolveQuestionSubParts(question: QuestionFrontmatter): FrqSubPa
   }
 
   if (detectedLabels.size === 0) {
-    // Default fallback if prompt has no explicit sub-part markers (single-part FRQ)
     return [{ label: "A", points: 1.0 }];
   }
 
-  // Sort alphabetically: A, B, C, D...
-  const sorted = Array.from(detectedLabels).sort();
-  return sorted.map((label) => ({
-    label,
-    points: 1.0,
-  }));
+  return Array.from(detectedLabels)
+    .sort()
+    .map((label) => ({ label, points: 1.0 }));
 }
 
-/**
- * Builds the authoritative SectionFrqManifest from section questions.
- * Used across desktop modal, mobile scanner, QR matcher, and server cropper.
- */
-export function buildSectionFrqManifest(
-  testId: string,
+function buildManifestQuestionsForSection(
   sectionId: string,
+  sectionTitle: string | undefined,
   questions: QuestionFrontmatter[]
-): SectionFrqManifest {
+): { manifestQuestions: ManifestQuestion[]; allSheets: ManifestSheet[] } {
   const handwrittenQuestions = questions
     .filter((q) => q.questionType === "FRQ_HANDWRITTEN")
     .sort((a, b) => a.questionNumber - b.questionNumber);
@@ -104,7 +105,9 @@ export function buildSectionFrqManifest(
     for (let pageNum = 1; pageNum <= totalSheets; pageNum++) {
       const pageParts = subParts.filter((sp) => sp.pageNumber === pageNum);
       const sheet: ManifestSheet = {
-        sheetKey: `${q.id}::p${pageNum}`,
+        sheetKey: `${sectionId}::${q.id}::p${pageNum}`,
+        sectionId,
+        sectionTitle,
         questionId: q.id,
         questionNumber: q.questionNumber,
         pageNumber: pageNum,
@@ -115,6 +118,8 @@ export function buildSectionFrqManifest(
     }
 
     manifestQuestions.push({
+      sectionId,
+      sectionTitle,
       questionId: q.id,
       questionNumber: q.questionNumber,
       totalSheets,
@@ -122,6 +127,24 @@ export function buildSectionFrqManifest(
       sheets,
     });
   }
+
+  return { manifestQuestions, allSheets };
+}
+
+/**
+ * Builds a single-section FRQ manifest (used by QuestionOptions & sandbox).
+ */
+export function buildSectionFrqManifest(
+  testId: string,
+  sectionId: string,
+  questions: QuestionFrontmatter[],
+  sectionTitle?: string
+): SectionFrqManifest {
+  const { manifestQuestions, allSheets } = buildManifestQuestionsForSection(
+    sectionId,
+    sectionTitle,
+    questions
+  );
 
   return {
     testId,
@@ -134,27 +157,138 @@ export function buildSectionFrqManifest(
 }
 
 /**
- * Resolves a decoded QR code (e.g., Q:2, PG:4 or PAGE:2) against the manifest.
+ * Builds a unified test-wide FRQ manifest across ALL sections containing handwritten FRQs.
  */
-export function lookupSheetInManifest(
-  manifest: SectionFrqManifest,
-  questionNumber: number,
-  rawPageNumber: number
-): { question: ManifestQuestion; sheet: ManifestSheet } | null {
-  const question = manifest.questions.find((q) => q.questionNumber === questionNumber);
-  if (!question) return null;
+export function buildTestFrqManifest(
+  testId: string,
+  sections: Array<{
+    sectionId: string;
+    sectionTitle?: string;
+    questions: QuestionFrontmatter[];
+  }>
+): SectionFrqManifest {
+  const manifestQuestions: ManifestQuestion[] = [];
+  const allSheets: ManifestSheet[] = [];
 
-  // Handle both relative page numbers (1, 2) and sequential booklet page numbers (1..12)
-  let relativePage = rawPageNumber;
-  if (rawPageNumber > question.totalSheets) {
-    // In APCalculusABFRQPDF.tex, sequential pages are odd for Sheet 1 (1,3,5,7,9,11)
-    // and even for Sheet 2 (2,4,6,8,10,12).
-    relativePage = rawPageNumber % 2 === 1 ? 1 : 2;
+  for (const sec of sections) {
+    const built = buildManifestQuestionsForSection(
+      sec.sectionId,
+      sec.sectionTitle,
+      sec.questions
+    );
+    manifestQuestions.push(...built.manifestQuestions);
+    allSheets.push(...built.allSheets);
+  }
+
+  return {
+    testId,
+    totalQuestions: manifestQuestions.length,
+    totalSheets: allSheets.length,
+    questions: manifestQuestions,
+    sheets: allSheets,
+  };
+}
+
+/**
+ * Parses both self-describing QR codes:
+ *   "FORM:ap-calc-ab-practice-1;SEC:ap-calc-ab-t1-s2a;QID:ap-calc-frq-q1;Q:1;PG:1;PARTS:AB"
+ * and legacy QR codes:
+ *   "EXAM:AB_2026;Q:1;PG:4;PARTS:AB"
+ */
+export function parseSelfDescribingSheetQr(rawText: string): DecodedSheetQr | null {
+  try {
+    const segments = rawText.split(";").reduce((acc, segment) => {
+      const colonIdx = segment.indexOf(":");
+      if (colonIdx > 0) {
+        const key = segment.slice(0, colonIdx).trim();
+        const val = segment.slice(colonIdx + 1).trim();
+        if (key && val) acc[key] = val;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+
+    if (!segments.Q && !segments.QID) return null;
+
+    const qNum = segments.Q ? parseInt(segments.Q, 10) : NaN;
+    const pNum = parseInt(segments.PAGE || segments.PG || "1", 10);
+    const parts = segments.PARTS ? segments.PARTS.split("") : [];
+
+    return {
+      formId: segments.FORM,
+      examCode: segments.EXAM,
+      sectionId: segments.SEC,
+      questionId: segments.QID,
+      questionNumber: Number.isFinite(qNum) ? qNum : 0,
+      pageNumber: Number.isFinite(pNum) ? pNum : 1,
+      parts,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type SheetQrMatchResult =
+  | { status: "MATCHED"; question: ManifestQuestion; sheet: ManifestSheet }
+  | { status: "WRONG_FORM"; expectedForm: string; actualForm: string }
+  | { status: "NOT_IN_TEST"; reason: string };
+
+/**
+ * Validates and resolves a decoded QR payload against the active test/section manifest.
+ */
+export function matchQrAgainstManifest(
+  manifest: SectionFrqManifest,
+  qr: DecodedSheetQr
+): SheetQrMatchResult {
+  // 1. Strict form check when FORM is present in QR
+  if (qr.formId && qr.formId !== manifest.testId) {
+    return {
+      status: "WRONG_FORM",
+      expectedForm: manifest.testId,
+      actualForm: qr.formId,
+    };
+  }
+
+  // 2. Locate matching question by QID (+ optional SEC) or fallback to questionNumber
+  let question: ManifestQuestion | undefined;
+  if (qr.questionId) {
+    question = manifest.questions.find(
+      (q) =>
+        q.questionId === qr.questionId &&
+        (!qr.sectionId || q.sectionId === qr.sectionId)
+    );
+  }
+  if (!question && qr.questionNumber > 0) {
+    question = manifest.questions.find(
+      (q) =>
+        q.questionNumber === qr.questionNumber &&
+        (!qr.sectionId || q.sectionId === qr.sectionId)
+    );
+  }
+
+  if (!question) {
+    return {
+      status: "NOT_IN_TEST",
+      reason: qr.questionNumber
+        ? `Question ${qr.questionNumber} does not belong to this exam.`
+        : "This response sheet does not belong to this exam.",
+    };
+  }
+
+  // 3. Resolve relative sheet page (handles both 1/2 and sequential booklet page numbers)
+  let relativePage = qr.pageNumber;
+  if (qr.pageNumber > question.totalSheets) {
+    relativePage = qr.pageNumber % 2 === 1 ? 1 : 2;
   }
 
   const sheet =
     question.sheets.find((s) => s.pageNumber === relativePage) || question.sheets[0];
 
-  if (!sheet) return null;
-  return { question, sheet };
+  if (!sheet) {
+    return {
+      status: "NOT_IN_TEST",
+      reason: `Sheet ${qr.pageNumber} not found for Question ${question.questionNumber}.`,
+    };
+  }
+
+  return { status: "MATCHED", question, sheet };
 }

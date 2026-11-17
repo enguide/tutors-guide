@@ -19,7 +19,9 @@ import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { CalculatorToolbar } from "../tools/CalculatorToolbar";
 import { FormulaSheetModal } from "../tools/FormulaSheetModal";
 import { TestPreFlightModal } from "./TestPreFlightModal";
+import { SectionCaptureModal } from "./SectionCaptureModal";
 import { completeTestSection } from "@/actions/completeTestSection";
+import { finalizeTestFrqCapture } from "@/actions/frqCapture";
 import { Category } from "@prisma/client";
 import { ExamErrorBoundary } from "./ExamErrorBoundary";
 import { resolveExamTheme } from "./presentationRegistry";
@@ -41,6 +43,7 @@ interface ExamClientProps {
   serverResponses?: ServerResponseRecord[];
   isExamAttemptStarted?: boolean;
   serverAccommodations?: AccommodationSettings | null;
+  hasHandwrittenFrqs?: boolean;
 }
 
 const emptySubscribe = () => () => {};
@@ -56,6 +59,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   serverResponses = [],
   isExamAttemptStarted = false,
   serverAccommodations = null,
+  hasHandwrittenFrqs = false,
 }) => {
   const router = useRouter();
 
@@ -74,7 +78,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
   const theme = resolveExamTheme(category);
   const accommodationsKey = `attempt_accommodations_${testId}`;
 
-  // Accommodations hierarchy: Database record -> LocalStorage -> Default Fallback
   const [accommodations, setAccommodations] = useState<AccommodationSettings>(() => {
     if (serverAccommodations) return serverAccommodations;
     if (serverCheckpoint?.accommodations) return serverCheckpoint.accommodations;
@@ -87,16 +90,12 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   });
 
-  // SINGLE SOURCE OF TRUTH:
-  // If the server confirmed the exam attempt is already started, preflight NEVER opens.
-  // Otherwise, it checks if local storage has it, falling back to opening on section 1.
   const [isPreFlightOpen, setIsPreFlightOpen] = useState<boolean>(() => {
     if (isExamAttemptStarted) return false;
     if (typeof window === "undefined") return true;
     return !Boolean(localStorage.getItem(accommodationsKey));
   });
 
-  // Section timing remains completely dormant if the preflight modal is displayed
   const [isSectionStarted, setIsSectionStarted] = useState<boolean>(() => {
     if (isExamAttemptStarted) {
       return Boolean(theme.autoStartSection);
@@ -106,14 +105,14 @@ export const ExamClient: React.FC<ExamClientProps> = ({
 
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTestCaptureOpen, setIsTestCaptureOpen] = useState(false);
 
   const effectiveTimeLimitSeconds = Math.round(
     frontmatter.timeLimit * accommodations.timeMultiplier
   );
 
-  // STRICT TIMER AND AUTOSAVE GATE:
-  // Timer and background checkpoint syncs NEVER run while the pre-flight modal is displayed
-  const isTimerActuallyRunning = !isPreFlightOpen && isSectionStarted && !isSubmitting;
+  const isTimerActuallyRunning =
+    !isPreFlightOpen && isSectionStarted && !isSubmitting && !isTestCaptureOpen;
 
   const {
     activeQuestion,
@@ -155,7 +154,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     serverResponses,
   });
 
-  // Direct check if THIS SPECIFIC SECTION is being resumed mid-way
   const isResumingThisSection = useMemo(() => {
     if (serverCheckpoint && serverCheckpoint.timeRemainingSeconds < effectiveTimeLimitSeconds) {
       return true;
@@ -177,7 +175,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     return false;
   }, [serverCheckpoint, serverResponses, testId, frontmatter.sectionId, effectiveTimeLimitSeconds]);
 
-  // Trap accidental browser back buttons, tab close, and page reloads during active exam testing
   useExamNavigationLock({
     enabled: isTimerActuallyRunning,
     onAttemptBack: () => {
@@ -193,7 +190,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
 
     const newEffectiveSeconds = Math.round(frontmatter.timeLimit * selected.timeMultiplier);
 
-    // Only reset time limit if starting fresh in section 1
     if (!isResumingThisSection) {
       resetTimeLimit(newEffectiveSeconds);
     }
@@ -244,6 +240,15 @@ export const ExamClient: React.FC<ExamClientProps> = ({
           clearAllTestBuffers(testId);
           localStorage.removeItem(accommodationsKey);
         } catch {}
+
+        // If this exam contains handwritten FRQ questions, open the test-wide capture modal
+        // before navigating to the final results page. Non-FRQ exams proceed untouched.
+        if (hasHandwrittenFrqs) {
+          setIsSubmitting(false);
+          setIsTestCaptureOpen(true);
+          return;
+        }
+
         router.push(`/tests/${metadata.category.toLowerCase()}/${testId}/results`);
         return;
       }
@@ -268,12 +273,25 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     questions,
     accommodations,
     accommodationsKey,
+    hasHandwrittenFrqs,
     getFinalizedAnswers,
     getFinalizedNavigationHistory,
     clearLocalBuffer,
     clearAllTestBuffers,
     router,
   ]);
+
+  const handleFinalizeTestCapture = useCallback(async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await finalizeTestFrqCapture(testId, metadata.category as Category);
+    } catch (err) {
+      console.error("Error rescoring FRQ capture:", err);
+    } finally {
+      router.push(`/tests/${metadata.category.toLowerCase()}/${testId}/results`);
+    }
+  }, [isSubmitting, testId, metadata.category, router]);
 
   const { speak, stop, isPlaying: isTTSPlaying, isSupported: isTTSSupported } =
     useTextToSpeech();
@@ -286,7 +304,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     }
   };
 
-  // Derive exam-level scope and metrics (accounting for multi-stage adaptive branches)
   const { totalDuration, totalModules, totalQuestions } = useMemo(() => {
     const sections = metadata.sections || [];
 
@@ -328,8 +345,7 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // Active theme-based submission transition screen
-  if (isSubmitting) {
+  if (isSubmitting && !isTestCaptureOpen) {
     const TransitionComponent = theme.Transition || BaseModuleTransition;
     return (
       <TransitionComponent
@@ -340,7 +356,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // 1. Preflight modal ONLY displayed at the very start of the entire test attempt
   if (isPreFlightOpen) {
     return (
       <TestPreFlightModal
@@ -356,7 +371,6 @@ export const ExamClient: React.FC<ExamClientProps> = ({
     );
   }
 
-  // 2. Interstitial directions modal for non-autostart categories (ACT, AP, GRE)
   if (!isSectionStarted && theme.Directions) {
     const DirectionsComponent = theme.Directions;
     return (
@@ -441,6 +455,16 @@ export const ExamClient: React.FC<ExamClientProps> = ({
         answers={answers}
         onJumpToQuestion={(idx) => setCurrentIndex(idx)}
       />
+
+      {hasHandwrittenFrqs && (
+        <SectionCaptureModal
+          isOpen={isTestCaptureOpen}
+          testId={testId}
+          questions={questions}
+          isSubmitting={isSubmitting}
+          onFinalizeSection={handleFinalizeTestCapture}
+        />
+      )}
     </ExamErrorBoundary>
   );
 };

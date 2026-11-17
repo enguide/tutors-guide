@@ -435,24 +435,23 @@ model FrqSubCrop {
 }
 
 model CaptureSession {
-  id              String               @id @default(cuid())
-  sessionToken    String               @unique
-  status          CaptureSessionStatus @default(ACTIVE)
+  id               String               @id @default(cuid())
+  sessionToken     String               @unique
+  status           CaptureSessionStatus @default(ACTIVE)
   manifestSnapshot Json?
 
-  profileId       String
-  profile         Profile              @relation("ProfileCaptureSessions", fields: [profileId], references: [id], onDelete: Cascade)
+  profileId        String
+  profile          Profile              @relation("ProfileCaptureSessions", fields: [profileId], references: [id], onDelete: Cascade)
 
-  testId          String
-  sectionId       String
-  questionId      String?              // Optional: session can cover the entire section
+  testId           String
+  sectionId        String?              // Nullable: null = test-wide capture across all FRQ sections
+  questionId       String?              // Optional: session can cover the entire test or section
 
-  // Multi-sheet relation: 1 session holds all submitted pages across the section
-  frqSubmissions  FrqSubmission[]      @relation("SessionSubmissions")
+  frqSubmissions   FrqSubmission[]      @relation("SessionSubmissions")
 
-  expiresAt       DateTime
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  expiresAt        DateTime
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   @@index([sessionToken])
   @@index([profileId, testId, sectionId])

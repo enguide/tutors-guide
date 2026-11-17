@@ -26,13 +26,11 @@ interface ExamPageRouteProps {
 }
 
 export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
-  // Opt in to dynamic server request execution for Next.js 16 Dynamic IO
   await connection();
 
   const { category, testId, sectionId } = await params;
   const examCat = category.toUpperCase() as SupportedExamCategory;
 
-  // 1. Authenticate user & enforce role permissions
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -44,12 +42,10 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
   const isAdmin = userRole === "ADMIN";
   const isStudent = userRole === "STUDENT";
 
-  // ORG_ADMIN and TUTOR are barred from taking tests
   if (!isAdmin && !isStudent) {
     redirect(`/dashboard?notice=staff_restricted`);
   }
 
-  // 2. Load test metadata upfront to verify lifecycle status, course entitlement, and structure
   const metadata = await getTestMetadata(category, testId);
   const section = await getSectionById(category, testId, sectionId);
 
@@ -57,13 +53,11 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     notFound();
   }
 
-  // 2b. Lifecycle Gate: Block non-admin access to draft or archived exams via direct URL
   const testStatus = resolveTestStatus(metadata);
   if (testStatus !== "published" && !isAdmin) {
     notFound();
   }
 
-  // 3. Granular Entitlement Verification
   const userEntitlements: string[] = session.user.entitlements || [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requiredEntitlement: string = (metadata as any).entitlement || examCat;
@@ -78,7 +72,6 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     redirect(`/dashboard?error=unauthorized_course&required=${encodeURIComponent(requiredEntitlement)}`);
   }
 
-  // 4. Strict One-Way Lockout Guard: Prevent re-taking or re-entering finalized sections
   const alreadySubmitted = await prisma.result.findUnique({
     where: {
       testId_profileId_sectionId: {
@@ -94,13 +87,26 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     redirect(`/tests/${category}/${testId}`);
   }
 
-  // Auto-sync: Guarantee this Test & Section exist in PostgreSQL before client boots
   await ensureTestInDatabase(metadata);
 
-  // 5. Locate the section entry in metadata.json to pull its manifest config
+  // Check whether ANY section in this exam uses FRQ_HANDWRITTEN (false for SAT, ACT, GRE, etc.)
+  let hasHandwrittenFrqs = section.frontmatter.questions.some(
+    (q) => q.questionType === "FRQ_HANDWRITTEN"
+  );
+
+  if (!hasHandwrittenFrqs && metadata.sections.length > 1) {
+    const otherSections = await Promise.all(
+      metadata.sections
+        .filter((s) => s.id !== sectionId)
+        .map((s) => getSectionById(category, testId, s.id))
+    );
+    hasHandwrittenFrqs = otherSections.some((sec) =>
+      sec?.frontmatter?.questions?.some((q) => q.questionType === "FRQ_HANDWRITTEN")
+    );
+  }
+
   const manifestSection = metadata.sections.find((s) => s.id === sectionId);
 
-  // 6. Cascade overrides: Category Defaults -> metadata.config -> metadata.sections[i].config -> frontmatter.config
   const effectiveConfig = resolveSectionConfig(
     examCat,
     metadata.config,
@@ -110,14 +116,12 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     }
   );
 
-  // 7. Authoritative Server Check: Has this student started ANY section of this test?
   const [
     checkpointRecord,
     existingResponses,
     anyCompletedSection,
     anyPriorCheckpoint,
   ] = await Promise.all([
-    // Checkpoint for THIS specific section
     prisma.sectionCheckpoint.findUnique({
       where: {
         profileId_testId_sectionId: {
@@ -127,7 +131,6 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
         },
       },
     }),
-    // Prior saved responses for THIS specific section
     prisma.response.findMany({
       where: {
         profileId: session.user.id,
@@ -143,7 +146,6 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
         changedAnswer: true,
       },
     }),
-    // Did the student complete any earlier section of this test?
     prisma.result.findFirst({
       where: {
         testId,
@@ -153,7 +155,6 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
         accommodations: true,
       },
     }),
-    // Does the student have ANY checkpoint for this test across all sections?
     prisma.sectionCheckpoint.findFirst({
       where: {
         testId,
@@ -165,10 +166,8 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
     }),
   ]);
 
-  // If the student has any submitted section OR any checkpoint anywhere in this test, the exam has started.
   const isExamAttemptStarted = Boolean(anyCompletedSection || anyPriorCheckpoint || checkpointRecord);
 
-  // Resolve accommodations from earlier sections in PostgreSQL if switching devices
   const resolvedAccommodations: AccommodationSettings | null =
     (checkpointRecord?.accommodations as unknown as AccommodationSettings) ||
     (anyPriorCheckpoint?.accommodations as unknown as AccommodationSettings) ||
@@ -199,6 +198,7 @@ export default async function ExamSectionPage({ params }: ExamPageRouteProps) {
       serverResponses={existingResponses}
       isExamAttemptStarted={isExamAttemptStarted}
       serverAccommodations={resolvedAccommodations}
+      hasHandwrittenFrqs={hasHandwrittenFrqs}
     />
   );
 }

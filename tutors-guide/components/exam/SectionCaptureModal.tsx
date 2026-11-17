@@ -30,11 +30,11 @@ type CaptureSyncHandle = ReturnType<typeof useCaptureSync>;
 interface SectionCaptureModalProps {
   isOpen: boolean;
   testId: string;
-  sectionId: string;
+  /** Optional: omit for test-wide capture across all FRQ sections */
+  sectionId?: string;
   questions: QuestionFrontmatter[];
   onFinalizeSection: () => void;
   isSubmitting?: boolean;
-  /** Optional shared sync state when parent component also tracks capture progress */
   externalSync?: CaptureSyncHandle;
 }
 
@@ -94,16 +94,17 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const activeTargetRef = useRef<{ questionId: string; pageNumber: number } | null>(
-    null
-  );
+  const activeTargetRef = useRef<{
+    sectionId: string;
+    questionId: string;
+    pageNumber: number;
+  } | null>(null);
 
   const localManifest = useMemo(
-    () => buildSectionFrqManifest(testId, sectionId, questions),
+    () => buildSectionFrqManifest(testId, sectionId || "default", questions),
     [testId, sectionId, questions]
   );
 
-  // Only spin up an internal sync hook if the parent did not provide a shared one
   const internalSync = useCaptureSync({
     testId,
     sectionId,
@@ -125,7 +126,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
   const submissionMap = useMemo(() => {
     const map = new Map<string, CaptureSubmissionSummary>();
     for (const sub of submissions) {
-      map.set(`${sub.questionId}::p${sub.pageNumber}`, sub);
+      map.set(`${sub.sectionId}::${sub.questionId}::p${sub.pageNumber}`, sub);
     }
     return map;
   }, [submissions]);
@@ -178,8 +179,8 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     const file = e.target.files?.[0];
     if (!file || !token || !activeTargetRef.current) return;
 
-    const { questionId, pageNumber } = activeTargetRef.current;
-    const targetKey = `${questionId}_p${pageNumber}`;
+    const { sectionId: targetSecId, questionId, pageNumber } = activeTargetRef.current;
+    const targetKey = `${targetSecId}_${questionId}_p${pageNumber}`;
     setUploadingTarget(targetKey);
     setUploadError(null);
 
@@ -192,7 +193,8 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
         token,
         mimeType || "image/jpeg",
         questionId,
-        pageNumber
+        pageNumber,
+        targetSecId
       );
 
       if (!presignRes.success || !presignRes.presigned) {
@@ -219,6 +221,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
         publicUrl,
         mimeType: mimeType || "image/jpeg",
         fileSizeBytes: normalizedBlob.size,
+        sectionId: targetSecId,
         questionId,
         pageNumber,
       });
@@ -231,6 +234,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
 
       upsertOptimisticSubmission({
         id: finalizeRes.submission.id,
+        sectionId: targetSecId,
         questionId,
         pageNumber,
         status: FrqSubmissionStatus.UPLOADED,
@@ -248,8 +252,12 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     }
   };
 
-  const triggerDesktopUpload = (questionId: string, pageNumber: number) => {
-    activeTargetRef.current = { questionId, pageNumber };
+  const triggerDesktopUpload = (
+    targetSecId: string,
+    questionId: string,
+    pageNumber: number
+  ) => {
+    activeTargetRef.current = { sectionId: targetSecId, questionId, pageNumber };
     fileInputRef.current?.click();
   };
 
@@ -285,7 +293,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
               Submit Handwritten Response Sheets
             </h2>
             <p className="text-xs text-neutral-500 font-mono mt-1">
-              Scan and verify all {activeManifest.totalSheets} response sheets before finalizing your section.
+              Scan all {activeManifest.totalSheets} response sheets in any order before viewing your results.
             </p>
           </div>
 
@@ -314,7 +322,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
           <div className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-lg p-5 flex flex-col items-center text-center space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
               <Smartphone className="w-4 h-4 text-blue-600" />
-              <span>Scan with phone to upload continuously</span>
+              <span>Scan with phone to upload in any order</span>
             </div>
 
             <div className="bg-white p-3 rounded-md border border-neutral-200 dark:border-neutral-800 shadow-xs">
@@ -335,7 +343,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
             )}
 
             <p className="text-[11px] text-neutral-400 leading-tight">
-              Point your phone camera at the QR code. Align all 4 black corner squares on each page; sheets auto-capture after a 3-second hold.
+              Point your phone camera at the QR code. Photograph pages in any order — each sheet&apos;s QR code automatically matches it to the right question.
             </p>
           </div>
 
@@ -350,14 +358,21 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
               </span>
             </div>
 
-            <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
               {activeManifest.questions.map((mq) => (
                 <div
-                  key={mq.questionId}
+                  key={`${mq.sectionId}::${mq.questionId}`}
                   className="p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-md space-y-2"
                 >
-                  <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                    Question {mq.questionNumber}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                      Question {mq.questionNumber}
+                    </span>
+                    {mq.sectionTitle && (
+                      <span className="text-[10px] text-neutral-400 truncate max-w-[180px]">
+                        {mq.sectionTitle}
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
@@ -365,7 +380,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
                       const sub = submissionMap.get(sheet.sheetKey);
                       const isUploadingLocal =
                         uploadingTarget ===
-                        `${sheet.questionId}_p${sheet.pageNumber}`;
+                        `${sheet.sectionId}_${sheet.questionId}_p${sheet.pageNumber}`;
                       const isProcessingServer =
                         sub?.status === FrqSubmissionStatus.UPLOADED ||
                         sub?.status === FrqSubmissionStatus.PROCESSING;
@@ -430,6 +445,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
                                 type="button"
                                 onClick={() =>
                                   triggerDesktopUpload(
+                                    sheet.sectionId,
                                     sheet.questionId,
                                     sheet.pageNumber
                                   )
@@ -480,7 +496,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
               </span>
             ) : allSheetsVerified ? (
               <span className="text-emerald-500 font-semibold">
-                All {activeManifest.totalSheets} sheets received & verified! Click Complete Section to submit.
+                All {activeManifest.totalSheets} sheets received & verified! Click Complete & View Results.
               </span>
             ) : retakeNeededCount > 0 ? (
               <span className="text-amber-500 font-medium">
@@ -510,7 +526,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
               </>
             ) : (
               <>
-                <span>Complete Section</span>
+                <span>Complete & View Results</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}

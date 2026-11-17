@@ -16,9 +16,11 @@ import jsQR from "jsqr";
 import { calculateLaplacianVariance, checkLightingGlare } from "@/lib/cv/qualityChecks";
 import { detectSheetFiducials } from "@/lib/cv/fiducials";
 import {
+  DecodedSheetQr,
   SectionFrqManifest,
   ManifestSheet,
-  lookupSheetInManifest,
+  matchQrAgainstManifest,
+  parseSelfDescribingSheetQr,
 } from "@/lib/frq/manifest";
 import {
   getPresignedUploadForSession,
@@ -27,6 +29,7 @@ import {
 
 export interface CaptureUploadResult {
   submissionId: string;
+  sectionId: string;
   questionId: string;
   questionNumber?: number;
   pageNumber: number;
@@ -38,15 +41,11 @@ interface MobileCameraViewProps {
   manifest: SectionFrqManifest | null;
   defaultQuestionId?: string;
   suggestedSheet: ManifestSheet | null;
+  uploadedSheetKeys: Set<string>;
+  initialAllowReplace?: boolean;
   completedCount: number;
   onOpenChecklist?: () => void;
   onSuccess: (result: CaptureUploadResult) => void;
-}
-
-interface DecodedQrMeta {
-  questionNumber: number;
-  pageNumber: number;
-  parts: string[];
 }
 
 const BLUR_THRESHOLD = 95.0;
@@ -54,37 +53,13 @@ const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x
 const ANALYSIS_INTERVAL_MS = 250;
 const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown
 
-function parseFooterQrText(rawText: string): DecodedQrMeta | null {
-  try {
-    const segments = rawText.split(";").reduce((acc, segment) => {
-      const [key, val] = segment.split(":");
-      if (key && val) acc[key.trim()] = val.trim();
-      return acc;
-    }, {} as Record<string, string>);
-
-    if (!segments.Q) return null;
-
-    const qNum = parseInt(segments.Q, 10);
-    const pNum = parseInt(segments.PAGE || segments.PG || "1", 10);
-    const parts = segments.PARTS ? segments.PARTS.split("") : [];
-
-    if (!Number.isFinite(qNum)) return null;
-
-    return {
-      questionNumber: qNum,
-      pageNumber: Number.isFinite(pNum) ? pNum : 1,
-      parts,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export function MobileCameraView({
   sessionToken,
   manifest,
   defaultQuestionId,
   suggestedSheet,
+  uploadedSheetKeys,
+  initialAllowReplace = false,
   completedCount,
   onOpenChecklist,
   onSuccess,
@@ -97,21 +72,33 @@ export function MobileCameraView({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
 
-  // Live CV telemetry & 3-second hold-steady progress (0..REQUIRED_STEADY_FRAMES)
+  // Live CV telemetry & 3-second hold-steady progress
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
   const [steadyFrames, setSteadyFrames] = useState<number>(0);
+
+  // Live QR-detected sheet during framing (enables any-order scanning)
+  const [liveDetectedSheet, setLiveDetectedSheet] = useState<ManifestSheet | null>(null);
+  const [duplicateSheetCandidate, setDuplicateSheetCandidate] =
+    useState<ManifestSheet | null>(null);
+  const [allowedReplaceKeys, setAllowedReplaceKeys] = useState<Set<string>>(() =>
+    initialAllowReplace && suggestedSheet
+      ? new Set([suggestedSheet.sheetKey])
+      : new Set()
+  );
 
   // Captured image state
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [detectedQr, setDetectedQr] = useState<DecodedQrMeta | null>(null);
+  const [detectedQr, setDetectedQr] = useState<DecodedSheetQr | null>(null);
   const [manualSheetOverride, setManualSheetOverride] = useState<string | null>(null);
 
   const steadyCountRef = useRef<number>(0);
   const isSnappingRef = useRef<boolean>(false);
 
+  // Priority: Explicit dropdown override -> Live QR-detected sheet -> Next uncaptured sheet
   const selectedSheetKey =
     manualSheetOverride ||
+    liveDetectedSheet?.sheetKey ||
     suggestedSheet?.sheetKey ||
     manifest?.sheets[0]?.sheetKey ||
     "";
@@ -122,8 +109,8 @@ export function MobileCameraView({
       const byKey = manifest.sheets.find((s) => s.sheetKey === selectedSheetKey);
       if (byKey) return byKey;
     }
-    return suggestedSheet || manifest.sheets[0] || null;
-  }, [manifest, selectedSheetKey, suggestedSheet]);
+    return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
+  }, [manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
 
   // 1. Initialize rear-facing camera at highest available resolution
   useEffect(() => {
@@ -202,7 +189,7 @@ export function MobileCameraView({
       ctx.drawImage(video, 0, 0, outW, outH);
 
       // Fast QR scan on a 900px working canvas (~12ms)
-      let decodedMeta: DecodedQrMeta | null = null;
+      let decodedMeta: DecodedSheetQr | null = null;
       try {
         const qrScale = Math.min(900 / longestEdge, 1.0);
         const qCanvasW = Math.round(outW * qrScale);
@@ -220,14 +207,14 @@ export function MobileCameraView({
           const subImg = qCtx.getImageData(qCanvasW - subW, qCanvasH - subH, subW, subH);
           const subCode = jsQR(subImg.data, subW, subH);
           if (subCode?.data) {
-            decodedMeta = parseFooterQrText(subCode.data);
+            decodedMeta = parseSelfDescribingSheetQr(subCode.data);
           }
 
           if (!decodedMeta) {
             const fullImg = qCtx.getImageData(0, 0, qCanvasW, qCanvasH);
             const fullCode = jsQR(fullImg.data, qCanvasW, qCanvasH);
             if (fullCode?.data) {
-              decodedMeta = parseFooterQrText(fullCode.data);
+              decodedMeta = parseSelfDescribingSheetQr(fullCode.data);
             }
           }
         }
@@ -235,18 +222,20 @@ export function MobileCameraView({
         console.warn("Client QR scan warning:", qrErr);
       }
 
-      if (decodedMeta) {
-        setDetectedQr(decodedMeta);
-        if (manifest) {
-          const matched = lookupSheetInManifest(
-            manifest,
-            decodedMeta.questionNumber,
-            decodedMeta.pageNumber
+      if (decodedMeta && manifest) {
+        const match = matchQrAgainstManifest(manifest, decodedMeta);
+        if (match.status === "WRONG_FORM" || match.status === "NOT_IN_TEST") {
+          isSnappingRef.current = false;
+          setIsSnapping(false);
+          setWarningMessage(
+            match.status === "WRONG_FORM"
+              ? `Wrong exam booklet (${match.actualForm}). Expected ${match.expectedForm}.`
+              : match.reason
           );
-          if (matched) {
-            setManualSheetOverride(matched.sheet.sheetKey);
-          }
+          return;
         }
+        setDetectedQr(decodedMeta);
+        setManualSheetOverride(match.sheet.sheetKey);
       }
 
       captureCanvas.toBlob(
@@ -263,7 +252,7 @@ export function MobileCameraView({
     });
   }, [manifest]);
 
-  // 3. Real-time frame quality + 4-corner fiducial detection loop (250ms)
+  // 3. Real-time frame quality + 4-corner fiducial + live QR form/duplicate check (250ms)
   const analyzeFrame = useCallback(() => {
     if (
       !videoRef.current ||
@@ -318,11 +307,59 @@ export function MobileCameraView({
     if (!detected) {
       setWarningMessage("Align all 4 black corner squares inside the frame.");
       setFiducialsLocked(false);
+      setDuplicateSheetCandidate(null);
       steadyCountRef.current = 0;
       setSteadyFrames(0);
       return;
     }
 
+    // Live pre-capture QR verification (<3ms on 480px quadrant)
+    if (manifest) {
+      const qrW = Math.round(w * 0.48);
+      const qrH = Math.round(h * 0.38);
+      const qrImg = ctx.getImageData(w - qrW, h - qrH, qrW, qrH);
+      const qrCode = jsQR(qrImg.data, qrW, qrH);
+
+      if (qrCode?.data) {
+        const liveMeta = parseSelfDescribingSheetQr(qrCode.data);
+        if (liveMeta) {
+          const match = matchQrAgainstManifest(manifest, liveMeta);
+
+          if (match.status === "WRONG_FORM" || match.status === "NOT_IN_TEST") {
+            setWarningMessage(
+              match.status === "WRONG_FORM"
+                ? `Wrong Exam Booklet: Detected "${match.actualForm}", expected "${match.expectedForm}".`
+                : match.reason
+            );
+            setFiducialsLocked(false);
+            setDuplicateSheetCandidate(null);
+            steadyCountRef.current = 0;
+            setSteadyFrames(0);
+            return;
+          }
+
+          // Matched a valid sheet in this exam! Auto-route to it (any-order scanning)
+          setLiveDetectedSheet(match.sheet);
+
+          // Block accidental duplicate capture unless user explicitly tapped "Replace Scan"
+          const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
+          const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
+
+          if (isAlreadyUploaded && !isExplicitReplace) {
+            setDuplicateSheetCandidate(match.sheet);
+            setWarningMessage(
+              `Q${match.sheet.questionNumber} Sheet ${match.sheet.pageNumber} is already uploaded — flip to another page.`
+            );
+            setFiducialsLocked(false);
+            steadyCountRef.current = 0;
+            setSteadyFrames(0);
+            return;
+          }
+        }
+      }
+    }
+
+    setDuplicateSheetCandidate(null);
     setWarningMessage(null);
     setFiducialsLocked(true);
 
@@ -333,7 +370,14 @@ export function MobileCameraView({
     if (steadyCountRef.current >= REQUIRED_STEADY_FRAMES) {
       captureStill();
     }
-  }, [isProcessing, capturedBlob, captureStill]);
+  }, [
+    isProcessing,
+    capturedBlob,
+    manifest,
+    uploadedSheetKeys,
+    allowedReplaceKeys,
+    captureStill,
+  ]);
 
   useEffect(() => {
     if (!streamActive || capturedBlob) return;
@@ -347,8 +391,15 @@ export function MobileCameraView({
     setIsProcessing(true);
     setWarningMessage(null);
 
+    const targetSectionId =
+      resolvedTargetSheet?.sectionId ||
+      detectedQr?.sectionId ||
+      manifest?.sectionId ||
+      manifest?.sheets[0]?.sectionId ||
+      "";
     const targetQuestionId =
       resolvedTargetSheet?.questionId ||
+      detectedQr?.questionId ||
       defaultQuestionId ||
       manifest?.questions[0]?.questionId;
     const targetPageNumber =
@@ -364,7 +415,8 @@ export function MobileCameraView({
         sessionToken,
         "image/jpeg",
         targetQuestionId,
-        targetPageNumber
+        targetPageNumber,
+        targetSectionId
       );
 
       if (!presignRes.success || !presignRes.presigned) {
@@ -392,6 +444,7 @@ export function MobileCameraView({
         publicUrl,
         mimeType: "image/jpeg",
         fileSizeBytes: capturedBlob.size,
+        sectionId: targetSectionId,
         questionId: targetQuestionId,
         pageNumber: targetPageNumber,
       });
@@ -402,6 +455,7 @@ export function MobileCameraView({
 
       onSuccess({
         submissionId: finalizeRes.submission.id,
+        sectionId: finalizeRes.submission.sectionId,
         questionId: finalizeRes.submission.questionId,
         questionNumber: targetQuestionNumber,
         pageNumber: targetPageNumber,
@@ -423,6 +477,8 @@ export function MobileCameraView({
     setCapturedBlob(null);
     setDetectedQr(null);
     setManualSheetOverride(null);
+    setLiveDetectedSheet(null);
+    setDuplicateSheetCandidate(null);
     setPreviewUrl(null);
     setFiducialsLocked(false);
     steadyCountRef.current = 0;
@@ -431,7 +487,6 @@ export function MobileCameraView({
     setWarningMessage(null);
   };
 
-  // 3-second countdown metrics (4 frames = 1 second)
   const steadyPercent = Math.min(
     100,
     Math.round((steadyFrames / REQUIRED_STEADY_FRAMES) * 100)
@@ -452,11 +507,11 @@ export function MobileCameraView({
             }`}
           />
           <span className="text-xs font-mono font-semibold tracking-wide text-zinc-100 truncate">
-            {resolvedTargetSheet
-              ? `TARGET: Q${resolvedTargetSheet.questionNumber} SHEET ${resolvedTargetSheet.pageNumber} (${resolvedTargetSheet.parts
+            {liveDetectedSheet
+              ? `DETECTED: Q${liveDetectedSheet.questionNumber} SHEET ${liveDetectedSheet.pageNumber} (${liveDetectedSheet.parts
                   .map((p) => p.label)
                   .join("&")})`
-              : "OPTICAL SHEET SCANNER"}
+              : "SCAN ANY SHEET IN BOOKLET"}
           </span>
         </div>
 
@@ -553,7 +608,6 @@ export function MobileCameraView({
                         )}
                       </span>
 
-                      {/* 3-Second Milestone Dots (1s, 2s, 3s) */}
                       <div className="flex items-center gap-1.5">
                         {[1, 2, 3].map((secStep) => {
                           const isFilled =
@@ -576,7 +630,6 @@ export function MobileCameraView({
                       </div>
                     </div>
 
-                    {/* Smooth 3-Second Progress Bar */}
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-emerald-400 rounded-full transition-all duration-200 ease-linear"
@@ -590,11 +643,28 @@ export function MobileCameraView({
           </div>
         )}
 
-        {/* Real-time CV Feedback Banner */}
+        {/* Real-time CV Feedback / Duplicate / Wrong-Form Banner */}
         {warningMessage && !previewUrl && (
-          <div className="absolute top-16 inset-x-4 z-30 flex items-center gap-2 p-3 bg-zinc-900/90 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
-            <span>{warningMessage}</span>
+          <div className="absolute top-16 inset-x-4 z-30 flex flex-col gap-2 p-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>{warningMessage}</span>
+            </div>
+
+            {duplicateSheetCandidate && (
+              <button
+                type="button"
+                onClick={() => {
+                  const key = duplicateSheetCandidate.sheetKey;
+                  setAllowedReplaceKeys((prev) => new Set(prev).add(key));
+                  setDuplicateSheetCandidate(null);
+                  setWarningMessage(null);
+                }}
+                className="self-end px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 font-bold text-[11px] cursor-pointer"
+              >
+                Replace Existing Scan
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -678,7 +748,7 @@ export function MobileCameraView({
                 ? "Capturing high-resolution sheet..."
                 : fiducialsLocked
                 ? `Hold steady for ${secondsRemainingCount}s...`
-                : "Frame all 4 corner squares or tap shutter"}
+                : "Frame any sheet's 4 black corner squares"}
             </span>
           </div>
         )}

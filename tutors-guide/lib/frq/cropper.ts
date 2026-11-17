@@ -18,56 +18,22 @@ import {
   warpRgbBufferBilinear,
 } from "@/lib/cv/homography";
 import {
+  DecodedSheetQr,
   ManifestSheet,
   SectionFrqManifest,
-  lookupSheetInManifest,
+  matchQrAgainstManifest,
+  parseSelfDescribingSheetQr,
 } from "./manifest";
 import { evaluateFrqSubCropMock } from "./mockEvaluator";
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || process.env.R2_BUCKET_NAME || "";
-
-export interface ParsedQrMetadata {
-  examCode: string;
-  questionNumber: number;
-  pageNumber: number;
-  parts: string[];
-}
-
-/**
- * Parses the QR verification string embedded in the LaTeX footer:
- * Example: "EXAM:AB_2026;Q:1;PG:4;PARTS:AB"
- */
-export function parseSheetQrCode(rawText: string): ParsedQrMetadata | null {
-  try {
-    const segments = rawText.split(";").reduce((acc, segment) => {
-      const [key, val] = segment.split(":");
-      if (key && val) acc[key.trim()] = val.trim();
-      return acc;
-    }, {} as Record<string, string>);
-
-    if (!segments.Q) return null;
-
-    const parsedPage = parseInt(segments.PAGE || segments.PG || "1", 10);
-    const parts = segments.PARTS ? segments.PARTS.split("") : [];
-
-    return {
-      examCode: segments.EXAM || "UNKNOWN",
-      questionNumber: parseInt(segments.Q, 10),
-      pageNumber: Number.isFinite(parsedPage) ? parsedPage : 1,
-      parts,
-    };
-  } catch (e) {
-    console.error("[FRQ Cropper] Failed to parse sheet QR data:", e);
-    return null;
-  }
-}
 
 /**
  * Scans the canonical bottom-right QR region of the perspective-rectified sheet.
  */
 async function extractCanonicalFooterQr(
   rectifiedRgbBuffer: Buffer
-): Promise<ParsedQrMetadata | null> {
+): Promise<DecodedSheetQr | null> {
   try {
     const qrBox = mmRectToPixelExtract(SHEET_REGIONS_MM.footerQrSearch);
 
@@ -95,7 +61,7 @@ async function extractCanonicalFooterQr(
     );
 
     if (code && code.data) {
-      return parseSheetQrCode(code.data);
+      return parseSelfDescribingSheetQr(code.data);
     }
   } catch (err) {
     console.warn("[FRQ Cropper] Canonical QR decode warning:", err);
@@ -150,7 +116,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
     throw new Error(`Submission ${submissionId} not found or missing storage key.`);
   }
 
-  // Mark as PROCESSING so desktop UI reflects live progress
   await prisma.frqSubmission.update({
     where: { id: submission.id },
     data: {
@@ -171,7 +136,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
     const srcWidth = srcInfo.width;
     const srcHeight = srcInfo.height;
 
-    // 2. Downsample to ~850px wide grayscale buffer for fast <12ms fiducial detection
+    // 2. Downsample to ~850px wide grayscale buffer for <12ms fiducial detection
     const detectWidth = Math.min(850, srcWidth);
     const scaleFactor = detectWidth / srcWidth;
     const detectHeight = Math.round(srcHeight * scaleFactor);
@@ -251,7 +216,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       H,
     });
 
-    // Save rectified full sheet for staff audit & clean review
     const deskewedJpeg = await sharp(rectifiedRgb, {
       raw: {
         width: CANONICAL_SHEET_PX.width,
@@ -262,43 +226,52 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       .jpeg({ quality: 88 })
       .toBuffer();
 
-    const deskewedKey = `deskewed/${submission.testId}/${submission.sectionId}/${submission.id}_rectified.jpg`;
-    const deskewedSheetUrl = await uploadJpegToStorage(deskewedKey, deskewedJpeg);
-
     // 4. Decode footer QR from exact canonical position on the rectified sheet
     const qrData = await extractCanonicalFooterQr(rectifiedRgb);
     const manifest = submission.captureSession
       ?.manifestSnapshot as unknown as SectionFrqManifest | null;
 
+    let resolvedSectionId = submission.sectionId;
     let resolvedQuestionId = submission.questionId;
     let resolvedPageNumber = submission.pageNumber;
     let resolvedSheet: ManifestSheet | null = null;
 
     if (manifest) {
       if (qrData) {
-        const matched = lookupSheetInManifest(
-          manifest,
-          qrData.questionNumber,
-          qrData.pageNumber
-        );
-        if (matched) {
-          resolvedQuestionId = matched.question.questionId;
-          resolvedPageNumber = matched.sheet.pageNumber;
-          resolvedSheet = matched.sheet;
+        const matchResult = matchQrAgainstManifest(manifest, qrData);
+        if (matchResult.status === "WRONG_FORM" || matchResult.status === "NOT_IN_TEST") {
+          await prisma.frqSubmission.update({
+            where: { id: submission.id },
+            data: {
+              status: FrqSubmissionStatus.NEEDS_RETAKE,
+              processingError:
+                matchResult.status === "WRONG_FORM"
+                  ? `Wrong exam form (${matchResult.actualForm}). Expected ${matchResult.expectedForm}.`
+                  : matchResult.reason,
+            },
+          });
+          return [];
         }
+        resolvedSectionId = matchResult.sheet.sectionId;
+        resolvedQuestionId = matchResult.sheet.questionId;
+        resolvedPageNumber = matchResult.sheet.pageNumber;
+        resolvedSheet = matchResult.sheet;
       }
 
       if (!resolvedSheet) {
         resolvedSheet =
           manifest.sheets.find(
             (s) =>
+              s.sectionId === resolvedSectionId &&
               s.questionId === resolvedQuestionId &&
               s.pageNumber === resolvedPageNumber
           ) || null;
       }
     }
 
-    // Determine exact sub-parts to crop (never creates phantom crops for unused slots)
+    const deskewedKey = `deskewed/${submission.testId}/${resolvedSectionId}/${submission.id}_rectified.jpg`;
+    const deskewedSheetUrl = await uploadJpegToStorage(deskewedKey, deskewedJpeg);
+
     const partsToCrop = resolvedSheet
       ? resolvedSheet.parts
       : (qrData?.parts.length
@@ -353,8 +326,8 @@ export async function processAndCropFrqSubmission(submissionId: string) {
 
     // 6. Persist crops and update submission metadata atomically
     const savedCrops = await prisma.$transaction(async (tx) => {
-      // If QR corrected the questionId/pageNumber from a fallback guess, remove any duplicate row
       if (
+        resolvedSectionId !== submission.sectionId ||
         resolvedQuestionId !== submission.questionId ||
         resolvedPageNumber !== submission.pageNumber
       ) {
@@ -362,7 +335,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
           where: {
             profileId: submission.profileId,
             testId: submission.testId,
-            sectionId: submission.sectionId,
+            sectionId: resolvedSectionId,
             questionId: resolvedQuestionId,
             pageNumber: resolvedPageNumber,
             id: { not: submission.id },
@@ -393,11 +366,16 @@ export async function processAndCropFrqSubmission(submissionId: string) {
         where: { id: submission.id },
         data: {
           status: FrqSubmissionStatus.CROPPED,
+          sectionId: resolvedSectionId,
           questionId: resolvedQuestionId,
           pageNumber: resolvedPageNumber,
           deskewedSheetUrl,
-          detectedExamCode: qrData?.examCode ?? submission.detectedExamCode,
-          detectedQuestion: qrData?.questionNumber ?? submission.detectedQuestion,
+          detectedExamCode:
+            qrData?.formId ?? qrData?.examCode ?? submission.detectedExamCode,
+          detectedQuestion:
+            qrData && qrData.questionNumber > 0
+              ? qrData.questionNumber
+              : submission.detectedQuestion,
           processingError: null,
         },
       });
@@ -405,7 +383,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       return createdCrops;
     });
 
-    // 7. Trigger downstream evaluator pass (awaited so Vercel doesn't kill it early)
+    // 7. Trigger downstream evaluator pass
     await Promise.allSettled(
       savedCrops.map((c) => evaluateFrqSubCropMock(c.id))
     );

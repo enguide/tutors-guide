@@ -19,6 +19,7 @@ import {
 
 export interface InitialMobileSubmission {
   id: string;
+  sectionId: string;
   questionId: string;
   pageNumber: number;
   status: FrqSubmissionStatus;
@@ -53,44 +54,42 @@ export function MobileCameraContainer({
 
   const [explicitTargetSheet, setExplicitTargetSheet] =
     useState<ManifestSheet | null>(null);
+  const [allowReplaceExplicit, setAllowReplaceExplicit] = useState(false);
 
   const submissionBySheetKey = useMemo(() => {
     const map = new Map<string, InitialMobileSubmission>();
     for (const sub of submissions) {
-      map.set(`${sub.questionId}::p${sub.pageNumber}`, sub);
+      map.set(`${sub.sectionId}::${sub.questionId}::p${sub.pageNumber}`, sub);
     }
     return map;
   }, [submissions]);
+
+  const uploadedSheetKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const [key, sub] of submissionBySheetKey.entries()) {
+      if (
+        sub.status !== FrqSubmissionStatus.NEEDS_RETAKE &&
+        sub.status !== FrqSubmissionStatus.FAILED
+      ) {
+        keys.add(key);
+      }
+    }
+    return keys;
+  }, [submissionBySheetKey]);
 
   const nextRecommendedSheet = useMemo<ManifestSheet | null>(() => {
     if (explicitTargetSheet) return explicitTargetSheet;
     if (!manifest) return null;
 
     for (const sheet of manifest.sheets) {
-      const existing = submissionBySheetKey.get(sheet.sheetKey);
-      if (
-        !existing ||
-        existing.status === FrqSubmissionStatus.NEEDS_RETAKE ||
-        existing.status === FrqSubmissionStatus.FAILED
-      ) {
+      if (!uploadedSheetKeys.has(sheet.sheetKey)) {
         return sheet;
       }
     }
     return null;
-  }, [explicitTargetSheet, manifest, submissionBySheetKey]);
+  }, [explicitTargetSheet, manifest, uploadedSheetKeys]);
 
-  const completedSheetCount = useMemo(() => {
-    if (!manifest) return submissions.length;
-    return manifest.sheets.filter((s) => {
-      const sub = submissionBySheetKey.get(s.sheetKey);
-      return (
-        sub &&
-        sub.status !== FrqSubmissionStatus.NEEDS_RETAKE &&
-        sub.status !== FrqSubmissionStatus.FAILED
-      );
-    }).length;
-  }, [manifest, submissions.length, submissionBySheetKey]);
-
+  const completedSheetCount = uploadedSheetKeys.size;
   const allComplete =
     manifest !== null && completedSheetCount >= manifest.totalSheets;
 
@@ -121,6 +120,7 @@ export function MobileCameraContainer({
             type="button"
             onClick={() => {
               setExplicitTargetSheet(null);
+              setAllowReplaceExplicit(false);
               setMode("camera");
             }}
             className={`px-3.5 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer ${
@@ -134,7 +134,6 @@ export function MobileCameraContainer({
           </button>
         </div>
 
-        {/* Prominent Next-Step Banner when All Sheets Are Synced */}
         {allComplete && (
           <div className="mt-4 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-start gap-3">
             <MonitorCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
@@ -144,7 +143,7 @@ export function MobileCameraContainer({
               </div>
               <p className="text-xs text-zinc-300 leading-relaxed">
                 You are finished using your phone. Return to your computer screen and click{" "}
-                <span className="font-bold text-white">Complete Section</span> to finish and grade your exam.
+                <span className="font-bold text-white">Complete & View Results</span> to finish your exam.
               </p>
             </div>
           </div>
@@ -165,6 +164,7 @@ export function MobileCameraContainer({
                 type="button"
                 onClick={() => {
                   setExplicitTargetSheet(sheet);
+                  setAllowReplaceExplicit(isDone);
                   setMode("camera");
                 }}
                 className={`w-full text-left p-3.5 rounded-xl border transition-colors flex items-center justify-between gap-3 cursor-pointer ${
@@ -192,14 +192,14 @@ export function MobileCameraContainer({
                       {needsRetake
                         ? sub?.processingError || "Retake required — tap to rescan"
                         : isDone
-                        ? "Synced to computer • Tap only to retake"
-                        : "Tap to scan this sheet"}
+                        ? "Synced to computer • Tap only to replace"
+                        : "Ready to scan (any order)"}
                     </div>
                   </div>
                 </div>
 
                 <span className="text-[11px] font-semibold text-zinc-400 shrink-0">
-                  {isDone ? "Retake" : "Scan"}
+                  {isDone ? "Replace" : "Scan"}
                 </span>
               </button>
             );
@@ -211,7 +211,7 @@ export function MobileCameraContainer({
           <span>
             {allComplete
               ? "Safe to lock phone & submit on computer"
-              : "Synced in real time with your computer"}
+              : "Scan pages in any order — auto-matched via QR"}
           </span>
         </div>
       </div>
@@ -248,13 +248,13 @@ export function MobileCameraContainer({
             </div>
             <p className="text-xs text-zinc-300 leading-relaxed">
               All {manifest?.totalSheets} sheets are verified on your desktop screen. Click{" "}
-              <span className="font-bold text-white">Complete Section</span> on your computer to finish.
+              <span className="font-bold text-white">Complete & View Results</span> on your computer to finish.
             </p>
           </div>
         ) : (
           <p className="text-xs text-zinc-400 mt-2 max-w-xs leading-relaxed">
             {manifest
-              ? `${completedSheetCount} of ${manifest.totalSheets} required sheets captured.`
+              ? `${completedSheetCount} of ${manifest.totalSheets} required sheets captured. Scan any remaining page next.`
               : "Your page was synchronized with your computer."}
           </p>
         )}
@@ -265,16 +265,13 @@ export function MobileCameraContainer({
               type="button"
               onClick={() => {
                 setExplicitTargetSheet(null);
+                setAllowReplaceExplicit(false);
                 setMode("camera");
               }}
               className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>
-                {nextRecommendedSheet
-                  ? `Scan Q${nextRecommendedSheet.questionNumber} Sheet ${nextRecommendedSheet.pageNumber}`
-                  : "Scan Next Sheet"}
-              </span>
+              <span>Scan Next Sheet (Any Order)</span>
             </button>
           )}
 
@@ -306,6 +303,8 @@ export function MobileCameraContainer({
       manifest={manifest}
       defaultQuestionId={defaultQuestionId}
       suggestedSheet={nextRecommendedSheet}
+      uploadedSheetKeys={uploadedSheetKeys}
+      initialAllowReplace={allowReplaceExplicit}
       completedCount={completedSheetCount}
       onOpenChecklist={manifest ? () => setMode("checklist") : undefined}
       onSuccess={(result) => {
@@ -313,6 +312,7 @@ export function MobileCameraContainer({
           const filtered = prev.filter(
             (s) =>
               !(
+                s.sectionId === result.sectionId &&
                 s.questionId === result.questionId &&
                 s.pageNumber === result.pageNumber
               )
@@ -321,6 +321,7 @@ export function MobileCameraContainer({
             ...filtered,
             {
               id: result.submissionId,
+              sectionId: result.sectionId,
               questionId: result.questionId,
               pageNumber: result.pageNumber,
               status: FrqSubmissionStatus.UPLOADED,
@@ -334,6 +335,7 @@ export function MobileCameraContainer({
           parts: result.parts,
         });
         setExplicitTargetSheet(null);
+        setAllowReplaceExplicit(false);
         setMode("interstitial");
       }}
     />
