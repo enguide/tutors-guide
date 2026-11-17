@@ -51,6 +51,7 @@ export function useCaptureSync({
   const [error, setError] = useState<string | null>(null);
   const [refreshCount, setRefreshCount] = useState<number>(0);
 
+  const manifestRef = useRef<SectionFrqManifest | null>(null);
   const onUploadSuccessRef = useRef(onUploadSuccess);
   useEffect(() => {
     onUploadSuccessRef.current = onUploadSuccess;
@@ -75,8 +76,10 @@ export function useCaptureSync({
           return;
         }
 
+        const resolvedManifest = (res.manifest as SectionFrqManifest | null) ?? null;
+        manifestRef.current = resolvedManifest;
+        setManifest(resolvedManifest);
         setToken(res.sessionToken);
-        setManifest((res.manifest as SectionFrqManifest | null) ?? null);
 
         if (Array.isArray(res.submissions)) {
           const mapped: CaptureSubmissionSummary[] = res.submissions.map((sub) => ({
@@ -107,7 +110,7 @@ export function useCaptureSync({
     };
   }, [enabled, testId, sectionId, questionId, refreshCount]);
 
-  // 2. Jittered short-polling against lightweight /status endpoint (scales cleanly to 1,000+ users)
+  // 2. Jittered short-polling against lightweight /status endpoint
   useEffect(() => {
     if (!enabled || !token) return;
     let isCancelled = false;
@@ -116,26 +119,29 @@ export function useCaptureSync({
     const pollStatus = async () => {
       if (isCancelled) return;
 
-      // Pause polling when browser tab is hidden to save server capacity
       if (typeof document !== "undefined" && document.hidden) {
-        timeoutId = setTimeout(pollStatus, 4000);
+        timeoutId = setTimeout(pollStatus, 3000);
         return;
       }
 
       try {
         const res = await fetch(`/api/capture/${token}/status`, {
           cache: "no-store",
+          credentials: "same-origin",
         });
         if (isCancelled) return;
 
-        if (res.ok) {
+        if (!res.ok) {
+          console.warn(`[Capture Sync] /status returned HTTP ${res.status}`);
+        } else {
           const data = await res.json();
           if (data.isExpired) {
             setError("Capture session expired. Refresh to generate a new QR code.");
             return;
           }
 
-          if (data.manifest && !manifest) {
+          if (data.manifest && !manifestRef.current) {
+            manifestRef.current = data.manifest;
             setManifest(data.manifest);
           }
 
@@ -153,9 +159,8 @@ export function useCaptureSync({
               }
             }
 
-            // If all expected sheets in manifest have reached a terminal state, slow polling to 10s
             const expectedCount =
-              data.manifest?.totalSheets ?? manifest?.totalSheets ?? 0;
+              data.manifest?.totalSheets ?? manifestRef.current?.totalSheets ?? 0;
             const completedCount = incoming.filter((s) =>
               TERMINAL_STATUSES.has(s.status)
             ).length;
@@ -167,29 +172,30 @@ export function useCaptureSync({
 
             const baseDelay =
               expectedCount > 0 && completedCount >= expectedCount && !hasInFlight
-                ? 10000
-                : 2500 + Math.floor(Math.random() * 1000); // 2.5s - 3.5s jitter
+                ? 8000
+                : 2000 + Math.floor(Math.random() * 800);
 
             timeoutId = setTimeout(pollStatus, baseDelay);
             return;
           }
         }
       } catch (err) {
-        console.warn("Capture status poll transient error:", err);
+        console.warn("[Capture Sync] Status poll error:", err);
       }
 
       if (!isCancelled) {
-        timeoutId = setTimeout(pollStatus, 4000);
+        timeoutId = setTimeout(pollStatus, 3000);
       }
     };
 
-    timeoutId = setTimeout(pollStatus, 2000);
+    // Run first poll immediately at 800ms so desktop updates right after mobile upload
+    timeoutId = setTimeout(pollStatus, 800);
 
     return () => {
       isCancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [enabled, token, manifest]);
+  }, [enabled, token]);
 
   const upsertOptimisticSubmission = useCallback(
     (incoming: CaptureSubmissionSummary) => {
@@ -209,13 +215,13 @@ export function useCaptureSync({
 
   const refreshSession = useCallback(() => {
     notifiedIdsRef.current.clear();
+    manifestRef.current = null;
     setToken(null);
     setSubmissions([]);
     setError(null);
     setRefreshCount((prev) => prev + 1);
   }, []);
 
-  // Convenience single-question fields for backward compatibility
   const matchingSubmission = questionId
     ? submissions.find((s) => s.questionId === questionId)
     : submissions[0];

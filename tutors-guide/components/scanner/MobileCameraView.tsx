@@ -51,6 +51,7 @@ interface DecodedQrMeta {
 
 const BLUR_THRESHOLD = 95.0;
 const MAX_UPLOAD_DIMENSION = 2200; // ~200 DPI US Letter; keeps S3 upload <500KB & server RAM low
+const REQUIRED_STEADY_FRAMES = 3; // 3 consecutive locked frames (~750ms) before auto-shutter
 
 function parseFooterQrText(rawText: string): DecodedQrMeta | null {
   try {
@@ -94,8 +95,9 @@ export function MobileCameraView({
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Live CV telemetry
+  // Live CV telemetry & hold-steady progress (0..REQUIRED_STEADY_FRAMES)
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
+  const [steadyFrames, setSteadyFrames] = useState<number>(0);
 
   // Captured image state
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
@@ -261,6 +263,7 @@ export function MobileCameraView({
       setWarningMessage("Overhead glare detected. Tilt sheet slightly.");
       setFiducialsLocked(false);
       steadyCountRef.current = 0;
+      setSteadyFrames(0);
       return;
     }
 
@@ -270,6 +273,7 @@ export function MobileCameraView({
       setWarningMessage("Hold steady — focusing on handwriting...");
       setFiducialsLocked(false);
       steadyCountRef.current = 0;
+      setSteadyFrames(0);
       return;
     }
 
@@ -285,6 +289,7 @@ export function MobileCameraView({
       setWarningMessage("Align all 4 black corner squares inside the frame.");
       setFiducialsLocked(false);
       steadyCountRef.current = 0;
+      setSteadyFrames(0);
       return;
     }
 
@@ -293,9 +298,11 @@ export function MobileCameraView({
     setFiducialsLocked(true);
 
     steadyCountRef.current += 1;
+    const clampedSteady = Math.min(steadyCountRef.current, REQUIRED_STEADY_FRAMES);
+    setSteadyFrames(clampedSteady);
 
-    // Auto-capture after 3 consecutive locked frames (~750ms)
-    if (steadyCountRef.current >= 3 && !capturedBlob && !isProcessing) {
+    // Auto-capture after REQUIRED_STEADY_FRAMES consecutive locked frames (~750ms)
+    if (steadyCountRef.current >= REQUIRED_STEADY_FRAMES && !capturedBlob && !isProcessing) {
       captureStill();
     }
   }, [isProcessing, capturedBlob, captureStill]);
@@ -389,9 +396,15 @@ export function MobileCameraView({
     setPreviewUrl(null);
     setFiducialsLocked(false);
     steadyCountRef.current = 0;
+    setSteadyFrames(0);
     setIsProcessing(false);
     setWarningMessage(null);
   };
+
+  const steadyPercent = Math.min(
+    100,
+    Math.round((steadyFrames / REQUIRED_STEADY_FRAMES) * 100)
+  );
 
   return (
     <div className="relative w-full h-screen bg-black flex flex-col justify-between overflow-hidden select-none">
@@ -490,11 +503,46 @@ export function MobileCameraView({
                 </span>
               </div>
 
+              {/* Hold-Steady Progress Pill with Filling Dots + Bar */}
               {fiducialsLocked && (
-                <div className="absolute bottom-3 inset-x-0 flex justify-center">
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/90 text-black text-[10px] font-bold tracking-wide flex items-center gap-1">
-                    <ScanLine className="w-3 h-3" />4 CORNERS LOCKED — HOLD STEADY
-                  </span>
+                <div className="absolute bottom-3 inset-x-3 flex justify-center">
+                  <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[240px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold tracking-wide text-emerald-300 flex items-center gap-1">
+                        <ScanLine className="w-3 h-3 shrink-0" />
+                        <span>
+                          {steadyFrames >= REQUIRED_STEADY_FRAMES
+                            ? "CAPTURING..."
+                            : "HOLD STEADY"}
+                        </span>
+                      </span>
+
+                      {/* 3-Step Filling Dots */}
+                      <div className="flex items-center gap-1.5">
+                        {Array.from({ length: REQUIRED_STEADY_FRAMES }, (_, idx) => {
+                          const isFilled = idx < steadyFrames;
+                          return (
+                            <span
+                              key={idx}
+                              className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                                isFilled
+                                  ? "bg-emerald-400 scale-110 shadow-[0_0_6px_rgba(52,211,153,0.9)]"
+                                  : "bg-zinc-600"
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Smooth Filling Progress Bar */}
+                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-400 rounded-full transition-all duration-200 ease-out"
+                        style={{ width: `${steadyPercent}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -586,7 +634,7 @@ export function MobileCameraView({
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">
               {fiducialsLocked
-                ? "Auto-capturing..."
+                ? `Hold steady (${steadyFrames}/${REQUIRED_STEADY_FRAMES})...`
                 : "Frame all 4 corner squares or tap shutter"}
             </span>
           </div>
