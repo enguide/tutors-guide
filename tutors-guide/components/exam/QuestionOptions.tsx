@@ -4,6 +4,7 @@
 import React from "react";
 import { QuestionFrontmatter } from "@/types/content";
 import { MarkdownQuestionRenderer } from "@/components/MarkdownQuestionRenderer";
+import { resolveQuestionSubParts } from "@/lib/frq/manifest";
 
 export type QuestionOptionVariant = "sat" | "ap" | "act" | "gre";
 
@@ -41,11 +42,27 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
   onToggleEliminate,
 }) => {
   // -------------------------------------------------------------
-  // 1. Handwritten Optical Free Response (Epic 16)
+  // 1. Handwritten Optical Free Response (Dynamic Sub-Part Manifest)
   // -------------------------------------------------------------
   if (question.questionType === "FRQ_HANDWRITTEN") {
+    const resolvedParts = resolveQuestionSubParts(question);
+    const totalSheets = Math.max(1, Math.ceil(resolvedParts.length / 2));
     const packetPageStart = (question.questionNumber - 1) * 2 + 4;
-    const packetPageEnd = packetPageStart + 1;
+
+    const sheetCards = Array.from({ length: totalSheets }, (_, idx) => {
+      const sheetNumber = idx + 1;
+      const sheetParts = resolvedParts.slice(idx * 2, idx * 2 + 2);
+      const partLabelText =
+        sheetParts.length === 1
+          ? `Part ${sheetParts[0].label}`
+          : `Parts ${sheetParts.map((p) => p.label).join(" & ")}`;
+
+      return {
+        sheetNumber,
+        partLabelText,
+        packetPage: packetPageStart + idx,
+      };
+    });
 
     return (
       <div className="pt-4 pb-2">
@@ -59,14 +76,19 @@ export const QuestionOptions: React.FC<QuestionOptionsProps> = ({
                 Complete all handwritten work for Question {question.questionNumber} inside your physical response packet:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-xs">
-                <div className="px-3 py-2 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded flex items-center justify-between">
-                  <span className="text-neutral-700 dark:text-neutral-300">Sheet 1 (Parts A & B)</span>
-                  <span className="text-[11px] text-neutral-400 font-sans">Page {packetPageStart}</span>
-                </div>
-                <div className="px-3 py-2 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded flex items-center justify-between">
-                  <span className="text-neutral-700 dark:text-neutral-300">Sheet 2 (Parts C & D)</span>
-                  <span className="text-[11px] text-neutral-400 font-sans">Page {packetPageEnd}</span>
-                </div>
+                {sheetCards.map((card) => (
+                  <div
+                    key={card.sheetNumber}
+                    className="px-3 py-2 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded flex items-center justify-between"
+                  >
+                    <span className="text-neutral-700 dark:text-neutral-300">
+                      Sheet {card.sheetNumber} ({card.partLabelText})
+                    </span>
+                    <span className="text-[11px] text-neutral-400 font-sans">
+                      Page {card.packetPage}
+                    </span>
+                  </div>
+                ))}
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
                 Do not stop to upload now. You will be prompted to scan and upload all sheets continuously after completing this section.

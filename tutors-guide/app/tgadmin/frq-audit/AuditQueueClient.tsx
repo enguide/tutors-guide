@@ -15,6 +15,9 @@ interface AuditCrop {
   auditReason: string | null;
   frqSubmission: {
     questionId: string;
+    pageNumber?: number;
+    fullSheetUrl?: string | null;
+    deskewedSheetUrl?: string | null;
     profile: {
       firstName: string;
       lastName: string;
@@ -61,7 +64,7 @@ export function AuditQueueClient({ initialCrops }: { initialCrops: AuditCrop[] }
             key={c.id}
             type="button"
             onClick={() => setActiveIdx(i)}
-            className={`w-full text-left p-3 rounded-lg border transition-colors ${
+            className={`w-full text-left p-3 rounded-lg border transition-colors cursor-pointer ${
               i === activeIdx
                 ? "bg-zinc-800 border-blue-500/50"
                 : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
@@ -107,6 +110,15 @@ function CropAuditForm({ crop, onSuccess }: CropAuditFormProps) {
   const [transcription, setTranscription] = useState<string>(crop.transcription ?? "");
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<"crop" | "sheet">("crop");
+
+  const rectifiedOrFullSheetUrl =
+    crop.frqSubmission.deskewedSheetUrl || crop.frqSubmission.fullSheetUrl;
+
+  const activeImageUrl =
+    viewMode === "sheet" && rectifiedOrFullSheetUrl
+      ? rectifiedOrFullSheetUrl
+      : crop.cropUrl;
 
   const handleResolve = async () => {
     setIsSubmitting(true);
@@ -132,30 +144,68 @@ function CropAuditForm({ crop, onSuccess }: CropAuditFormProps) {
         <div>
           <h2 className="text-base font-bold text-white">
             Evaluating Part {crop.subPartLabel}
+            {crop.frqSubmission.pageNumber
+              ? ` (Sheet ${crop.frqSubmission.pageNumber})`
+              : ""}
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
             Flag Reason: <span className="text-amber-400">{crop.auditReason}</span>
           </p>
         </div>
         <a
-          href={crop.cropUrl}
+          href={activeImageUrl}
           target="_blank"
           rel="noreferrer"
           className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
         >
-          <ExternalLink className="w-3.5 h-3.5" /> Full Image
+          <ExternalLink className="w-3.5 h-3.5" /> Open Image
         </a>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Handwriting Crop Display */}
-        <div className="bg-black border border-zinc-800 rounded-lg overflow-hidden flex items-center justify-center p-2 min-h-[280px]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={crop.cropUrl}
-            alt="Student response crop"
-            className="max-h-[360px] object-contain rounded"
-          />
+        {/* Handwriting Crop / Rectified Full-Sheet Display */}
+        <div className="space-y-2">
+          {rectifiedOrFullSheetUrl && (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setViewMode("crop")}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  viewMode === "crop"
+                    ? "bg-blue-600 text-white"
+                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Part {crop.subPartLabel} Crop
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("sheet")}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  viewMode === "sheet"
+                    ? "bg-blue-600 text-white"
+                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                {crop.frqSubmission.deskewedSheetUrl
+                  ? "Rectified Full Sheet"
+                  : "Original Full Sheet"}
+              </button>
+            </div>
+          )}
+
+          <div className="bg-black border border-zinc-800 rounded-lg overflow-hidden flex items-center justify-center p-2 min-h-[280px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeImageUrl}
+              alt={
+                viewMode === "sheet"
+                  ? "Rectified full exam sheet"
+                  : "Student response crop"
+              }
+              className="max-h-[380px] object-contain rounded"
+            />
+          </div>
         </div>
 
         {/* Audit Form Controls */}
@@ -204,7 +254,7 @@ function CropAuditForm({ crop, onSuccess }: CropAuditFormProps) {
             type="button"
             onClick={handleResolve}
             disabled={isSubmitting}
-            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />

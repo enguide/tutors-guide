@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CaptureSessionStatus } from "@prisma/client";
-import { MobileCameraContainer } from "./MobileCameraContainer";
+import { SectionFrqManifest } from "@/lib/frq/manifest";
+import { MobileCameraContainer, InitialMobileSubmission } from "./MobileCameraContainer";
 
 export const instant = false;
 
@@ -16,7 +17,6 @@ export default async function MobileScanPage({
 
   const { token } = await params;
 
-  // Validate session existence and validity
   const session = await prisma.captureSession.findUnique({
     where: { sessionToken: token },
     select: {
@@ -24,6 +24,22 @@ export default async function MobileScanPage({
       status: true,
       expiresAt: true,
       questionId: true,
+      manifestSnapshot: true,
+      frqSubmissions: {
+        select: {
+          id: true,
+          questionId: true,
+          pageNumber: true,
+          status: true,
+          processingError: true,
+          crops: {
+            select: {
+              id: true,
+              subPartLabel: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -35,13 +51,28 @@ export default async function MobileScanPage({
     session.expiresAt < new Date() ||
     session.status === CaptureSessionStatus.EXPIRED;
 
+  const manifest =
+    (session.manifestSnapshot as unknown as SectionFrqManifest | null) ?? null;
+
+  const initialSubmissions: InitialMobileSubmission[] = session.frqSubmissions.map(
+    (sub) => ({
+      id: sub.id,
+      questionId: sub.questionId,
+      pageNumber: sub.pageNumber,
+      status: sub.status,
+      processingError: sub.processingError,
+      cropLabels: sub.crops.map((c) => c.subPartLabel),
+    })
+  );
+
   return (
     <main className="w-full h-screen bg-black overflow-hidden">
       <MobileCameraContainer
         sessionToken={token}
-        questionId={session.questionId ?? undefined}
+        defaultQuestionId={session.questionId ?? undefined}
         isExpired={isExpired}
-        initialStatus={session.status}
+        manifest={manifest}
+        initialSubmissions={initialSubmissions}
       />
     </main>
   );

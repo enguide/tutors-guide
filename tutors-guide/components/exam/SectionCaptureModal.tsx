@@ -1,15 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/exam/SectionCaptureModal.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { QuestionFrontmatter } from "@/types/content";
+import { buildSectionFrqManifest } from "@/lib/frq/manifest";
+import { useCaptureSync, CaptureSubmissionSummary } from "@/hooks/useCaptureSync";
 import {
-  getOrCreateCaptureSession,
   getPresignedUploadForSession,
   finalizeSubmissionUpload,
 } from "@/actions/frqCapture";
+import { FrqSubmissionStatus } from "@prisma/client";
 import {
   CheckCircle2,
   Circle,
@@ -17,6 +18,8 @@ import {
   Loader2,
   ArrowRight,
   Upload,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 
 interface SectionCaptureModalProps {
@@ -28,6 +31,57 @@ interface SectionCaptureModalProps {
   isSubmitting?: boolean;
 }
 
+const MAX_DESKTOP_IMAGE_DIM = 2200;
+
+/**
+ * Downscales oversized desktop image uploads on an offscreen canvas so they match
+ * the 2200px (~200 DPI) canonical upload budget used by mobile captures.
+ */
+async function normalizeDesktopImageFile(file: File): Promise<Blob> {
+  if (!file.type.startsWith("image/")) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const longest = Math.max(img.width, img.height);
+      if (longest <= MAX_DESKTOP_IMAGE_DIM) {
+        resolve(file);
+        return;
+      }
+
+      const scale = MAX_DESKTOP_IMAGE_DIM / longest;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => resolve(blob || file),
+        "image/jpeg",
+        0.91
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
   isOpen,
   testId,
@@ -36,80 +90,86 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
   onFinalizeSection,
   isSubmitting = false,
 }) => {
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [uploadedPages, setUploadedPages] = useState<
-    Record<string, { page1: boolean; page2: boolean }>
-  >({});
   const [uploadingTarget, setUploadingTarget] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const activeTargetRef = useRef<{ questionId: string; pageNumber: number } | null>(null);
-
-  const handwrittenQuestions = questions.filter(
-    (q) => q.questionType === "FRQ_HANDWRITTEN"
+  const activeTargetRef = useRef<{ questionId: string; pageNumber: number } | null>(
+    null
   );
 
-  useEffect(() => {
-    if (!isOpen) return;
+  // Build authoritative manifest directly from section questions
+  const localManifest = useMemo(
+    () => buildSectionFrqManifest(testId, sectionId, questions),
+    [testId, sectionId, questions]
+  );
 
-    let mounted = true;
-    getOrCreateCaptureSession({ testId, sectionId }).then((res) => {
-      if (mounted && res.success && res.sessionToken) {
-        setToken(res.sessionToken);
-        setLoading(false);
+  const {
+    token,
+    manifest: serverManifest,
+    submissions,
+    isLoading,
+    error: syncError,
+    upsertOptimisticSubmission,
+  } = useCaptureSync({
+    testId,
+    sectionId,
+    enabled: isOpen,
+  });
 
-        // Pre-populate any sheets already uploaded for this session
-        if (Array.isArray(res.submissions)) {
-          const map: Record<string, { page1: boolean; page2: boolean }> = {};
-          res.submissions.forEach((sub: any) => {
-            if (!map[sub.questionId]) {
-              map[sub.questionId] = { page1: false, page2: false };
-            }
-            if (sub.pageNumber === 1) map[sub.questionId].page1 = true;
-            if (sub.pageNumber === 2) map[sub.questionId].page2 = true;
-          });
-          setUploadedPages(map);
-        }
-      }
-    });
+  const activeManifest = serverManifest ?? localManifest;
 
-    return () => {
-      mounted = false;
-    };
-  }, [isOpen, testId, sectionId]);
+  // Map `${questionId}::p${pageNumber}` -> submission record
+  const submissionMap = useMemo(() => {
+    const map = new Map<string, CaptureSubmissionSummary>();
+    for (const sub of submissions) {
+      map.set(`${sub.questionId}::p${sub.pageNumber}`, sub);
+    }
+    return map;
+  }, [submissions]);
 
-  // Listen to SSE events for real-time status updates across all sheets
-  useEffect(() => {
-    if (!token) return;
+  // Check if any uploaded sheets are still actively being deskewed/cropped
+  const hasSheetsInFlight = useMemo(
+    () =>
+      submissions.some(
+        (s) =>
+          s.status === FrqSubmissionStatus.UPLOADED ||
+          s.status === FrqSubmissionStatus.PROCESSING
+      ),
+    [submissions]
+  );
 
-    const eventSource = new EventSource(`/api/capture/${token}/events`);
+  const verifiedSheetCount = useMemo(
+    () =>
+      activeManifest.sheets.filter((sheet) => {
+        const sub = submissionMap.get(sheet.sheetKey);
+        return (
+          sub &&
+          (sub.status === FrqSubmissionStatus.CROPPED ||
+            sub.status === FrqSubmissionStatus.PENDING_AUDIT ||
+            sub.status === FrqSubmissionStatus.EVALUATED)
+        );
+      }).length,
+    [activeManifest.sheets, submissionMap]
+  );
 
-    eventSource.addEventListener("STATUS_CHANGE", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.questionId && data.pageNumber) {
-          setUploadedPages((prev) => ({
-            ...prev,
-            [data.questionId]: {
-              ...(prev[data.questionId] || { page1: false, page2: false }),
-              [data.pageNumber === 1 ? "page1" : "page2"]: true,
-            },
-          }));
-        }
-      } catch (err) {
-        console.error("Error parsing SSE status change:", err);
-      }
-    });
+  const retakeNeededCount = useMemo(
+    () =>
+      activeManifest.sheets.filter((sheet) => {
+        const sub = submissionMap.get(sheet.sheetKey);
+        return (
+          sub &&
+          (sub.status === FrqSubmissionStatus.NEEDS_RETAKE ||
+            sub.status === FrqSubmissionStatus.FAILED)
+        );
+      }).length,
+    [activeManifest.sheets, submissionMap]
+  );
 
-    return () => {
-      eventSource.close();
-    };
-  }, [token]);
-
-  // Handle direct file upload from desktop (PDF or Image)
-  const handleDesktopFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle direct image file upload from desktop fallback
+  const handleDesktopFileSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file || !token || !activeTargetRef.current) return;
 
@@ -119,9 +179,13 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     setUploadError(null);
 
     try {
+      const normalizedBlob = await normalizeDesktopImageFile(file);
+      const mimeType =
+        normalizedBlob instanceof File ? normalizedBlob.type : "image/jpeg";
+
       const presignRes = await getPresignedUploadForSession(
         token,
-        file.type || "image/jpeg",
+        mimeType || "image/jpeg",
         questionId,
         pageNumber
       );
@@ -133,7 +197,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
       const { url, fields, key, publicUrl } = presignRes.presigned;
       const formData = new FormData();
       Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
-      formData.append("file", file);
+      formData.append("file", normalizedBlob, "sheet.jpg");
 
       const uploadRes = await fetch(url, {
         method: "POST",
@@ -148,26 +212,31 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
         sessionToken: token,
         storageKey: key,
         publicUrl,
-        mimeType: file.type || "image/jpeg",
-        fileSizeBytes: file.size,
+        mimeType: mimeType || "image/jpeg",
+        fileSizeBytes: normalizedBlob.size,
         questionId,
         pageNumber,
       });
 
-      if (!finalizeRes.success) {
-        throw new Error(finalizeRes.error || "Failed to finalize sheet submission.");
+      if (!finalizeRes.success || !finalizeRes.submission) {
+        throw new Error(
+          finalizeRes.error || "Failed to finalize sheet submission."
+        );
       }
 
-      setUploadedPages((prev) => ({
-        ...prev,
-        [questionId]: {
-          ...(prev[questionId] || { page1: false, page2: false }),
-          [pageNumber === 1 ? "page1" : "page2"]: true,
-        },
-      }));
-    } catch (err: any) {
+      upsertOptimisticSubmission({
+        id: finalizeRes.submission.id,
+        questionId,
+        pageNumber,
+        status: FrqSubmissionStatus.UPLOADED,
+        fullSheetUrl: publicUrl,
+        deskewedSheetUrl: null,
+        processingError: null,
+        crops: [],
+      });
+    } catch (err: unknown) {
       console.error(err);
-      setUploadError(err.message || "Upload failed");
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploadingTarget(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -183,8 +252,12 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
 
   const appBaseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000");
   const scanUrl = token ? `${appBaseUrl.replace(/\/$/, "")}/scan/${token}` : "";
+
+  const combinedError = uploadError || syncError;
 
   return (
     <div
@@ -195,24 +268,32 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp,application/pdf"
+        accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={handleDesktopFileSelect}
       />
 
       <div className="w-full max-w-3xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg shadow-2xl p-6 sm:p-8 space-y-6">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            Submit Handwritten Response Sheets
-          </h2>
-          <p className="text-xs text-neutral-500 font-mono mt-1">
-            Section timer has ended. Scan and upload your physical response packet before finalizing scores.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+              Submit Handwritten Response Sheets
+            </h2>
+            <p className="text-xs text-neutral-500 font-mono mt-1">
+              Scan and verify all {activeManifest.totalSheets} response sheets before finalizing your section.
+            </p>
+          </div>
+
+          <div className="text-right shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+              {verifiedSheetCount}/{activeManifest.totalSheets} Verified
+            </span>
+          </div>
         </div>
 
-        {uploadError && (
+        {combinedError && (
           <div className="p-3 bg-red-500/10 border border-red-500/30 rounded text-red-600 dark:text-red-400 text-xs font-mono">
-            {uploadError}
+            {combinedError}
           </div>
         )}
 
@@ -225,7 +306,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
             </div>
 
             <div className="bg-white p-3 rounded-md border border-neutral-200 dark:border-neutral-800 shadow-xs">
-              {loading || !token ? (
+              {isLoading || !token ? (
                 <div className="w-44 h-44 flex items-center justify-center">
                   <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
                 </div>
@@ -235,101 +316,165 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
             </div>
 
             <p className="text-[11px] text-neutral-400 leading-tight">
-              Open your phone camera, scan the QR code, and photograph each sheet in sequence.
+              Point your phone camera at the QR code. Align all 4 black corner squares on each page; sheets auto-capture and deskew automatically.
             </p>
           </div>
 
-          {/* Right: Required Pages Checklist with Desktop File Upload */}
+          {/* Right: Dynamic Required Sheets Checklist */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                Required Sheets ({handwrittenQuestions.length * 2} Pages)
+                Required Sheets ({activeManifest.totalSheets} Pages)
               </h3>
               <span className="text-[10px] text-neutral-400 font-mono">
-                Click upload icon to browse file
+                Or upload PNG/JPG directly
               </span>
             </div>
 
-            <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
-              {handwrittenQuestions.map((q) => {
-                const status = uploadedPages[q.id] || { page1: false, page2: false };
-                const isUploadingP1 = uploadingTarget === `${q.id}_p1`;
-                const isUploadingP2 = uploadingTarget === `${q.id}_p2`;
-
-                return (
-                  <div
-                    key={q.id}
-                    className="p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-md space-y-2"
-                  >
-                    <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                      Question {q.questionNumber}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      {/* Sheet 1: Parts A & B */}
-                      <div className="flex items-center justify-between px-2.5 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {status.page1 ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          ) : isUploadingP1 ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />
-                          ) : (
-                            <Circle className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                          )}
-                          <span className="truncate">Sheet 1 (A & B)</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => triggerDesktopUpload(q.id, 1)}
-                          title="Upload Sheet 1 from desktop"
-                          className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-                        >
-                          <Upload className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      {/* Sheet 2: Parts C & D */}
-                      <div className="flex items-center justify-between px-2.5 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {status.page2 ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          ) : isUploadingP2 ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />
-                          ) : (
-                            <Circle className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                          )}
-                          <span className="truncate">Sheet 2 (C & D)</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => triggerDesktopUpload(q.id, 2)}
-                          title="Upload Sheet 2 from desktop"
-                          className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-                        >
-                          <Upload className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
+            <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+              {activeManifest.questions.map((mq) => (
+                <div
+                  key={mq.questionId}
+                  className="p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-md space-y-2"
+                >
+                  <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                    Question {mq.questionNumber}
                   </div>
-                );
-              })}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    {mq.sheets.map((sheet) => {
+                      const sub = submissionMap.get(sheet.sheetKey);
+                      const isUploadingLocal =
+                        uploadingTarget ===
+                        `${sheet.questionId}_p${sheet.pageNumber}`;
+                      const isProcessingServer =
+                        sub?.status === FrqSubmissionStatus.UPLOADED ||
+                        sub?.status === FrqSubmissionStatus.PROCESSING;
+                      const needsRetake =
+                        sub?.status === FrqSubmissionStatus.NEEDS_RETAKE ||
+                        sub?.status === FrqSubmissionStatus.FAILED;
+                      const isVerified =
+                        sub &&
+                        (sub.status === FrqSubmissionStatus.CROPPED ||
+                          sub.status === FrqSubmissionStatus.PENDING_AUDIT ||
+                          sub.status === FrqSubmissionStatus.EVALUATED);
+
+                      const partsDisplay =
+                        sheet.parts.length === 1
+                          ? `Part ${sheet.parts[0].label}`
+                          : sheet.parts.map((p) => p.label).join(" & ");
+
+                      return (
+                        <div
+                          key={sheet.sheetKey}
+                          className={`flex flex-col justify-between px-2.5 py-2 bg-white dark:bg-neutral-900 border rounded ${
+                            needsRetake
+                              ? "border-red-500/50 bg-red-500/5"
+                              : isVerified
+                              ? "border-emerald-500/40"
+                              : "border-neutral-200 dark:border-neutral-800"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {isUploadingLocal || isProcessingServer ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />
+                              ) : needsRetake ? (
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                              ) : isVerified ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <Circle className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                              )}
+                              <span className="truncate font-medium">
+                                Sheet {sheet.pageNumber} ({partsDisplay})
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {(sub?.deskewedSheetUrl || sub?.fullSheetUrl) && (
+                                <a
+                                  href={
+                                    sub.deskewedSheetUrl ||
+                                    sub.fullSheetUrl ||
+                                    "#"
+                                  }
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Inspect processed sheet"
+                                  className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded text-blue-500 transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  triggerDesktopUpload(
+                                    sheet.questionId,
+                                    sheet.pageNumber
+                                  )
+                                }
+                                title={`Upload Sheet ${sheet.pageNumber} from computer`}
+                                className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors cursor-pointer"
+                              >
+                                <Upload className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Status Sub-line */}
+                          {isProcessingServer && (
+                            <span className="text-[10px] text-blue-500 font-mono mt-1">
+                              Aligning fiducials & cropping...
+                            </span>
+                          )}
+                          {needsRetake && (
+                            <span
+                              className="text-[10px] text-red-500 mt-1 leading-tight"
+                              title={sub?.processingError || undefined}
+                            >
+                              {sub?.processingError ||
+                                "Corner markers unclear — retake photo"}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-neutral-200 dark:border-neutral-800">
-          <p className="text-[11px] text-neutral-400">
-            You can finalize even if some pages were left blank.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+          <div className="text-[11px] text-neutral-400">
+            {hasSheetsInFlight ? (
+              <span className="text-blue-500 font-medium">
+                Waiting for uploaded sheets to finish cropping before submission...
+              </span>
+            ) : retakeNeededCount > 0 ? (
+              <span className="text-amber-500 font-medium">
+                {retakeNeededCount} sheet(s) flagged for retake. Rescan on phone or complete anyway.
+              </span>
+            ) : (
+              <span>You can finalize even if some pages were left blank.</span>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={onFinalizeSection}
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-2.5 bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-bold uppercase tracking-wider rounded-sm transition-all disabled:opacity-50 cursor-pointer"
+            disabled={isSubmitting || hasSheetsInFlight}
+            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-bold uppercase tracking-wider rounded-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
           >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+            {isSubmitting || hasSheetsInFlight ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{hasSheetsInFlight ? "Processing Sheets..." : "Finalizing..."}</span>
+              </>
             ) : (
               <>
                 <span>Complete Section</span>

@@ -2,11 +2,17 @@
 "use server";
 
 import crypto from "crypto";
+import { after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createPresignedUploadPost } from "@/lib/storage/s3";
+import { getSectionById, getTestMetadata } from "@/lib/contentLoader";
+import {
+  SectionFrqManifest,
+  buildSectionFrqManifest,
+} from "@/lib/frq/manifest";
 import { processAndCropFrqSubmission } from "@/lib/frq/cropper";
-import { CaptureSessionStatus, FrqSubmissionStatus } from "@prisma/client";
+import { CaptureSessionStatus, FrqSubmissionStatus, Prisma } from "@prisma/client";
 
 export interface CreateCaptureSessionParams {
   testId: string;
@@ -15,7 +21,52 @@ export interface CreateCaptureSessionParams {
 }
 
 /**
- * Creates or reuses a tokenized capture session scoped to the whole section.
+ * Resolves and caches the SectionFrqManifest so mobile & desktop clients
+ * know the exact questions, sheet counts, and sub-part rubrics in a single DB lookup.
+ */
+async function resolveManifestForSection(
+  testId: string,
+  sectionId: string
+): Promise<SectionFrqManifest | null> {
+  // Look up test category in DB first
+  const testRecord = await prisma.test.findUnique({
+    where: { id: testId },
+    select: { category: true },
+  });
+
+  const categorySlug = testRecord?.category?.toLowerCase() || "ap_calc";
+  const parsedSection = await getSectionById(categorySlug, testId, sectionId);
+  if (parsedSection?.frontmatter?.questions) {
+    return buildSectionFrqManifest(
+      testId,
+      sectionId,
+      parsedSection.frontmatter.questions
+    );
+  }
+
+  // Fallback: check metadata category if DB category wasn't populated
+  const meta = await getTestMetadata(categorySlug, testId);
+  if (meta) {
+    const fallbackSection = await getSectionById(
+      meta.category.toLowerCase(),
+      testId,
+      sectionId
+    );
+    if (fallbackSection?.frontmatter?.questions) {
+      return buildSectionFrqManifest(
+        testId,
+        sectionId,
+        fallbackSection.frontmatter.questions
+      );
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Creates or reuses a tokenized capture session scoped to the whole section,
+ * persisting a manifestSnapshot so 1,000+ concurrent scans require zero filesystem reads.
  */
 export async function getOrCreateCaptureSession(params: CreateCaptureSessionParams) {
   const session = await auth();
@@ -29,7 +80,6 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
   const now = new Date();
 
   try {
-    // Check for an active session that hasn't expired yet
     const existingSession = await prisma.captureSession.findFirst({
       where: {
         profileId,
@@ -46,16 +96,29 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
     });
 
     if (existingSession) {
+      let manifest = existingSession.manifestSnapshot as unknown as SectionFrqManifest | null;
+      if (!manifest) {
+        manifest = await resolveManifestForSection(testId, sectionId);
+        if (manifest) {
+          await prisma.captureSession.update({
+            where: { id: existingSession.id },
+            data: { manifestSnapshot: manifest as unknown as Prisma.InputJsonValue },
+          });
+        }
+      }
+
       return {
         success: true,
         sessionToken: existingSession.sessionToken,
         expiresAt: existingSession.expiresAt.toISOString(),
+        manifest,
         submissions: existingSession.frqSubmissions,
       };
     }
 
+    const manifest = await resolveManifestForSection(testId, sectionId);
     const sessionToken = crypto.randomBytes(16).toString("hex");
-    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000); // 30-minute window for post-exam upload
+    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
 
     const createdSession = await prisma.captureSession.create({
       data: {
@@ -64,6 +127,9 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
         testId,
         sectionId,
         questionId: questionId || null,
+        manifestSnapshot: manifest
+          ? (manifest as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
         expiresAt,
         status: CaptureSessionStatus.ACTIVE,
       },
@@ -78,6 +144,7 @@ export async function getOrCreateCaptureSession(params: CreateCaptureSessionPara
       success: true,
       sessionToken: createdSession.sessionToken,
       expiresAt: createdSession.expiresAt.toISOString(),
+      manifest,
       submissions: createdSession.frqSubmissions,
     };
   } catch (error) {
@@ -106,8 +173,8 @@ export async function getPresignedUploadForSession(
   try {
     const fileExt = contentType.includes("png")
       ? "png"
-      : contentType.includes("pdf")
-      ? "pdf"
+      : contentType.includes("webp")
+      ? "webp"
       : "jpg";
     const qId = targetQuestionId || session.questionId || "unassigned";
     const storageKey = `submissions/${session.testId}/${session.sectionId}/${qId}/p${pageNumber}_${Date.now()}.${fileExt}`;
@@ -134,8 +201,8 @@ export async function getPresignedUploadForSession(
 }
 
 /**
- * Finalizes an upload (from desktop fallback or mobile capture), upserts the FrqSubmission
- * for that specific question and pageNumber, and triggers the coordinate cropper.
+ * Finalizes an upload, upserts the FrqSubmission, and schedules fiducial deskewing
+ * & cropping inside Next.js `after()` so Vercel keeps the function alive until finished.
  */
 export async function finalizeSubmissionUpload({
   sessionToken,
@@ -163,7 +230,11 @@ export async function finalizeSubmissionUpload({
       return { success: false, error: "Session not found." };
     }
 
-    const resolvedQuestionId = questionId || sessionRecord.questionId;
+    const manifest = sessionRecord.manifestSnapshot as unknown as SectionFrqManifest | null;
+    const defaultFirstQuestionId = manifest?.questions[0]?.questionId;
+    const resolvedQuestionId =
+      questionId || sessionRecord.questionId || defaultFirstQuestionId;
+
     if (!resolvedQuestionId) {
       return { success: false, error: "Question identifier is required." };
     }
@@ -190,6 +261,7 @@ export async function finalizeSubmissionUpload({
         storageKey,
         mimeType,
         fileSizeBytes,
+        processingError: null,
       },
       update: {
         captureSessionId: sessionRecord.id,
@@ -198,12 +270,17 @@ export async function finalizeSubmissionUpload({
         storageKey,
         mimeType,
         fileSizeBytes,
+        processingError: null,
       },
     });
 
-    // Automatically trigger normalizer & cropping pipeline asynchronously
-    processAndCropFrqSubmission(submission.id).catch((cropErr) => {
-      console.error("[FRQ Cropper] Failed to process crops asynchronously:", cropErr);
+    // Next.js `after()` guarantees Vercel waits for cropping to finish after returning the response
+    after(async () => {
+      try {
+        await processAndCropFrqSubmission(submission.id);
+      } catch (cropErr) {
+        console.error("[FRQ Cropper] Background processing failed:", cropErr);
+      }
     });
 
     return { success: true, submission };

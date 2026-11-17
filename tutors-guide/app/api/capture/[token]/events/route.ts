@@ -1,108 +1,78 @@
-// app/api/capture/[token]/events/route.ts
-import { NextRequest, connection } from "next/server";
+// app/api/capture/[token]/status/route.ts
+import { NextRequest, NextResponse, connection } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { CaptureSessionStatus } from "@prisma/client";
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  // Opt in to dynamic runtime execution under Dynamic I/O / cacheComponents
   await connection();
-
   const { token } = await params;
 
-  const encoder = new TextEncoder();
-  let isClosed = false;
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      const sendEvent = (event: string, data: unknown) => {
-        if (isClosed) return;
-        try {
-          controller.enqueue(
-            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-          );
-        } catch {
-          isClosed = true;
-        }
-      };
-
-      // Heartbeat ping every 15s to keep SSE connection alive
-      const pingInterval = setInterval(() => {
-        if (!isClosed) {
-          try {
-            controller.enqueue(encoder.encode(": ping\n\n"));
-          } catch {
-            isClosed = true;
-            clearInterval(pingInterval);
-          }
-        }
-      }, 15000);
-
-      // Track last broadcast state per submission ID: `${sub.status}_${sub.crops.length}`
-      const submissionSnapshots = new Map<string, string>();
-
-      const pollInterval = setInterval(async () => {
-        if (isClosed) return;
-
-        try {
-          const session = await prisma.captureSession.findUnique({
-            where: { sessionToken: token },
-            include: {
-              frqSubmissions: {
-                include: { crops: true },
+  try {
+    const session = await prisma.captureSession.findUnique({
+      where: { sessionToken: token },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+        manifestSnapshot: true,
+        frqSubmissions: {
+          orderBy: [{ questionId: "asc" }, { pageNumber: "asc" }],
+          select: {
+            id: true,
+            questionId: true,
+            pageNumber: true,
+            status: true,
+            fullSheetUrl: true,
+            deskewedSheetUrl: true,
+            processingError: true,
+            updatedAt: true,
+            crops: {
+              orderBy: { subPartLabel: "asc" },
+              select: {
+                id: true,
+                subPartLabel: true,
+                cropUrl: true,
+                pointsPossible: true,
+                pointsAwarded: true,
               },
             },
-          });
+          },
+        },
+      },
+    });
 
-          if (!session) {
-            sendEvent("ERROR", { message: "Session expired or invalid" });
-            clearInterval(pollInterval);
-            clearInterval(pingInterval);
-            if (!isClosed) {
-              controller.close();
-              isClosed = true;
-            }
-            return;
-          }
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "Session not found" },
+        { status: 404 }
+      );
+    }
 
-          // Iterate through all submissions attached to this batch capture session
-          for (const sub of session.frqSubmissions) {
-            const currentCropsCount = sub.crops.length;
-            const currentSnapshot = `${sub.status}_${currentCropsCount}`;
-            const previousSnapshot = submissionSnapshots.get(sub.id);
+    const isExpired =
+      session.expiresAt < new Date() ||
+      session.status === CaptureSessionStatus.EXPIRED;
 
-            if (previousSnapshot !== currentSnapshot) {
-              submissionSnapshots.set(sub.id, currentSnapshot);
-
-              sendEvent("STATUS_CHANGE", {
-                status: sub.status,
-                submissionId: sub.id,
-                questionId: sub.questionId,
-                pageNumber: sub.pageNumber,
-                fullSheetUrl: sub.fullSheetUrl,
-                crops: sub.crops,
-              });
-            }
-          }
-        } catch (err) {
-          console.error("Capture SSE polling error:", err);
-        }
-      }, 1500);
-
-      req.signal.addEventListener("abort", () => {
-        isClosed = true;
-        clearInterval(pollInterval);
-        clearInterval(pingInterval);
-      });
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
+    return NextResponse.json(
+      {
+        success: true,
+        isExpired,
+        manifest: session.manifestSnapshot,
+        submissions: session.frqSubmissions,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      }
+    );
+  } catch (err) {
+    console.error("[Capture Status API] Error:", err);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch capture status" },
+      { status: 500 }
+    );
+  }
 }

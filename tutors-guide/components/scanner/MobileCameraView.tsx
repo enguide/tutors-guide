@@ -1,26 +1,58 @@
 // components/scanner/MobileCameraView.tsx
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
-import { Camera, CheckCircle2, AlertTriangle, RefreshCw, ZapOff, Loader2 } from "lucide-react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Camera,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  ZapOff,
+  Loader2,
+  ListChecks,
+  ScanLine,
+} from "lucide-react";
 import jsQR from "jsqr";
 import { calculateLaplacianVariance, checkLightingGlare } from "@/lib/cv/qualityChecks";
-import { getPresignedUploadForSession, finalizeSubmissionUpload } from "@/actions/frqCapture";
+import { detectSheetFiducials } from "@/lib/cv/fiducials";
+import {
+  SectionFrqManifest,
+  ManifestSheet,
+  lookupSheetInManifest,
+} from "@/lib/frq/manifest";
+import {
+  getPresignedUploadForSession,
+  finalizeSubmissionUpload,
+} from "@/actions/frqCapture";
+
+export interface CaptureUploadResult {
+  submissionId: string;
+  questionId: string;
+  questionNumber?: number;
+  pageNumber: number;
+  parts: string[];
+}
 
 interface MobileCameraViewProps {
   sessionToken: string;
-  onSuccess: (submissionId: string) => void;
+  manifest: SectionFrqManifest | null;
+  defaultQuestionId?: string;
+  suggestedSheet: ManifestSheet | null;
+  completedCount: number;
+  onOpenChecklist?: () => void;
+  onSuccess: (result: CaptureUploadResult) => void;
 }
 
-interface DecodedSheetMeta {
+interface DecodedQrMeta {
   questionNumber: number;
   pageNumber: number;
   parts: string[];
 }
 
-const BLUR_THRESHOLD = 95.0; // Variance threshold for clean handwritten strokes
+const BLUR_THRESHOLD = 95.0;
+const MAX_UPLOAD_DIMENSION = 2200; // ~200 DPI US Letter; keeps S3 upload <500KB & server RAM low
 
-function parseClientQr(rawText: string): DecodedSheetMeta | null {
+function parseFooterQrText(rawText: string): DecodedQrMeta | null {
   try {
     const segments = rawText.split(";").reduce((acc, segment) => {
       const [key, val] = segment.split(":");
@@ -32,11 +64,13 @@ function parseClientQr(rawText: string): DecodedSheetMeta | null {
 
     const qNum = parseInt(segments.Q, 10);
     const pNum = parseInt(segments.PAGE || segments.PG || "1", 10);
-    const parts = (segments.PARTS || "AB").split("");
+    const parts = segments.PARTS ? segments.PARTS.split("") : [];
+
+    if (!Number.isFinite(qNum)) return null;
 
     return {
       questionNumber: qNum,
-      pageNumber: pNum > 2 ? (pNum % 2 === 0 ? 1 : 2) : pNum,
+      pageNumber: Number.isFinite(pNum) ? pNum : 1,
       parts,
     };
   } catch {
@@ -44,22 +78,51 @@ function parseClientQr(rawText: string): DecodedSheetMeta | null {
   }
 }
 
-export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewProps) {
+export function MobileCameraView({
+  sessionToken,
+  manifest,
+  defaultQuestionId,
+  suggestedSheet,
+  completedCount,
+  onOpenChecklist,
+  onSuccess,
+}: MobileCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [streamActive, setStreamActive] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAligned, setIsAligned] = useState(false);
-  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
-  const [detectedMeta, setDetectedMeta] = useState<DecodedSheetMeta | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Frame sampling counter stored in a ref to avoid cascading render lint errors
+  // Live CV telemetry
+  const [fiducialsLocked, setFiducialsLocked] = useState(false);
+
+  // Captured image state
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [detectedQr, setDetectedQr] = useState<DecodedQrMeta | null>(null);
+  const [manualSheetOverride, setManualSheetOverride] = useState<string | null>(null);
+
   const steadyCountRef = useRef<number>(0);
 
-  // 1. Initialize rear-facing environment camera stream
+  // Derive effective sheet key without synchronous setState in useEffect
+  const selectedSheetKey =
+    manualSheetOverride ||
+    suggestedSheet?.sheetKey ||
+    manifest?.sheets[0]?.sheetKey ||
+    "";
+
+  // Resolve active sheet metadata from QR detection, manual override, or suggested sheet
+  const resolvedTargetSheet = useMemo<ManifestSheet | null>(() => {
+    if (!manifest) return null;
+    if (selectedSheetKey) {
+      const byKey = manifest.sheets.find((s) => s.sheetKey === selectedSheetKey);
+      if (byKey) return byKey;
+    }
+    return suggestedSheet || manifest.sheets[0] || null;
+  }, [manifest, selectedSheetKey, suggestedSheet]);
+
+  // 1. Initialize rear-facing camera at high resolution
   useEffect(() => {
     let currentStream: MediaStream | null = null;
 
@@ -68,8 +131,8 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 2560 },
+            height: { ideal: 1920 },
           },
           audio: false,
         });
@@ -77,7 +140,7 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
         currentStream = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          await videoRef.current.play();
           setStreamActive(true);
         }
       } catch (err) {
@@ -95,99 +158,143 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
     };
   }, []);
 
-  // 2. Capture high-resolution still from video stream and scan QR metadata
+  // 2. Capture downscaled 2200px still + decode footer QR
   const captureStill = useCallback(() => {
     if (!videoRef.current) return;
     const video = videoRef.current;
+    const rawW = video.videoWidth || 1920;
+    const rawH = video.videoHeight || 1080;
 
-    const fullCanvas = document.createElement("canvas");
-    fullCanvas.width = video.videoWidth || 1920;
-    fullCanvas.height = video.videoHeight || 1080;
+    // Bound longest edge to 2200px (~200 DPI) for fast cellular upload & low server memory
+    const longestEdge = Math.max(rawW, rawH);
+    const scale = longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0;
+    const outW = Math.round(rawW * scale);
+    const outH = Math.round(rawH * scale);
 
-    const ctx = fullCanvas.getContext("2d");
+    const captureCanvas = document.createElement("canvas");
+    captureCanvas.width = outW;
+    captureCanvas.height = outH;
+
+    const ctx = captureCanvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
+    ctx.drawImage(video, 0, 0, outW, outH);
 
-    // Scan bottom-right region for the LaTeX footer QR code
+    // Attempt QR decode on bottom-right quadrant first, then full frame fallback
+    let decodedMeta: DecodedQrMeta | null = null;
     try {
-      const qrWidth = Math.round(fullCanvas.width * 0.4);
-      const qrHeight = Math.round(fullCanvas.height * 0.25);
-      const qrLeft = Math.round(fullCanvas.width * 0.6);
-      const qrTop = Math.round(fullCanvas.height * 0.75);
+      const qrW = Math.round(outW * 0.45);
+      const qrH = Math.round(outH * 0.35);
+      const qrLeft = outW - qrW;
+      const qrTop = outH - qrH;
 
-      const qrData = ctx.getImageData(qrLeft, qrTop, qrWidth, qrHeight);
-      const decoded = jsQR(qrData.data, qrWidth, qrHeight);
+      const subImg = ctx.getImageData(qrLeft, qrTop, qrW, qrH);
+      const subCode = jsQR(subImg.data, qrW, qrH);
+      if (subCode?.data) {
+        decodedMeta = parseFooterQrText(subCode.data);
+      }
 
-      if (decoded && decoded.data) {
-        const meta = parseClientQr(decoded.data);
-        if (meta) {
-          setDetectedMeta(meta);
+      if (!decodedMeta) {
+        const fullImg = ctx.getImageData(0, 0, outW, outH);
+        const fullCode = jsQR(fullImg.data, outW, outH);
+        if (fullCode?.data) {
+          decodedMeta = parseFooterQrText(fullCode.data);
         }
       }
     } catch (qrErr) {
-      console.warn("Client QR scan exception:", qrErr);
+      console.warn("Client QR scan warning:", qrErr);
+    }
+
+    if (decodedMeta) {
+      setDetectedQr(decodedMeta);
+      if (manifest) {
+        const matched = lookupSheetInManifest(
+          manifest,
+          decodedMeta.questionNumber,
+          decodedMeta.pageNumber
+        );
+        if (matched) {
+          setManualSheetOverride(matched.sheet.sheetKey);
+        }
+      }
     }
 
     if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate([40, 60, 40]);
+      navigator.vibrate([35, 50, 35]);
     }
 
-    fullCanvas.toBlob(
+    captureCanvas.toBlob(
       (blob) => {
         if (!blob) return;
         setCapturedBlob(blob);
         setPreviewUrl(URL.createObjectURL(blob));
       },
       "image/jpeg",
-      0.95
+      0.91
     );
-  }, []);
+  }, [manifest]);
 
-  // 3. Automated frame analysis loop
+  // 3. Real-time frame quality + 4-corner fiducial detection loop (250ms)
   const analyzeFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current || isProcessing || capturedBlob) {
+    if (!videoRef.current || !analysisCanvasRef.current || isProcessing || capturedBlob) {
       return;
     }
 
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-
+    const canvas = analysisCanvasRef.current;
     if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
     const scale = Math.min(480 / video.videoWidth, 1.0);
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
+    const w = Math.round(video.videoWidth * scale);
+    const h = Math.round(video.videoHeight * scale);
+    canvas.width = w;
+    canvas.height = h;
 
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, w, h);
+    const frameData = ctx.getImageData(0, 0, w, h);
 
+    // Check specular glare
+    if (checkLightingGlare(frameData)) {
+      setWarningMessage("Overhead glare detected. Tilt sheet slightly.");
+      setFiducialsLocked(false);
+      steadyCountRef.current = 0;
+      return;
+    }
+
+    // Check focus/blur sharpness
     const blurScore = calculateLaplacianVariance(frameData);
-    const hasGlare = checkLightingGlare(frameData);
-
-    if (hasGlare) {
-      setWarningMessage("Glare detected. Tilt paper away from overhead light.");
-      setIsAligned(false);
-      steadyCountRef.current = 0;
-      return;
-    }
-
     if (blurScore < BLUR_THRESHOLD) {
-      setWarningMessage("Image blurry. Hold steady and tap screen to focus.");
-      setIsAligned(false);
+      setWarningMessage("Hold steady — focusing on handwriting...");
+      setFiducialsLocked(false);
       steadyCountRef.current = 0;
       return;
     }
 
-    // Image is sharp and glare-free
+    // Convert RGBA -> grayscale for fast 4-corner fiducial detection (<5ms at 480px)
+    const rgba = frameData.data;
+    const gray = new Uint8Array(w * h);
+    for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
+      gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0;
+    }
+
+    const detected = detectSheetFiducials(gray, w, h);
+    if (!detected) {
+      setWarningMessage("Align all 4 black corner squares inside the frame.");
+      setFiducialsLocked(false);
+      steadyCountRef.current = 0;
+      return;
+    }
+
+    // All 4 fiducials locked, sharp, and glare-free!
     setWarningMessage(null);
-    setIsAligned(true);
+    setFiducialsLocked(true);
+
     steadyCountRef.current += 1;
 
-    // Auto-snap when held steady for ~750ms (3 consecutive successful frames)
+    // Auto-capture after 3 consecutive locked frames (~750ms)
     if (steadyCountRef.current >= 3 && !capturedBlob && !isProcessing) {
       captureStill();
     }
@@ -199,23 +306,30 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
     return () => clearInterval(interval);
   }, [streamActive, capturedBlob, analyzeFrame]);
 
-  // 4. Batch Section Upload Pipeline
+  // 4. Upload captured sheet to S3/R2 and trigger server homography cropper
   const handleUpload = async () => {
     if (!capturedBlob) return;
     setIsProcessing(true);
     setWarningMessage(null);
 
-    const targetQNum = detectedMeta?.questionNumber || 1;
-    const targetPage = detectedMeta?.pageNumber || 1;
-    const fallbackQuestionId = `ap-calc-frq-q${targetQNum}`;
+    const targetQuestionId =
+      resolvedTargetSheet?.questionId ||
+      defaultQuestionId ||
+      manifest?.questions[0]?.questionId;
+    const targetPageNumber =
+      resolvedTargetSheet?.pageNumber || detectedQr?.pageNumber || 1;
+    const targetQuestionNumber =
+      resolvedTargetSheet?.questionNumber || detectedQr?.questionNumber;
+    const targetParts = resolvedTargetSheet
+      ? resolvedTargetSheet.parts.map((p) => p.label)
+      : detectedQr?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]);
 
     try {
-      // Step A: Request pre-signed POST with target question & page scope
       const presignRes = await getPresignedUploadForSession(
         sessionToken,
         "image/jpeg",
-        fallbackQuestionId,
-        targetPage
+        targetQuestionId,
+        targetPageNumber
       );
 
       if (!presignRes.success || !presignRes.presigned) {
@@ -224,7 +338,6 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
 
       const { url, fields, key, publicUrl } = presignRes.presigned;
 
-      // Step B: Post directly to cloud storage
       const formData = new FormData();
       Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
       formData.append("file", capturedBlob, "sheet.jpg");
@@ -238,22 +351,27 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
         throw new Error("Direct upload to storage bucket failed");
       }
 
-      // Step C: Commit FrqSubmission with explicit questionId and pageNumber
       const finalizeRes = await finalizeSubmissionUpload({
         sessionToken,
         storageKey: key,
         publicUrl,
         mimeType: "image/jpeg",
         fileSizeBytes: capturedBlob.size,
-        questionId: fallbackQuestionId,
-        pageNumber: targetPage,
+        questionId: targetQuestionId,
+        pageNumber: targetPageNumber,
       });
 
       if (!finalizeRes.success || !finalizeRes.submission) {
         throw new Error(finalizeRes.error || "Failed to commit record in database");
       }
 
-      onSuccess(finalizeRes.submission.id);
+      onSuccess({
+        submissionId: finalizeRes.submission.id,
+        questionId: finalizeRes.submission.questionId,
+        questionNumber: targetQuestionNumber,
+        pageNumber: targetPageNumber,
+        parts: targetParts,
+      });
     } catch (err) {
       console.error(err);
       setWarningMessage(err instanceof Error ? err.message : "Upload failed. Please retake.");
@@ -266,8 +384,10 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
       URL.revokeObjectURL(previewUrl);
     }
     setCapturedBlob(null);
-    setDetectedMeta(null);
+    setDetectedQr(null);
+    setManualSheetOverride(null);
     setPreviewUrl(null);
+    setFiducialsLocked(false);
     steadyCountRef.current = 0;
     setIsProcessing(false);
     setWarningMessage(null);
@@ -275,25 +395,45 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
 
   return (
     <div className="relative w-full h-screen bg-black flex flex-col justify-between overflow-hidden select-none">
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={analysisCanvasRef} className="hidden" />
 
-      {/* Top Telemetry Bar */}
-      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono font-medium tracking-wide text-zinc-200">
-            {detectedMeta
-              ? `Q${detectedMeta.questionNumber} • SHEET ${detectedMeta.pageNumber} (${detectedMeta.parts.join(",")})`
-              : "AP CALC OPTICAL SCANNER"}
+      {/* Top Telemetry & Checklist Trigger */}
+      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/85 to-transparent">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+              fiducialsLocked ? "bg-emerald-400 animate-ping" : "bg-amber-400"
+            }`}
+          />
+          <span className="text-xs font-mono font-semibold tracking-wide text-zinc-100 truncate">
+            {resolvedTargetSheet
+              ? `TARGET: Q${resolvedTargetSheet.questionNumber} SHEET ${resolvedTargetSheet.pageNumber} (${resolvedTargetSheet.parts
+                  .map((p) => p.label)
+                  .join("&")})`
+              : "OPTICAL SHEET SCANNER"}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <ZapOff className="w-4 h-4 text-zinc-400" />
-          <span className="text-xs text-zinc-400">NO FLASH</span>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {onOpenChecklist && manifest && (
+            <button
+              type="button"
+              onClick={onOpenChecklist}
+              className="px-2.5 py-1 rounded-full bg-zinc-800/90 border border-zinc-700 text-[11px] font-semibold text-zinc-200 flex items-center gap-1.5 cursor-pointer"
+            >
+              <ListChecks className="w-3.5 h-3.5 text-emerald-400" />
+              <span>
+                {completedCount}/{manifest.totalSheets}
+              </span>
+            </button>
+          )}
+          <div className="hidden sm:flex items-center gap-1 text-xs text-zinc-400">
+            <ZapOff className="w-3.5 h-3.5" />
+          </div>
         </div>
       </div>
 
-      {/* Active Video Feed or Captured Preview */}
+      {/* Live Video Stream or Captured Preview */}
       <div className="relative flex-1 flex items-center justify-center overflow-hidden">
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -311,72 +451,133 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
           />
         )}
 
-        {/* Viewfinder Overlay Guide (175mm x 210mm unified box ratio: 0.833) */}
+        {/* Live Viewfinder Guide */}
         {!previewUrl && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
             <div
-              className={`relative w-full max-w-sm aspect-[175/210] border-2 rounded-2xl transition-colors duration-200 ${
-                isAligned ? "border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.3)]" : "border-zinc-500/60"
+              className={`relative w-full max-w-sm aspect-[215.9/279.4] border-2 rounded-xl transition-all duration-150 ${
+                fiducialsLocked
+                  ? "border-emerald-400 shadow-[0_0_28px_rgba(52,211,153,0.45)]"
+                  : "border-white/40"
               }`}
             >
-              <div className="absolute -top-3 -left-3 w-6 h-6 border-t-4 border-l-4 border-white" />
-              <div className="absolute -top-3 -right-3 w-6 h-6 border-t-4 border-r-4 border-white" />
-              <div className="absolute -bottom-3 -left-3 w-6 h-6 border-b-4 border-l-4 border-white" />
-              <div className="absolute -bottom-3 -right-3 w-6 h-6 border-b-4 border-r-4 border-white" />
+              {/* Corner Target Brackets */}
+              <div
+                className={`absolute -top-1.5 -left-1.5 w-7 h-7 border-t-4 border-l-4 rounded-tl-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                }`}
+              />
+              <div
+                className={`absolute -top-1.5 -right-1.5 w-7 h-7 border-t-4 border-r-4 rounded-tr-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                }`}
+              />
+              <div
+                className={`absolute -bottom-1.5 -left-1.5 w-7 h-7 border-b-4 border-l-4 rounded-bl-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                }`}
+              />
+              <div
+                className={`absolute -bottom-1.5 -right-1.5 w-7 h-7 border-b-4 border-r-4 rounded-br-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                }`}
+              />
 
-              <div className="absolute top-[52%] inset-x-4 border-b border-dashed border-white/40 flex justify-end">
-                <span className="text-[10px] text-white/60 tracking-wider pr-1">PART BOUNDARY</span>
+              {/* Mid-Sheet Divider Reference */}
+              <div className="absolute top-[50%] inset-x-4 border-b border-dashed border-white/30 flex justify-end">
+                <span className="text-[9px] font-mono text-white/60 tracking-wider pr-1">
+                  PART DIVIDER
+                </span>
               </div>
+
+              {fiducialsLocked && (
+                <div className="absolute bottom-3 inset-x-0 flex justify-center">
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/90 text-black text-[10px] font-bold tracking-wide flex items-center gap-1">
+                    <ScanLine className="w-3 h-3" />4 CORNERS LOCKED — HOLD STEADY
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* Real-time CV Feedback Banner */}
         {warningMessage && !previewUrl && (
-          <div className="absolute top-16 inset-x-4 z-30 flex items-center gap-2 p-3 bg-red-950/80 backdrop-blur-md border border-red-500/30 rounded-xl text-red-200 text-xs shadow-lg animate-in fade-in duration-200">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+          <div className="absolute top-16 inset-x-4 z-30 flex items-center gap-2 p-3 bg-zinc-900/90 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
             <span>{warningMessage}</span>
           </div>
         )}
       </div>
 
-      {/* Bottom Shutter Controls */}
-      <div className="relative z-20 p-6 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center gap-4">
+      {/* Bottom Controls + Sheet Assignment Confirmation */}
+      <div className="relative z-20 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center gap-3">
         {previewUrl ? (
-          <div className="w-full flex items-center justify-between gap-4 max-w-sm">
-            <button
-              type="button"
-              onClick={handleRetake}
-              disabled={isProcessing}
-              className="flex-1 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Retake
-            </button>
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={isProcessing}
-              className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  Submit Sheet
-                </>
-              )}
-            </button>
+          <div className="w-full max-w-sm space-y-3">
+            {/* Sheet Confirmation / Override Selector */}
+            {manifest && manifest.sheets.length > 0 && (
+              <div className="bg-zinc-900/95 border border-zinc-700 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-zinc-400 shrink-0 pl-1">
+                  {detectedQr ? "QR Verified:" : "Assign Sheet:"}
+                </span>
+                <select
+                  value={selectedSheetKey}
+                  onChange={(e) => setManualSheetOverride(e.target.value)}
+                  disabled={isProcessing}
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
+                >
+                  {manifest.sheets.map((s) => (
+                    <option key={s.sheetKey} value={s.sheetKey}>
+                      Q{s.questionNumber} • Sheet {s.pageNumber} (Parts{" "}
+                      {s.parts.map((p) => p.label).join(" & ")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {warningMessage && (
+              <div className="p-2.5 bg-red-950/80 border border-red-500/40 rounded-lg text-red-200 text-xs">
+                {warningMessage}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleRetake}
+                disabled={isProcessing}
+                className="flex-1 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retake
+              </button>
+              <button
+                type="button"
+                onClick={handleUpload}
+                disabled={isProcessing}
+                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Submit Sheet
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
               onClick={captureStill}
-              className="w-18 h-18 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer"
+              className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer"
               aria-label="Capture still frame"
             >
               <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
@@ -384,7 +585,9 @@ export function MobileCameraView({ sessionToken, onSuccess }: MobileCameraViewPr
               </div>
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">
-              Auto-snaps when steady & in focus
+              {fiducialsLocked
+                ? "Auto-capturing..."
+                : "Frame all 4 corner squares or tap shutter"}
             </span>
           </div>
         )}
