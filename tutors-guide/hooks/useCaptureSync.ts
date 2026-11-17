@@ -188,8 +188,8 @@ export function useCaptureSync({
       }
     };
 
-    // Run first poll immediately at 800ms so desktop updates right after mobile upload
-    timeoutId = setTimeout(pollStatus, 800);
+    // Run first poll immediately so desktop reflects any mobile uploads right away
+    pollStatus();
 
     return () => {
       isCancelled = true;

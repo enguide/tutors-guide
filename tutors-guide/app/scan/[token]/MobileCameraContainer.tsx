@@ -14,6 +14,7 @@ import {
   Circle,
   Camera,
   ListChecks,
+  MonitorCheck,
 } from "lucide-react";
 
 export interface InitialMobileSubmission {
@@ -50,11 +51,9 @@ export function MobileCameraContainer({
     parts: string[];
   } | null>(null);
 
-  // Target sheet when a student explicitly taps a row in the checklist to scan/retake
   const [explicitTargetSheet, setExplicitTargetSheet] =
     useState<ManifestSheet | null>(null);
 
-  // Map sheetKey (`${questionId}::p${pageNumber}`) -> submission record
   const submissionBySheetKey = useMemo(() => {
     const map = new Map<string, InitialMobileSubmission>();
     for (const sub of submissions) {
@@ -63,7 +62,6 @@ export function MobileCameraContainer({
     return map;
   }, [submissions]);
 
-  // Determine the next uncaptured (or NEEDS_RETAKE) sheet to guide the student
   const nextRecommendedSheet = useMemo<ManifestSheet | null>(() => {
     if (explicitTargetSheet) return explicitTargetSheet;
     if (!manifest) return null;
@@ -92,6 +90,9 @@ export function MobileCameraContainer({
       );
     }).length;
   }, [manifest, submissions.length, submissionBySheetKey]);
+
+  const allComplete =
+    manifest !== null && completedSheetCount >= manifest.totalSheets;
 
   if (isExpired) {
     return (
@@ -122,12 +123,32 @@ export function MobileCameraContainer({
               setExplicitTargetSheet(null);
               setMode("camera");
             }}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer"
+            className={`px-3.5 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer ${
+              allComplete
+                ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white"
+            }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>Open Camera</span>
+            <span>{allComplete ? "Rescan" : "Open Camera"}</span>
           </button>
         </div>
+
+        {/* Prominent Next-Step Banner when All Sheets Are Synced */}
+        {allComplete && (
+          <div className="mt-4 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-start gap-3">
+            <MonitorCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="text-sm font-bold text-emerald-300">
+                All {manifest.totalSheets} Sheets Uploaded & Synced!
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                You are finished using your phone. Return to your computer screen and click{" "}
+                <span className="font-bold text-white">Complete Section</span> to finish and grade your exam.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto py-4 space-y-2.5">
           {manifest.sheets.map((sheet) => {
@@ -171,7 +192,7 @@ export function MobileCameraContainer({
                       {needsRetake
                         ? sub?.processingError || "Retake required — tap to rescan"
                         : isDone
-                        ? "Uploaded & synced to exam"
+                        ? "Synced to computer • Tap only to retake"
                         : "Tap to scan this sheet"}
                     </div>
                   </div>
@@ -185,9 +206,13 @@ export function MobileCameraContainer({
           })}
         </div>
 
-        <div className="pt-3 border-t border-zinc-800 flex items-center justify-center gap-2 text-xs text-zinc-500">
-          <Smartphone className="w-4 h-4" />
-          <span>Synced in real time with your computer</span>
+        <div className="pt-3 border-t border-zinc-800 flex items-center justify-center gap-2 text-xs text-zinc-400">
+          <Smartphone className="w-4 h-4 text-emerald-400" />
+          <span>
+            {allComplete
+              ? "Safe to lock phone & submit on computer"
+              : "Synced in real time with your computer"}
+          </span>
         </div>
       </div>
     );
@@ -195,9 +220,6 @@ export function MobileCameraContainer({
 
   // Post-Capture Interstitial Confirmation Screen
   if (mode === "interstitial") {
-    const allComplete =
-      manifest !== null && completedSheetCount >= manifest.totalSheets;
-
     return (
       <div className="w-full h-screen flex flex-col items-center justify-center p-6 text-center text-zinc-100 bg-zinc-950 select-none">
         <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4 border border-emerald-500/30">
@@ -205,7 +227,9 @@ export function MobileCameraContainer({
         </div>
 
         <h2 className="text-xl font-bold">
-          {lastUploadedSheet?.questionNumber
+          {allComplete
+            ? "All Response Sheets Synced!"
+            : lastUploadedSheet?.questionNumber
             ? `Q${lastUploadedSheet.questionNumber} Sheet ${lastUploadedSheet.pageNumber} Uploaded!`
             : `Sheet ${completedSheetCount} Uploaded!`}
         </h2>
@@ -216,13 +240,26 @@ export function MobileCameraContainer({
           </p>
         )}
 
-        <p className="text-xs text-zinc-400 mt-2 max-w-xs leading-relaxed">
-          {manifest
-            ? `${completedSheetCount} of ${manifest.totalSheets} required sheets captured.`
-            : "Your page was synchronized with your computer."}
-        </p>
+        {allComplete ? (
+          <div className="mt-5 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 max-w-xs space-y-2">
+            <div className="flex items-center justify-center gap-2 text-emerald-300 font-bold text-sm">
+              <MonitorCheck className="w-5 h-5" />
+              <span>Next Step: Return to Computer</span>
+            </div>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              All {manifest?.totalSheets} sheets are verified on your desktop screen. Click{" "}
+              <span className="font-bold text-white">Complete Section</span> on your computer to finish.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-400 mt-2 max-w-xs leading-relaxed">
+            {manifest
+              ? `${completedSheetCount} of ${manifest.totalSheets} required sheets captured.`
+              : "Your page was synchronized with your computer."}
+          </p>
+        )}
 
-        <div className="mt-8 flex flex-col gap-3 w-full max-w-xs">
+        <div className="mt-6 flex flex-col gap-3 w-full max-w-xs">
           {!allComplete && (
             <button
               type="button"
@@ -249,15 +286,9 @@ export function MobileCameraContainer({
             >
               <ListChecks className="w-4 h-4" />
               <span>
-                {allComplete ? "Review All Captured Sheets" : "View Sheet Checklist"}
+                {allComplete ? "Review Captured Sheets" : "View Sheet Checklist"}
               </span>
             </button>
-          )}
-
-          {allComplete && (
-            <p className="text-xs text-emerald-400 font-medium pt-2">
-              All sheets captured! You can now click &ldquo;Complete Section&rdquo; on your computer.
-            </p>
           )}
         </div>
 

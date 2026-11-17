@@ -33,10 +33,6 @@ interface SectionCaptureModalProps {
 
 const MAX_DESKTOP_IMAGE_DIM = 2200;
 
-/**
- * Downscales oversized desktop image uploads on an offscreen canvas so they match
- * the 2200px (~200 DPI) canonical upload budget used by mobile captures.
- */
 async function normalizeDesktopImageFile(file: File): Promise<Blob> {
   if (!file.type.startsWith("image/")) {
     return file;
@@ -69,7 +65,7 @@ async function normalizeDesktopImageFile(file: File): Promise<Blob> {
       canvas.toBlob(
         (blob) => resolve(blob || file),
         "image/jpeg",
-        0.91
+        0.9
       );
     };
 
@@ -98,7 +94,6 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     null
   );
 
-  // Build authoritative manifest directly from section questions
   const localManifest = useMemo(
     () => buildSectionFrqManifest(testId, sectionId, questions),
     [testId, sectionId, questions]
@@ -119,7 +114,6 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
 
   const activeManifest = serverManifest ?? localManifest;
 
-  // Map `${questionId}::p${pageNumber}` -> submission record
   const submissionMap = useMemo(() => {
     const map = new Map<string, CaptureSubmissionSummary>();
     for (const sub of submissions) {
@@ -128,7 +122,6 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     return map;
   }, [submissions]);
 
-  // Check if any uploaded sheets are still actively being deskewed/cropped
   const hasSheetsInFlight = useMemo(
     () =>
       submissions.some(
@@ -166,7 +159,11 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     [activeManifest.sheets, submissionMap]
   );
 
-  // Handle direct image file upload from desktop fallback
+  const allSheetsVerified =
+    activeManifest.totalSheets > 0 &&
+    verifiedSheetCount >= activeManifest.totalSheets &&
+    !hasSheetsInFlight;
+
   const handleDesktopFileSelect = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -285,7 +282,14 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
           </div>
 
           <div className="text-right shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold transition-colors ${
+                allSheetsVerified
+                  ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
+                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200"
+              }`}
+            >
+              {allSheetsVerified && <CheckCircle2 className="w-3.5 h-3.5" />}
               {verifiedSheetCount}/{activeManifest.totalSheets} Verified
             </span>
           </div>
@@ -314,6 +318,14 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
                 <QRCodeSVG value={scanUrl} size={176} level="M" />
               )}
             </div>
+
+            {/* Live Connection Heartbeat */}
+            {token && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Live sync active — uploads appear automatically</span>
+              </div>
+            )}
 
             <p className="text-[11px] text-neutral-400 leading-tight">
               Point your phone camera at the QR code. Align all 4 black corner squares on each page; sheets auto-capture and deskew automatically.
@@ -367,11 +379,11 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
                       return (
                         <div
                           key={sheet.sheetKey}
-                          className={`flex flex-col justify-between px-2.5 py-2 bg-white dark:bg-neutral-900 border rounded ${
+                          className={`flex flex-col justify-between px-2.5 py-2 bg-white dark:bg-neutral-900 border rounded transition-colors ${
                             needsRetake
                               ? "border-red-500/50 bg-red-500/5"
                               : isVerified
-                              ? "border-emerald-500/40"
+                              ? "border-emerald-500/50 bg-emerald-500/5"
                               : "border-neutral-200 dark:border-neutral-800"
                           }`}
                         >
@@ -423,7 +435,11 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
                             </div>
                           </div>
 
-                          {/* Status Sub-line */}
+                          {isVerified && (
+                            <span className="text-[10px] text-emerald-500 font-mono mt-1">
+                              Synced & cropped ({sub.crops.length} part{sub.crops.length === 1 ? "" : "s"})
+                            </span>
+                          )}
                           {isProcessingServer && (
                             <span className="text-[10px] text-blue-500 font-mono mt-1">
                               Aligning fiducials & cropping...
@@ -450,17 +466,23 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
 
         {/* Footer */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-          <div className="text-[11px] text-neutral-400">
+          <div className="text-[11px]">
             {hasSheetsInFlight ? (
               <span className="text-blue-500 font-medium">
                 Waiting for uploaded sheets to finish cropping before submission...
+              </span>
+            ) : allSheetsVerified ? (
+              <span className="text-emerald-500 font-semibold">
+                All {activeManifest.totalSheets} sheets received & verified! Click Complete Section to submit.
               </span>
             ) : retakeNeededCount > 0 ? (
               <span className="text-amber-500 font-medium">
                 {retakeNeededCount} sheet(s) flagged for retake. Rescan on phone or complete anyway.
               </span>
             ) : (
-              <span>You can finalize even if some pages were left blank.</span>
+              <span className="text-neutral-400">
+                You can finalize even if some pages were left blank.
+              </span>
             )}
           </div>
 
@@ -468,7 +490,11 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
             type="button"
             onClick={onFinalizeSection}
             disabled={isSubmitting || hasSheetsInFlight}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950 text-xs font-bold uppercase tracking-wider rounded-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm transition-all disabled:opacity-50 cursor-pointer shrink-0 ${
+              allSheetsVerified
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20"
+                : "bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-950"
+            }`}
           >
             {isSubmitting || hasSheetsInFlight ? (
               <>

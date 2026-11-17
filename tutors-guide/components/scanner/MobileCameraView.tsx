@@ -51,7 +51,7 @@ interface DecodedQrMeta {
 
 const BLUR_THRESHOLD = 95.0;
 const MAX_UPLOAD_DIMENSION = 2200; // ~200 DPI US Letter; keeps S3 upload <500KB & server RAM low
-const REQUIRED_STEADY_FRAMES = 3; // 3 consecutive locked frames (~750ms) before auto-shutter
+const REQUIRED_STEADY_FRAMES = 3; // 3 consecutive locked frames (~750ms)
 
 function parseFooterQrText(rawText: string): DecodedQrMeta | null {
   try {
@@ -94,6 +94,7 @@ export function MobileCameraView({
   const [streamActive, setStreamActive] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSnapping, setIsSnapping] = useState(false);
 
   // Live CV telemetry & hold-steady progress (0..REQUIRED_STEADY_FRAMES)
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
@@ -106,15 +107,14 @@ export function MobileCameraView({
   const [manualSheetOverride, setManualSheetOverride] = useState<string | null>(null);
 
   const steadyCountRef = useRef<number>(0);
+  const isSnappingRef = useRef<boolean>(false);
 
-  // Derive effective sheet key without synchronous setState in useEffect
   const selectedSheetKey =
     manualSheetOverride ||
     suggestedSheet?.sheetKey ||
     manifest?.sheets[0]?.sheetKey ||
     "";
 
-  // Resolve active sheet metadata from QR detection, manual override, or suggested sheet
   const resolvedTargetSheet = useMemo<ManifestSheet | null>(() => {
     if (!manifest) return null;
     if (selectedSheetKey) {
@@ -160,85 +160,120 @@ export function MobileCameraView({
     };
   }, []);
 
-  // 2. Capture downscaled 2200px still + decode footer QR
+  // 2. Capture downscaled 2200px still + fast 900px QR decode
   const captureStill = useCallback(() => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const rawW = video.videoWidth || 1920;
-    const rawH = video.videoHeight || 1080;
-
-    // Bound longest edge to 2200px (~200 DPI) for fast cellular upload & low server memory
-    const longestEdge = Math.max(rawW, rawH);
-    const scale = longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0;
-    const outW = Math.round(rawW * scale);
-    const outH = Math.round(rawH * scale);
-
-    const captureCanvas = document.createElement("canvas");
-    captureCanvas.width = outW;
-    captureCanvas.height = outH;
-
-    const ctx = captureCanvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0, outW, outH);
-
-    // Attempt QR decode on bottom-right quadrant first, then full frame fallback
-    let decodedMeta: DecodedQrMeta | null = null;
-    try {
-      const qrW = Math.round(outW * 0.45);
-      const qrH = Math.round(outH * 0.35);
-      const qrLeft = outW - qrW;
-      const qrTop = outH - qrH;
-
-      const subImg = ctx.getImageData(qrLeft, qrTop, qrW, qrH);
-      const subCode = jsQR(subImg.data, qrW, qrH);
-      if (subCode?.data) {
-        decodedMeta = parseFooterQrText(subCode.data);
-      }
-
-      if (!decodedMeta) {
-        const fullImg = ctx.getImageData(0, 0, outW, outH);
-        const fullCode = jsQR(fullImg.data, outW, outH);
-        if (fullCode?.data) {
-          decodedMeta = parseFooterQrText(fullCode.data);
-        }
-      }
-    } catch (qrErr) {
-      console.warn("Client QR scan warning:", qrErr);
-    }
-
-    if (decodedMeta) {
-      setDetectedQr(decodedMeta);
-      if (manifest) {
-        const matched = lookupSheetInManifest(
-          manifest,
-          decodedMeta.questionNumber,
-          decodedMeta.pageNumber
-        );
-        if (matched) {
-          setManualSheetOverride(matched.sheet.sheetKey);
-        }
-      }
-    }
+    if (!videoRef.current || isSnappingRef.current) return;
+    isSnappingRef.current = true;
+    setIsSnapping(true);
 
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate([35, 50, 35]);
     }
 
-    captureCanvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        setCapturedBlob(blob);
-        setPreviewUrl(URL.createObjectURL(blob));
-      },
-      "image/jpeg",
-      0.91
-    );
+    // Yield one animation frame so the UI immediately paints the 100% / CAPTURING state
+    requestAnimationFrame(() => {
+      const video = videoRef.current;
+      if (!video) {
+        isSnappingRef.current = false;
+        setIsSnapping(false);
+        return;
+      }
+
+      const rawW = video.videoWidth || 1920;
+      const rawH = video.videoHeight || 1080;
+
+      const longestEdge = Math.max(rawW, rawH);
+      const scale =
+        longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0;
+      const outW = Math.round(rawW * scale);
+      const outH = Math.round(rawH * scale);
+
+      const captureCanvas = document.createElement("canvas");
+      captureCanvas.width = outW;
+      captureCanvas.height = outH;
+
+      const ctx = captureCanvas.getContext("2d");
+      if (!ctx) {
+        isSnappingRef.current = false;
+        setIsSnapping(false);
+        return;
+      }
+
+      ctx.drawImage(video, 0, 0, outW, outH);
+
+      // Fast QR scan on a 900px working canvas (~12ms instead of ~350ms on full 2200px)
+      let decodedMeta: DecodedQrMeta | null = null;
+      try {
+        const qrScale = Math.min(900 / longestEdge, 1.0);
+        const qCanvasW = Math.round(outW * qrScale);
+        const qCanvasH = Math.round(outH * qrScale);
+        const qrCanvas = document.createElement("canvas");
+        qrCanvas.width = qCanvasW;
+        qrCanvas.height = qCanvasH;
+        const qCtx = qrCanvas.getContext("2d", { willReadFrequently: true });
+
+        if (qCtx) {
+          qCtx.drawImage(captureCanvas, 0, 0, qCanvasW, qCanvasH);
+
+          // Scan bottom-right quadrant first
+          const subW = Math.round(qCanvasW * 0.48);
+          const subH = Math.round(qCanvasH * 0.38);
+          const subImg = qCtx.getImageData(qCanvasW - subW, qCanvasH - subH, subW, subH);
+          const subCode = jsQR(subImg.data, subW, subH);
+          if (subCode?.data) {
+            decodedMeta = parseFooterQrText(subCode.data);
+          }
+
+          // Fallback to full 900px canvas if sheet was rotated
+          if (!decodedMeta) {
+            const fullImg = qCtx.getImageData(0, 0, qCanvasW, qCanvasH);
+            const fullCode = jsQR(fullImg.data, qCanvasW, qCanvasH);
+            if (fullCode?.data) {
+              decodedMeta = parseFooterQrText(fullCode.data);
+            }
+          }
+        }
+      } catch (qrErr) {
+        console.warn("Client QR scan warning:", qrErr);
+      }
+
+      if (decodedMeta) {
+        setDetectedQr(decodedMeta);
+        if (manifest) {
+          const matched = lookupSheetInManifest(
+            manifest,
+            decodedMeta.questionNumber,
+            decodedMeta.pageNumber
+          );
+          if (matched) {
+            setManualSheetOverride(matched.sheet.sheetKey);
+          }
+        }
+      }
+
+      captureCanvas.toBlob(
+        (blob) => {
+          isSnappingRef.current = false;
+          setIsSnapping(false);
+          if (!blob) return;
+          setCapturedBlob(blob);
+          setPreviewUrl(URL.createObjectURL(blob));
+        },
+        "image/jpeg",
+        0.9
+      );
+    });
   }, [manifest]);
 
   // 3. Real-time frame quality + 4-corner fiducial detection loop (250ms)
   const analyzeFrame = useCallback(() => {
-    if (!videoRef.current || !analysisCanvasRef.current || isProcessing || capturedBlob) {
+    if (
+      !videoRef.current ||
+      !analysisCanvasRef.current ||
+      isProcessing ||
+      capturedBlob ||
+      isSnappingRef.current
+    ) {
       return;
     }
 
@@ -258,7 +293,6 @@ export function MobileCameraView({
     ctx.drawImage(video, 0, 0, w, h);
     const frameData = ctx.getImageData(0, 0, w, h);
 
-    // Check specular glare
     if (checkLightingGlare(frameData)) {
       setWarningMessage("Overhead glare detected. Tilt sheet slightly.");
       setFiducialsLocked(false);
@@ -267,7 +301,6 @@ export function MobileCameraView({
       return;
     }
 
-    // Check focus/blur sharpness
     const blurScore = calculateLaplacianVariance(frameData);
     if (blurScore < BLUR_THRESHOLD) {
       setWarningMessage("Hold steady — focusing on handwriting...");
@@ -277,7 +310,6 @@ export function MobileCameraView({
       return;
     }
 
-    // Convert RGBA -> grayscale for fast 4-corner fiducial detection (<5ms at 480px)
     const rgba = frameData.data;
     const gray = new Uint8Array(w * h);
     for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
@@ -293,7 +325,6 @@ export function MobileCameraView({
       return;
     }
 
-    // All 4 fiducials locked, sharp, and glare-free!
     setWarningMessage(null);
     setFiducialsLocked(true);
 
@@ -301,8 +332,7 @@ export function MobileCameraView({
     const clampedSteady = Math.min(steadyCountRef.current, REQUIRED_STEADY_FRAMES);
     setSteadyFrames(clampedSteady);
 
-    // Auto-capture after REQUIRED_STEADY_FRAMES consecutive locked frames (~750ms)
-    if (steadyCountRef.current >= REQUIRED_STEADY_FRAMES && !capturedBlob && !isProcessing) {
+    if (steadyCountRef.current >= REQUIRED_STEADY_FRAMES) {
       captureStill();
     }
   }, [isProcessing, capturedBlob, captureStill]);
@@ -390,6 +420,8 @@ export function MobileCameraView({
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+    isSnappingRef.current = false;
+    setIsSnapping(false);
     setCapturedBlob(null);
     setDetectedQr(null);
     setManualSheetOverride(null);
@@ -474,7 +506,6 @@ export function MobileCameraView({
                   : "border-white/40"
               }`}
             >
-              {/* Corner Target Brackets */}
               <div
                 className={`absolute -top-1.5 -left-1.5 w-7 h-7 border-t-4 border-l-4 rounded-tl-md ${
                   fiducialsLocked ? "border-emerald-400" : "border-white"
@@ -496,7 +527,6 @@ export function MobileCameraView({
                 }`}
               />
 
-              {/* Mid-Sheet Divider Reference */}
               <div className="absolute top-[50%] inset-x-4 border-b border-dashed border-white/30 flex justify-end">
                 <span className="text-[9px] font-mono text-white/60 tracking-wider pr-1">
                   PART DIVIDER
@@ -504,27 +534,31 @@ export function MobileCameraView({
               </div>
 
               {/* Hold-Steady Progress Pill with Filling Dots + Bar */}
-              {fiducialsLocked && (
+              {(fiducialsLocked || isSnapping) && (
                 <div className="absolute bottom-3 inset-x-3 flex justify-center">
                   <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[240px]">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold tracking-wide text-emerald-300 flex items-center gap-1">
-                        <ScanLine className="w-3 h-3 shrink-0" />
-                        <span>
-                          {steadyFrames >= REQUIRED_STEADY_FRAMES
-                            ? "CAPTURING..."
-                            : "HOLD STEADY"}
-                        </span>
+                      <span className="text-[10px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
+                        {isSnapping ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                            <span>PROCESSING CAPTURE...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ScanLine className="w-3 h-3 shrink-0" />
+                            <span>HOLD STEADY</span>
+                          </>
+                        )}
                       </span>
 
-                      {/* 3-Step Filling Dots */}
                       <div className="flex items-center gap-1.5">
                         {Array.from({ length: REQUIRED_STEADY_FRAMES }, (_, idx) => {
-                          const isFilled = idx < steadyFrames;
+                          const isFilled = idx < steadyFrames || isSnapping;
                           return (
                             <span
                               key={idx}
-                              className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                              className={`w-2 h-2 rounded-full transition-all duration-150 ${
                                 isFilled
                                   ? "bg-emerald-400 scale-110 shadow-[0_0_6px_rgba(52,211,153,0.9)]"
                                   : "bg-zinc-600"
@@ -535,11 +569,10 @@ export function MobileCameraView({
                       </div>
                     </div>
 
-                    {/* Smooth Filling Progress Bar */}
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-400 rounded-full transition-all duration-200 ease-out"
-                        style={{ width: `${steadyPercent}%` }}
+                        className="h-full bg-emerald-400 rounded-full transition-all duration-150 ease-out"
+                        style={{ width: `${isSnapping ? 100 : steadyPercent}%` }}
                       />
                     </div>
                   </div>
@@ -562,7 +595,6 @@ export function MobileCameraView({
       <div className="relative z-20 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center gap-3">
         {previewUrl ? (
           <div className="w-full max-w-sm space-y-3">
-            {/* Sheet Confirmation / Override Selector */}
             {manifest && manifest.sheets.length > 0 && (
               <div className="bg-zinc-900/95 border border-zinc-700 rounded-xl p-2.5 flex items-center justify-between gap-2">
                 <span className="text-[11px] font-semibold text-zinc-400 shrink-0 pl-1">
@@ -625,7 +657,8 @@ export function MobileCameraView({
             <button
               type="button"
               onClick={captureStill}
-              className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer"
+              disabled={isSnapping}
+              className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer disabled:opacity-60"
               aria-label="Capture still frame"
             >
               <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
@@ -633,7 +666,9 @@ export function MobileCameraView({
               </div>
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">
-              {fiducialsLocked
+              {isSnapping
+                ? "Processing capture..."
+                : fiducialsLocked
                 ? `Hold steady (${steadyFrames}/${REQUIRED_STEADY_FRAMES})...`
                 : "Frame all 4 corner squares or tap shutter"}
             </span>
