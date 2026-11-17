@@ -9,7 +9,8 @@ import { QrCode, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle } from "lu
 
 interface FrqSandboxClientProps {
   testId: string;
-  sectionId: string;
+  /** Optional: omit for test-wide capture across all FRQ sections */
+  sectionId?: string;
   questions: QuestionFrontmatter[];
 }
 
@@ -42,7 +43,7 @@ export function FrqSandboxClient({
             Active Token: <span className="text-zinc-200">{token ?? "Initializing..."}</span>
           </div>
           <p className="text-xs text-zinc-500">
-            Open the capture modal to display the QR code, or inspect live cropped artifacts below.
+            Open the capture modal to display the QR code, or inspect live cropped artifacts below[cite: 11].
           </p>
         </div>
 
@@ -73,8 +74,8 @@ export function FrqSandboxClient({
       {finalizedBanner && (
         <div className="p-4 bg-emerald-950/50 border border-emerald-500/30 rounded-xl flex items-center justify-between text-xs text-emerald-300">
           <span>
-            Modal finalized! In a real exam, this triggers <code>completeTestSection</code>[cite: 36].
-            Inspect your processed crops below or check <code>/tgadmin/frq-audit</code>[cite: 7].
+            Modal finalized! In a real exam, this triggers <code>finalizeTestFrqCapture</code>[cite: 11].
+            Inspect your processed crops below or check <code>/tgadmin/frq-audit</code>[cite: 11].
           </span>
           <a
             href="/tgadmin/frq-audit"
@@ -88,12 +89,12 @@ export function FrqSandboxClient({
       {/* Live Processed Submissions & Crop Inspector */}
       <div className="space-y-4">
         <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-          Processed Submissions & Cropped Sub-Parts ({submissions.length})
+          Processed Submissions & Cropped Sub-Parts ({submissions.length})[cite: 11]
         </h2>
 
         {submissions.length === 0 ? (
           <div className="p-10 text-center bg-zinc-900/60 border border-zinc-800 rounded-xl text-xs text-zinc-500">
-            No sheets uploaded yet. Click <strong>Open QR Capture Modal</strong> and scan a sheet with your phone (or upload an image directly).
+            No sheets uploaded yet. Click <strong>Open QR Capture Modal</strong> and scan a sheet with your phone (or upload an image directly)[cite: 11].
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -108,7 +109,7 @@ export function FrqSandboxClient({
                       {sub.questionId} • Sheet {sub.pageNumber}
                     </div>
                     <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                      Status: {sub.status}
+                      Section: {sub.sectionId} • Status: {sub.status}
                     </div>
                   </div>
 
