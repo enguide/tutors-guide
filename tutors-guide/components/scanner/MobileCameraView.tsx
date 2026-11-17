@@ -50,8 +50,9 @@ interface DecodedQrMeta {
 }
 
 const BLUR_THRESHOLD = 95.0;
-const MAX_UPLOAD_DIMENSION = 2200; // ~200 DPI US Letter; keeps S3 upload <500KB & server RAM low
-const REQUIRED_STEADY_FRAMES = 3; // 3 consecutive locked frames (~750ms)
+const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x2200 server canvas
+const ANALYSIS_INTERVAL_MS = 250;
+const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown
 
 function parseFooterQrText(rawText: string): DecodedQrMeta | null {
   try {
@@ -96,7 +97,7 @@ export function MobileCameraView({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
 
-  // Live CV telemetry & hold-steady progress (0..REQUIRED_STEADY_FRAMES)
+  // Live CV telemetry & 3-second hold-steady progress (0..REQUIRED_STEADY_FRAMES)
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
   const [steadyFrames, setSteadyFrames] = useState<number>(0);
 
@@ -124,7 +125,7 @@ export function MobileCameraView({
     return suggestedSheet || manifest.sheets[0] || null;
   }, [manifest, selectedSheetKey, suggestedSheet]);
 
-  // 1. Initialize rear-facing camera at high resolution
+  // 1. Initialize rear-facing camera at highest available resolution
   useEffect(() => {
     let currentStream: MediaStream | null = null;
 
@@ -160,7 +161,7 @@ export function MobileCameraView({
     };
   }, []);
 
-  // 2. Capture downscaled 2200px still + fast 900px QR decode
+  // 2. Capture high-res 2200px still + fast 900px QR decode
   const captureStill = useCallback(() => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
@@ -170,7 +171,6 @@ export function MobileCameraView({
       navigator.vibrate([35, 50, 35]);
     }
 
-    // Yield one animation frame so the UI immediately paints the 100% / CAPTURING state
     requestAnimationFrame(() => {
       const video = videoRef.current;
       if (!video) {
@@ -201,7 +201,7 @@ export function MobileCameraView({
 
       ctx.drawImage(video, 0, 0, outW, outH);
 
-      // Fast QR scan on a 900px working canvas (~12ms instead of ~350ms on full 2200px)
+      // Fast QR scan on a 900px working canvas (~12ms)
       let decodedMeta: DecodedQrMeta | null = null;
       try {
         const qrScale = Math.min(900 / longestEdge, 1.0);
@@ -215,7 +215,6 @@ export function MobileCameraView({
         if (qCtx) {
           qCtx.drawImage(captureCanvas, 0, 0, qCanvasW, qCanvasH);
 
-          // Scan bottom-right quadrant first
           const subW = Math.round(qCanvasW * 0.48);
           const subH = Math.round(qCanvasH * 0.38);
           const subImg = qCtx.getImageData(qCanvasW - subW, qCanvasH - subH, subW, subH);
@@ -224,7 +223,6 @@ export function MobileCameraView({
             decodedMeta = parseFooterQrText(subCode.data);
           }
 
-          // Fallback to full 900px canvas if sheet was rotated
           if (!decodedMeta) {
             const fullImg = qCtx.getImageData(0, 0, qCanvasW, qCanvasH);
             const fullCode = jsQR(fullImg.data, qCanvasW, qCanvasH);
@@ -260,7 +258,7 @@ export function MobileCameraView({
           setPreviewUrl(URL.createObjectURL(blob));
         },
         "image/jpeg",
-        0.9
+        0.92
       );
     });
   }, [manifest]);
@@ -339,7 +337,7 @@ export function MobileCameraView({
 
   useEffect(() => {
     if (!streamActive || capturedBlob) return;
-    const interval = setInterval(analyzeFrame, 250);
+    const interval = setInterval(analyzeFrame, ANALYSIS_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [streamActive, capturedBlob, analyzeFrame]);
 
@@ -433,10 +431,13 @@ export function MobileCameraView({
     setWarningMessage(null);
   };
 
+  // 3-second countdown metrics (4 frames = 1 second)
   const steadyPercent = Math.min(
     100,
     Math.round((steadyFrames / REQUIRED_STEADY_FRAMES) * 100)
   );
+  const completedSeconds = Math.min(3, Math.floor(steadyFrames / 4));
+  const secondsRemainingCount = Math.max(1, 3 - completedSeconds);
 
   return (
     <div className="relative w-full h-screen bg-black flex flex-col justify-between overflow-hidden select-none">
@@ -533,35 +534,41 @@ export function MobileCameraView({
                 </span>
               </div>
 
-              {/* Hold-Steady Progress Pill with Filling Dots + Bar */}
+              {/* 3-Second Guided Hold-Steady Countdown Pill */}
               {(fiducialsLocked || isSnapping) && (
                 <div className="absolute bottom-3 inset-x-3 flex justify-center">
-                  <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[240px]">
+                  <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2.5 shadow-lg space-y-2 w-full max-w-[260px]">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
                         {isSnapping ? (
                           <>
-                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                            <span>PROCESSING CAPTURE...</span>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                            <span>CAPTURING...</span>
                           </>
                         ) : (
                           <>
-                            <ScanLine className="w-3 h-3 shrink-0" />
-                            <span>HOLD STEADY</span>
+                            <ScanLine className="w-3.5 h-3.5 shrink-0" />
+                            <span>HOLD STEADY • {secondsRemainingCount}s</span>
                           </>
                         )}
                       </span>
 
+                      {/* 3-Second Milestone Dots (1s, 2s, 3s) */}
                       <div className="flex items-center gap-1.5">
-                        {Array.from({ length: REQUIRED_STEADY_FRAMES }, (_, idx) => {
-                          const isFilled = idx < steadyFrames || isSnapping;
+                        {[1, 2, 3].map((secStep) => {
+                          const isFilled =
+                            steadyFrames >= secStep * 4 || isSnapping;
+                          const isInProgress =
+                            !isFilled && steadyFrames > (secStep - 1) * 4;
                           return (
                             <span
-                              key={idx}
-                              className={`w-2 h-2 rounded-full transition-all duration-150 ${
+                              key={secStep}
+                              className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
                                 isFilled
-                                  ? "bg-emerald-400 scale-110 shadow-[0_0_6px_rgba(52,211,153,0.9)]"
-                                  : "bg-zinc-600"
+                                  ? "bg-emerald-400 scale-110 shadow-[0_0_8px_rgba(52,211,153,0.95)]"
+                                  : isInProgress
+                                  ? "bg-emerald-400/50 animate-pulse"
+                                  : "bg-zinc-700"
                               }`}
                             />
                           );
@@ -569,9 +576,10 @@ export function MobileCameraView({
                       </div>
                     </div>
 
+                    {/* Smooth 3-Second Progress Bar */}
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-400 rounded-full transition-all duration-150 ease-out"
+                        className="h-full bg-emerald-400 rounded-full transition-all duration-200 ease-linear"
                         style={{ width: `${isSnapping ? 100 : steadyPercent}%` }}
                       />
                     </div>
@@ -667,9 +675,9 @@ export function MobileCameraView({
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">
               {isSnapping
-                ? "Processing capture..."
+                ? "Capturing high-resolution sheet..."
                 : fiducialsLocked
-                ? `Hold steady (${steadyFrames}/${REQUIRED_STEADY_FRAMES})...`
+                ? `Hold steady for ${secondsRemainingCount}s...`
                 : "Frame all 4 corner squares or tap shutter"}
             </span>
           </div>

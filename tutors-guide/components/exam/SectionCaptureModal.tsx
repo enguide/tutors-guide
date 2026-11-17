@@ -5,7 +5,10 @@ import React, { useState, useRef, useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { QuestionFrontmatter } from "@/types/content";
 import { buildSectionFrqManifest } from "@/lib/frq/manifest";
-import { useCaptureSync, CaptureSubmissionSummary } from "@/hooks/useCaptureSync";
+import {
+  useCaptureSync,
+  CaptureSubmissionSummary,
+} from "@/hooks/useCaptureSync";
 import {
   getPresignedUploadForSession,
   finalizeSubmissionUpload,
@@ -22,6 +25,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 
+type CaptureSyncHandle = ReturnType<typeof useCaptureSync>;
+
 interface SectionCaptureModalProps {
   isOpen: boolean;
   testId: string;
@@ -29,6 +34,8 @@ interface SectionCaptureModalProps {
   questions: QuestionFrontmatter[];
   onFinalizeSection: () => void;
   isSubmitting?: boolean;
+  /** Optional shared sync state when parent component also tracks capture progress */
+  externalSync?: CaptureSyncHandle;
 }
 
 const MAX_DESKTOP_IMAGE_DIM = 2200;
@@ -62,11 +69,7 @@ async function normalizeDesktopImageFile(file: File): Promise<Blob> {
       }
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-        (blob) => resolve(blob || file),
-        "image/jpeg",
-        0.9
-      );
+      canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.92);
     };
 
     img.onerror = () => {
@@ -85,6 +88,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
   questions,
   onFinalizeSection,
   isSubmitting = false,
+  externalSync,
 }) => {
   const [uploadingTarget, setUploadingTarget] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -99,6 +103,14 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     [testId, sectionId, questions]
   );
 
+  // Only spin up an internal sync hook if the parent did not provide a shared one
+  const internalSync = useCaptureSync({
+    testId,
+    sectionId,
+    enabled: isOpen && !externalSync,
+  });
+
+  const activeSync = externalSync ?? internalSync;
   const {
     token,
     manifest: serverManifest,
@@ -106,11 +118,7 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
     isLoading,
     error: syncError,
     upsertOptimisticSubmission,
-  } = useCaptureSync({
-    testId,
-    sectionId,
-    enabled: isOpen,
-  });
+  } = activeSync;
 
   const activeManifest = serverManifest ?? localManifest;
 
@@ -319,16 +327,15 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
               )}
             </div>
 
-            {/* Live Connection Heartbeat */}
             {token && (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Live sync active — uploads appear automatically</span>
+                <span>Live sync active • uploads appear automatically</span>
               </div>
             )}
 
             <p className="text-[11px] text-neutral-400 leading-tight">
-              Point your phone camera at the QR code. Align all 4 black corner squares on each page; sheets auto-capture and deskew automatically.
+              Point your phone camera at the QR code. Align all 4 black corner squares on each page; sheets auto-capture after a 3-second hold.
             </p>
           </div>
 

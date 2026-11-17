@@ -21,15 +21,17 @@ export function FrqSandboxClient({
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [finalizedBanner, setFinalizedBanner] = useState(false);
 
-  const {
-    token,
-    submissions,
-    refreshSession,
-  } = useCaptureSync({
+  const syncState = useCaptureSync({
     testId,
     sectionId,
     enabled: true,
   });
+
+  const {
+    token,
+    submissions,
+    refreshSession,
+  } = syncState;
 
   return (
     <div className="space-y-6">
@@ -71,8 +73,8 @@ export function FrqSandboxClient({
       {finalizedBanner && (
         <div className="p-4 bg-emerald-950/50 border border-emerald-500/30 rounded-xl flex items-center justify-between text-xs text-emerald-300">
           <span>
-            Modal finalized! In a real exam, this triggers <code>completeTestSection</code>.
-            Inspect your processed crops below or check <code>/tgadmin/frq-audit</code>.
+            Modal finalized! In a real exam, this triggers <code>completeTestSection</code>[cite: 36].
+            Inspect your processed crops below or check <code>/tgadmin/frq-audit</code>[cite: 7].
           </span>
           <a
             href="/tgadmin/frq-audit"
@@ -183,6 +185,7 @@ export function FrqSandboxClient({
         testId={testId}
         sectionId={sectionId}
         questions={questions}
+        externalSync={syncState}
         onFinalizeSection={() => {
           setIsModalOpen(false);
           setFinalizedBanner(true);
