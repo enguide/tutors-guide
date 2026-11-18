@@ -190,27 +190,44 @@ export function buildTestFrqManifest(
 }
 
 /**
- * Parses both self-describing QR codes:
- *   "FORM:ap-calc-ab-practice-1;SEC:ap-calc-ab-t1-s2a;QID:ap-calc-frq-q1;Q:1;PG:1;PARTS:AB"
- * and legacy QR codes:
- *   "EXAM:AB_2026;Q:1;PG:4;PARTS:AB"
+ * Parses compact pipe-delimited QR codes:
+ *   4-part: "<formId>|<sectionId>|<questionNumber>|<pageNumber>"
+ *   3-part: "<formId>|<questionNumber>|<pageNumber>"
+ * as well as key-value and legacy QR codes:
+ *   "F:...;S:...;I:...;Q:...;P:...;R:..." or "EXAM:AB_2026;Q:1;PG:4;PARTS:AB"
  */
 export function parseSelfDescribingSheetQr(rawText: string): DecodedSheetQr | null {
   try {
     const trimmed = rawText.trim();
 
-    // 1. Ultra-compact Version-1 QR format: "<formId>|<questionNumber>|<pageNumber>"
+    // 1. Compact Version-1 / Version-2 pipe format
     if (trimmed.includes("|") && !trimmed.includes(";")) {
-      const [rawForm, rawQ, rawPg] = trimmed.split("|");
-      const qNum = parseInt(rawQ || "", 10);
-      const pNum = parseInt(rawPg || "1", 10);
-      if (rawForm && Number.isFinite(qNum)) {
-        return {
-          formId: rawForm.trim(),
-          questionNumber: qNum,
-          pageNumber: Number.isFinite(pNum) ? pNum : 1,
-          parts: [],
-        };
+      const partsArr = trimmed.split("|");
+      if (partsArr.length >= 4) {
+        const [rawForm, rawSec, rawQ, rawPg] = partsArr;
+        const qNum = parseInt(rawQ || "", 10);
+        const pNum = parseInt(rawPg || "1", 10);
+        if (rawForm && Number.isFinite(qNum)) {
+          return {
+            formId: rawForm.trim(),
+            sectionId: rawSec?.trim() || undefined,
+            questionNumber: qNum,
+            pageNumber: Number.isFinite(pNum) ? pNum : 1,
+            parts: [],
+          };
+        }
+      } else {
+        const [rawForm, rawQ, rawPg] = partsArr;
+        const qNum = parseInt(rawQ || "", 10);
+        const pNum = parseInt(rawPg || "1", 10);
+        if (rawForm && Number.isFinite(qNum)) {
+          return {
+            formId: rawForm.trim(),
+            questionNumber: qNum,
+            pageNumber: Number.isFinite(pNum) ? pNum : 1,
+            parts: [],
+          };
+        }
       }
     }
 

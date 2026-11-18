@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import jsQR from "jsqr";
 import { calculateLaplacianVariance, checkLightingGlare } from "@/lib/cv/qualityChecks";
-import { detectSheetFiducials } from "@/lib/cv/fiducials";
+import { detectSheetFiducials, DetectedFiducials } from "@/lib/cv/fiducials";
 import {
   DecodedSheetQr,
   SectionFrqManifest,
@@ -50,9 +50,66 @@ interface MobileCameraViewProps {
 }
 
 const BLUR_THRESHOLD = 95.0;
-const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x2200 server canvas[cite: 25, 29]
-const ANALYSIS_INTERVAL_MS = 250; //[cite: 25]
-const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown[cite: 25]
+const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x2200 server canvas[cite: 13]
+const ANALYSIS_INTERVAL_MS = 250; //[cite: 13]
+const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown[cite: 13]
+
+/**
+ * Validates that detected fiducials form an upright, low-keystone US Letter rectangle
+ * so perspective warps stay razor-straight without manual cropping.
+ */
+function evaluateFiducialGeometry(
+  f: DetectedFiducials,
+  frameW: number,
+  frameH: number
+): { valid: boolean; reason?: string } {
+  const topW = Math.hypot(f.TR.x - f.TL.x, f.TR.y - f.TL.y);
+  const botW = Math.hypot(f.BR.x - f.BL.x, f.BR.y - f.BL.y);
+  const leftH = Math.hypot(f.BL.x - f.TL.x, f.BL.y - f.TL.y);
+  const rightH = Math.hypot(f.BR.x - f.TR.x, f.BR.y - f.TR.y);
+
+  const avgW = (topW + botW) / 2;
+  const avgH = (leftH + rightH) / 2;
+
+  // 1. Minimum size in frame (prevents low-DPI distant captures)
+  if (avgW / frameW < 0.36 || avgH / frameH < 0.46) {
+    return {
+      valid: false,
+      reason: "Move closer so the sheet fills the viewfinder guide.",
+    };
+  }
+
+  // 2. Keystone / perspective skew ratio check (phone tilted forward/backward or sideways)
+  const widthRatio = topW / Math.max(botW, 1);
+  const heightRatio = leftH / Math.max(rightH, 1);
+  if (widthRatio < 0.85 || widthRatio > 1.18 || heightRatio < 0.85 || heightRatio > 1.18) {
+    return {
+      valid: false,
+      reason: "Hold phone parallel (flat) directly above the page.",
+    };
+  }
+
+  // 3. In-plane rotation check (< ~6 degrees tilt)
+  const topAngleDeg = Math.abs((Math.atan2(f.TR.y - f.TL.y, f.TR.x - f.TL.x) * 180) / Math.PI);
+  const botAngleDeg = Math.abs((Math.atan2(f.BR.y - f.BL.y, f.BR.x - f.BL.x) * 180) / Math.PI);
+  if (topAngleDeg > 6.5 || botAngleDeg > 6.5) {
+    return {
+      valid: false,
+      reason: "Level the page straight inside the guide frame.",
+    };
+  }
+
+  // 4. Aspect ratio sanity check (US Letter fiducial span is ~177.9mm x 251.4mm => ~0.708)
+  const observedAspect = avgW / Math.max(avgH, 1);
+  if (observedAspect < 0.56 || observedAspect > 0.88) {
+    return {
+      valid: false,
+      reason: "Align all 4 black corner squares with the corner targets.",
+    };
+  }
+
+  return { valid: true };
+}
 
 /**
  * Decodes the footer QR code using native hardware-accelerated BarcodeDetector first,
@@ -66,7 +123,6 @@ async function decodeSheetQrHighRes(
 ): Promise<DecodedSheetQr | null> {
   if (srcW <= 0 || srcH <= 0) return null;
 
-  // 1. Native hardware-accelerated BarcodeDetector (Chrome/Android & Safari/iOS 17+)
   if (typeof window !== "undefined" && "BarcodeDetector" in window) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,11 +135,10 @@ async function decodeSheetQrHighRes(
         }
       }
     } catch {
-      // Fall back to jsQR if BarcodeDetector is unsupported on this device
+      // Fall back to jsQR if BarcodeDetector is unsupported
     }
   }
 
-  // 2. Full-resolution 1:1 bottom-right quadrant crop for jsQR (zero downscaling of QR modules)
   const cropW = Math.min(900, Math.round(srcW * 0.55));
   const cropH = Math.min(700, Math.round(srcH * 0.42));
   const cropCanvas = document.createElement("canvas");
@@ -111,7 +166,6 @@ async function decodeSheetQrHighRes(
     return parseSelfDescribingSheetQr(brCode.data);
   }
 
-  // 3. Optional full-frame 1400px fallback during final capture (handles rotated sheets)
   if (includeFullFallback) {
     const scale = Math.min(1400 / Math.max(srcW, srcH), 1.0);
     const fullW = Math.round(srcW * scale);
@@ -154,12 +208,13 @@ export function MobileCameraView({
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
+  const [focusPulse, setFocusPulse] = useState(false);
 
-  // Live CV telemetry & 3-second hold-steady progress[cite: 25]
+  // Live CV telemetry & 3-second hold-steady progress[cite: 13]
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
   const [steadyFrames, setSteadyFrames] = useState<number>(0);
 
-  // Live QR-detected sheet during framing (enables any-order scanning)[cite: 25]
+  // Live QR-detected sheet during framing[cite: 13]
   const [liveDetectedSheet, setLiveDetectedSheet] = useState<ManifestSheet | null>(null);
   const [duplicateSheetCandidate, setDuplicateSheetCandidate] =
     useState<ManifestSheet | null>(null);
@@ -169,7 +224,7 @@ export function MobileCameraView({
       : new Set()
   );
 
-  // Captured image state[cite: 25]
+  // Captured image state[cite: 13]
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [detectedQr, setDetectedQr] = useState<DecodedSheetQr | null>(null);
@@ -179,8 +234,10 @@ export function MobileCameraView({
   const steadyCountRef = useRef<number>(0);
   const isSnappingRef = useRef<boolean>(false);
   const isAnalyzingRef = useRef<boolean>(false);
+  const prevFiducialsRef = useRef<{ f: DetectedFiducials; w: number; h: number } | null>(
+    null
+  );
 
-  // If QR was decoded and matched, verifiedQrSheet is authoritative and immutable
   const selectedSheetKey =
     verifiedQrSheet?.sheetKey ||
     manualFallbackKey ||
@@ -199,6 +256,28 @@ export function MobileCameraView({
     return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
   }, [verifiedQrSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
 
+  const applyContinuousFocusConstraints = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || typeof track.getCapabilities !== "function") return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const caps = track.getCapabilities() as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const advanced: any[] = [];
+      if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+        advanced.push({ focusMode: "continuous" });
+      }
+      if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) {
+        advanced.push({ exposureMode: "continuous" });
+      }
+      if (advanced.length > 0) {
+        await track.applyConstraints({ advanced });
+      }
+    } catch {
+      // Ignore on browsers that don't expose advanced camera constraints
+    }
+  }, []);
+
   // 1. Initialize rear-facing camera once and keep <video> mounted across retakes
   useEffect(() => {
     let isCancelled = false;
@@ -212,7 +291,7 @@ export function MobileCameraView({
             height: { ideal: 1920 },
           },
           audio: false,
-        }); //[cite: 25]
+        }); //[cite: 13]
 
         if (isCancelled) {
           stream.getTracks().forEach((track) => track.stop());
@@ -224,10 +303,11 @@ export function MobileCameraView({
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
           setStreamActive(true);
+          await applyContinuousFocusConstraints();
         }
       } catch (err) {
-        console.error("Camera access error:", err); //[cite: 25]
-        setWarningMessage("Unable to access rear camera. Check browser permissions."); //[cite: 25]
+        console.error("Camera access error:", err); //[cite: 13]
+        setWarningMessage("Unable to access rear camera. Check browser permissions."); //[cite: 13]
       }
     }
 
@@ -240,78 +320,103 @@ export function MobileCameraView({
         streamRef.current = null;
       }
     };
-  }, []);
+  }, [applyContinuousFocusConstraints]);
 
-  // 2. Capture high-res 2200px still + full-resolution QR verification[cite: 25]
-  const captureStill = useCallback(() => {
+  const handleTapToFocus = useCallback(async () => {
+    if (previewUrl) return;
+    setFocusPulse(true);
+    setTimeout(() => setFocusPulse(false), 600);
+    await applyContinuousFocusConstraints();
+  }, [previewUrl, applyContinuousFocusConstraints]);
+
+  // 2. Burst-of-3 sharpest frame capture + full-resolution QR verification
+  const captureStill = useCallback(async () => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
     setIsSnapping(true);
 
     if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate([35, 50, 35]); //[cite: 25]
+      navigator.vibrate([35, 50, 35]); //[cite: 13]
     }
 
-    requestAnimationFrame(async () => {
+    try {
       const video = videoRef.current;
-      if (!video) {
-        isSnappingRef.current = false;
-        setIsSnapping(false);
-        return;
-      }
+      if (!video) return;
 
-      const rawW = video.videoWidth || 1920; //[cite: 25]
-      const rawH = video.videoHeight || 1080; //[cite: 25]
+      const rawW = video.videoWidth || 1920; //[cite: 13]
+      const rawH = video.videoHeight || 1080; //[cite: 13]
 
       const longestEdge = Math.max(rawW, rawH);
       const scale =
-        longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0; //[cite: 25]
+        longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0; //[cite: 13]
       const outW = Math.round(rawW * scale);
       const outH = Math.round(rawH * scale);
 
-      const captureCanvas = document.createElement("canvas");
-      captureCanvas.width = outW;
-      captureCanvas.height = outH;
+      // Capture 3 rapid frames (~160ms total) and select the highest Laplacian sharpness score
+      let bestCanvas: HTMLCanvasElement | null = null;
+      let bestSharpness = -1;
 
-      const ctx = captureCanvas.getContext("2d");
-      if (!ctx) {
-        isSnappingRef.current = false;
-        setIsSnapping(false);
-        return;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 80));
+        }
+
+        const candidate = document.createElement("canvas");
+        candidate.width = outW;
+        candidate.height = outH;
+        const cCtx = candidate.getContext("2d", { willReadFrequently: true });
+        if (!cCtx) continue;
+
+        cCtx.drawImage(video, 0, 0, outW, outH);
+
+        // Measure sharpness on a fast 480px sample
+        const sScale = Math.min(480 / Math.max(outW, outH), 1.0);
+        const sW = Math.round(outW * sScale);
+        const sH = Math.round(outH * sScale);
+        const sCanvas = document.createElement("canvas");
+        sCanvas.width = sW;
+        sCanvas.height = sH;
+        const sCtx = sCanvas.getContext("2d", { willReadFrequently: true });
+        if (sCtx) {
+          sCtx.drawImage(candidate, 0, 0, sW, sH);
+          const sharpness = calculateLaplacianVariance(sCtx.getImageData(0, 0, sW, sH));
+          if (sharpness > bestSharpness) {
+            bestSharpness = sharpness;
+            bestCanvas = candidate;
+          }
+        } else if (!bestCanvas) {
+          bestCanvas = candidate;
+        }
       }
 
-      ctx.drawImage(video, 0, 0, outW, outH);
+      if (!bestCanvas) return;
 
-      // Decode QR at full native 1:1 resolution (BarcodeDetector + 1:1 jsQR crop + full fallback)
+      // Decode QR at full native 1:1 resolution on the sharpest burst frame
       let decodedMeta: DecodedSheetQr | null = null;
       try {
-        decodedMeta = await decodeSheetQrHighRes(captureCanvas, outW, outH, true);
+        decodedMeta = await decodeSheetQrHighRes(bestCanvas, outW, outH, true);
       } catch (qrErr) {
-        console.warn("Client QR scan warning:", qrErr); //[cite: 25]
+        console.warn("Client QR scan warning:", qrErr); //[cite: 13]
       }
 
       if (decodedMeta && manifest) {
         const match = matchQrAgainstManifest(manifest, decodedMeta);
         if (match.status === "WRONG_FORM" || match.status === "NOT_IN_TEST") {
-          isSnappingRef.current = false;
-          setIsSnapping(false);
           setWarningMessage(
             match.status === "WRONG_FORM"
               ? `Wrong exam booklet (${match.actualForm}). Expected ${match.expectedForm}.`
               : match.reason
-          ); //[cite: 25]
+          ); //[cite: 13]
           return;
         }
 
         const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
         const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
         if (isAlreadyUploaded && !isExplicitReplace) {
-          isSnappingRef.current = false;
-          setIsSnapping(false);
           setDuplicateSheetCandidate(match.sheet);
           setWarningMessage(
             `Q${match.sheet.questionNumber} Sheet ${match.sheet.pageNumber} is already uploaded — flip to another page.`
-          ); //[cite: 25]
+          ); //[cite: 13]
           return;
         }
 
@@ -321,21 +426,26 @@ export function MobileCameraView({
         setVerifiedQrSheet(liveDetectedSheet);
       }
 
-      captureCanvas.toBlob(
-        (blob) => {
-          isSnappingRef.current = false;
-          setIsSnapping(false);
-          if (!blob) return;
-          setCapturedBlob(blob);
-          setPreviewUrl(URL.createObjectURL(blob));
-        },
-        "image/jpeg",
-        0.92
-      ); //[cite: 25]
-    });
+      await new Promise<void>((resolve) => {
+        bestCanvas!.toBlob(
+          (blob) => {
+            if (blob) {
+              setCapturedBlob(blob);
+              setPreviewUrl(URL.createObjectURL(blob));
+            }
+            resolve();
+          },
+          "image/jpeg",
+          0.92
+        ); //[cite: 13]
+      });
+    } finally {
+      isSnappingRef.current = false;
+      setIsSnapping(false);
+    }
   }, [manifest, uploadedSheetKeys, allowedReplaceKeys, liveDetectedSheet]);
 
-  // 3. Real-time frame quality + fiducial-inside-guide check + high-res live QR verification
+  // 3. Real-time frame quality + keystone geometry + motion stability + live QR check
   const analyzeFrame = useCallback(async () => {
     if (
       !videoRef.current ||
@@ -367,8 +477,9 @@ export function MobileCameraView({
       const frameData = ctx.getImageData(0, 0, w, h);
 
       if (checkLightingGlare(frameData)) {
-        setWarningMessage("Overhead glare detected. Tilt sheet slightly."); //[cite: 25]
+        setWarningMessage("Overhead glare detected. Tilt sheet slightly."); //[cite: 13]
         setFiducialsLocked(false);
+        prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
         setSteadyFrames(0);
         return;
@@ -376,17 +487,17 @@ export function MobileCameraView({
 
       const blurScore = calculateLaplacianVariance(frameData);
       if (blurScore < BLUR_THRESHOLD) {
-        setWarningMessage("Hold steady — focusing on handwriting..."); //[cite: 25]
+        setWarningMessage("Hold steady — focusing on handwriting..."); //[cite: 13]
         setFiducialsLocked(false);
-        steadyCountRef.current = 0;
-        setSteadyFrames(0);
+        steadyCountRef.current = Math.max(0, steadyCountRef.current - 1);
+        setSteadyFrames(steadyCountRef.current);
         return;
       }
 
       const rgba = frameData.data;
       const gray = new Uint8Array(w * h);
       for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
-        gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0; //[cite: 25]
+        gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0; //[cite: 13]
       }
 
       const detected = detectSheetFiducials(gray, w, h);
@@ -394,23 +505,44 @@ export function MobileCameraView({
         setWarningMessage("Align all 4 black corner squares inside the corner targets.");
         setFiducialsLocked(false);
         setDuplicateSheetCandidate(null);
+        prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
         setSteadyFrames(0);
         return;
       }
 
-      // Ensure the 4 detected fiducials span a reasonable portion of the frame
-      const spanX = Math.abs(detected.TR.x - detected.TL.x) / w;
-      const spanY = Math.abs(detected.BL.y - detected.TL.y) / h;
-      if (spanX < 0.35 || spanY < 0.45) {
-        setWarningMessage("Move closer so the sheet fills the viewfinder guide.");
+      // Enforce upright, low-keystone geometry so homography warps stay straight
+      const geom = evaluateFiducialGeometry(detected, w, h);
+      if (!geom.valid) {
+        setWarningMessage(geom.reason || "Align the sheet with the guide frame.");
         setFiducialsLocked(false);
+        prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
         setSteadyFrames(0);
         return;
       }
 
-      // Live QR scan directly on full-resolution video element (1:1 QR modules)
+      // Check inter-frame hand stability (pause countdown if phone is actively shifting)
+      let isHandMoving = false;
+      if (
+        prevFiducialsRef.current &&
+        prevFiducialsRef.current.w === w &&
+        prevFiducialsRef.current.h === h
+      ) {
+        const prev = prevFiducialsRef.current.f;
+        const maxShift = Math.max(
+          Math.hypot(detected.TL.x - prev.TL.x, detected.TL.y - prev.TL.y),
+          Math.hypot(detected.TR.x - prev.TR.x, detected.TR.y - prev.TR.y),
+          Math.hypot(detected.BL.x - prev.BL.x, detected.BL.y - prev.BL.y),
+          Math.hypot(detected.BR.x - prev.BR.x, detected.BR.y - prev.BR.y)
+        );
+        if (maxShift > w * 0.016) {
+          isHandMoving = true;
+        }
+      }
+      prevFiducialsRef.current = { f: detected, w, h };
+
+      // Live QR scan directly on full-resolution video element
       if (manifest) {
         const liveMeta = await decodeSheetQrHighRes(
           video,
@@ -427,7 +559,7 @@ export function MobileCameraView({
               match.status === "WRONG_FORM"
                 ? `Wrong Exam Booklet: Detected "${match.actualForm}", expected "${match.expectedForm}".`
                 : match.reason
-            ); //[cite: 25]
+            ); //[cite: 13]
             setFiducialsLocked(false);
             setDuplicateSheetCandidate(null);
             steadyCountRef.current = 0;
@@ -444,7 +576,7 @@ export function MobileCameraView({
             setDuplicateSheetCandidate(match.sheet);
             setWarningMessage(
               `Q${match.sheet.questionNumber} Sheet ${match.sheet.pageNumber} is already uploaded — flip to another page.`
-            ); //[cite: 25]
+            ); //[cite: 13]
             setFiducialsLocked(false);
             steadyCountRef.current = 0;
             setSteadyFrames(0);
@@ -454,15 +586,22 @@ export function MobileCameraView({
       }
 
       setDuplicateSheetCandidate(null);
-      setWarningMessage(null);
       setFiducialsLocked(true);
 
+      if (isHandMoving) {
+        setWarningMessage("Hold phone still...");
+        steadyCountRef.current = Math.max(0, steadyCountRef.current - 1);
+        setSteadyFrames(steadyCountRef.current);
+        return;
+      }
+
+      setWarningMessage(null);
       steadyCountRef.current += 1;
       const clampedSteady = Math.min(steadyCountRef.current, REQUIRED_STEADY_FRAMES);
       setSteadyFrames(clampedSteady);
 
       if (steadyCountRef.current >= REQUIRED_STEADY_FRAMES) {
-        captureStill();
+        void captureStill();
       }
     } finally {
       isAnalyzingRef.current = false;
@@ -484,7 +623,7 @@ export function MobileCameraView({
     return () => clearInterval(interval);
   }, [streamActive, capturedBlob, analyzeFrame]);
 
-  // 4. Upload captured sheet to S3/R2 and trigger server homography cropper[cite: 25]
+  // 4. Upload captured sheet to S3/R2 and trigger server homography cropper[cite: 13]
   const handleUpload = async () => {
     if (!capturedBlob) return;
     setIsProcessing(true);
@@ -507,7 +646,7 @@ export function MobileCameraView({
       resolvedTargetSheet?.questionNumber || detectedQr?.questionNumber;
     const targetParts = resolvedTargetSheet
       ? resolvedTargetSheet.parts.map((p) => p.label)
-      : detectedQr?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]); //[cite: 25]
+      : detectedQr?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]); //[cite: 13]
 
     try {
       const presignRes = await getPresignedUploadForSession(
@@ -516,25 +655,25 @@ export function MobileCameraView({
         targetQuestionId,
         targetPageNumber,
         targetSectionId
-      ); //[cite: 25]
+      ); //[cite: 13]
 
       if (!presignRes.success || !presignRes.presigned) {
-        throw new Error(presignRes.error || "Failed to authorize upload"); //[cite: 25]
+        throw new Error(presignRes.error || "Failed to authorize upload"); //[cite: 13]
       }
 
       const { url, fields, key, publicUrl } = presignRes.presigned;
 
       const formData = new FormData();
-      Object.entries(fields).forEach(([k, v]) => formData.append(k, v)); //[cite: 25]
-      formData.append("file", capturedBlob, "sheet.jpg"); //[cite: 25]
+      Object.entries(fields).forEach(([k, v]) => formData.append(k, v)); //[cite: 13]
+      formData.append("file", capturedBlob, "sheet.jpg"); //[cite: 13]
 
       const uploadRes = await fetch(url, {
         method: "POST",
         body: formData,
-      }); //[cite: 25]
+      }); //[cite: 13]
 
       if (!uploadRes.ok) {
-        throw new Error("Direct upload to storage bucket failed"); //[cite: 25]
+        throw new Error("Direct upload to storage bucket failed"); //[cite: 13]
       }
 
       const finalizeRes = await finalizeSubmissionUpload({
@@ -546,10 +685,10 @@ export function MobileCameraView({
         sectionId: targetSectionId,
         questionId: targetQuestionId,
         pageNumber: targetPageNumber,
-      }); //[cite: 25]
+      }); //[cite: 13]
 
       if (!finalizeRes.success || !finalizeRes.submission) {
-        throw new Error(finalizeRes.error || "Failed to commit record in database"); //[cite: 25]
+        throw new Error(finalizeRes.error || "Failed to commit record in database"); //[cite: 13]
       }
 
       onSuccess({
@@ -561,18 +700,18 @@ export function MobileCameraView({
         parts: targetParts,
       });
     } catch (err) {
-      console.error(err); //[cite: 25]
-      setWarningMessage(err instanceof Error ? err.message : "Upload failed. Please retake."); //[cite: 25]
+      console.error(err); //[cite: 13]
+      setWarningMessage(err instanceof Error ? err.message : "Upload failed. Please retake."); //[cite: 13]
       setIsProcessing(false);
     }
   };
 
-  // Re-attaches existing MediaStream immediately on Retake without unmounting <video>
   const handleRetake = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
     isSnappingRef.current = false;
+    prevFiducialsRef.current = null;
     setIsSnapping(false);
     setCapturedBlob(null);
     setDetectedQr(null);
@@ -598,9 +737,9 @@ export function MobileCameraView({
   const steadyPercent = Math.min(
     100,
     Math.round((steadyFrames / REQUIRED_STEADY_FRAMES) * 100)
-  ); //[cite: 25]
-  const completedSeconds = Math.min(3, Math.floor(steadyFrames / 4)); //[cite: 25]
-  const secondsRemainingCount = Math.max(1, 3 - completedSeconds); //[cite: 25]
+  ); //[cite: 13]
+  const completedSeconds = Math.min(3, Math.floor(steadyFrames / 4)); //[cite: 13]
+  const secondsRemainingCount = Math.max(1, 3 - completedSeconds); //[cite: 13]
 
   return (
     <div className="relative w-full h-screen bg-black flex flex-col justify-between overflow-hidden select-none">
@@ -642,8 +781,11 @@ export function MobileCameraView({
         </div>
       </div>
 
-      {/* Live Video Stream (always mounted so Retake is instant) + Captured Preview */}
-      <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black">
+      {/* Live Video Stream (tap anywhere to re-trigger focus) + Captured Preview */}
+      <div
+        onClick={handleTapToFocus}
+        className="relative flex-1 flex items-center justify-center overflow-hidden bg-black"
+      >
         <video
           ref={videoRef}
           playsInline
@@ -660,59 +802,86 @@ export function MobileCameraView({
           />
         )}
 
-        {/* Exact US Letter Proportional Viewfinder Guide */}
+        {/* Exact US Letter (215.9mm x 279.4mm) Proportional Viewfinder Guide */}
         {!previewUrl && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center px-4 py-14">
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div
-              className={`relative h-full max-w-full aspect-[215.9/279.4] border-2 rounded-lg transition-all duration-150 ${
+              style={{
+                width: "min(92vw, calc((100dvh - 180px) * 0.7727))",
+                aspectRatio: "215.9 / 279.4",
+              }}
+              className={`relative border-2 rounded-md transition-all duration-150 ${
                 fiducialsLocked
                   ? "border-emerald-400 shadow-[0_0_28px_rgba(52,211,153,0.45)]"
-                  : "border-white/45"
+                  : focusPulse
+                  ? "border-blue-400"
+                  : "border-white/50"
               }`}
             >
-              {/* True Fiducial Corner Boxes matching LaTeX coordinates (15mm/215.9mm, 10mm/279.4mm) */}
+              {/* Exact 8mm x 8mm Fiducial Target Boxes (3.71% W x 2.86% H at true mm offsets) */}
               <div
-                className={`absolute top-[3.6%] left-[6.9%] w-4 h-4 border-2 ${
-                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
+                style={{ left: "6.95%", top: "3.58%", width: "3.71%", height: "2.86%" }}
+                className={`absolute border-2 ${
+                  fiducialsLocked
+                    ? "border-emerald-400 bg-emerald-400/25"
+                    : "border-white/90"
                 }`}
               />
               <div
-                className={`absolute top-[3.6%] right-[6.9%] w-4 h-4 border-2 ${
-                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
+                style={{ right: "6.95%", top: "3.58%", width: "3.71%", height: "2.86%" }}
+                className={`absolute border-2 ${
+                  fiducialsLocked
+                    ? "border-emerald-400 bg-emerald-400/25"
+                    : "border-white/90"
                 }`}
               />
               <div
-                className={`absolute bottom-[3.6%] left-[6.9%] w-4 h-4 border-2 ${
-                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
+                style={{ left: "6.95%", bottom: "3.58%", width: "3.71%", height: "2.86%" }}
+                className={`absolute border-2 ${
+                  fiducialsLocked
+                    ? "border-emerald-400 bg-emerald-400/25"
+                    : "border-white/90"
                 }`}
               />
               <div
-                className={`absolute bottom-[3.6%] right-[6.9%] w-4 h-4 border-2 ${
-                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
+                style={{ right: "6.95%", bottom: "3.58%", width: "3.71%", height: "2.86%" }}
+                className={`absolute border-2 ${
+                  fiducialsLocked
+                    ? "border-emerald-400 bg-emerald-400/25"
+                    : "border-white/90"
                 }`}
               />
 
               {/* Exact Part Divider Line at y = 139mm / 279.4mm (49.75%) */}
-              <div className="absolute top-[49.75%] inset-x-[9.3%] border-b border-dashed border-white/45 flex justify-end">
-                <span className="text-[9px] font-mono text-white/75 tracking-wider pr-1 -mt-3.5">
+              <div
+                style={{ top: "49.75%", left: "9.26%", right: "9.26%" }}
+                className="absolute border-b border-dashed border-white/50 flex justify-end"
+              >
+                <span className="text-[9px] font-mono text-white/80 tracking-wider pr-1 -mt-3.5">
                   PART DIVIDER
                 </span>
               </div>
 
-              {/* Footer QR Target Box matching shifted 18mm bottom-right QR zone */}
+              {/* Exact 18mm x 18mm Footer QR Target Box (right: 36mm/215.9mm = 16.67%, bottom: 6mm/279.4mm = 2.15%) */}
               <div
-                className={`absolute bottom-[2.2%] right-[16.6%] w-8 h-8 border border-dashed rounded-xs flex items-center justify-center ${
+                style={{
+                  right: "16.67%",
+                  bottom: "2.15%",
+                  width: "8.34%",
+                  height: "6.44%",
+                }}
+                className={`absolute border border-dashed flex items-center justify-center ${
                   liveDetectedSheet
                     ? "border-emerald-400 text-emerald-300"
-                    : "border-white/40 text-white/50"
+                    : "border-white/45 text-white/60"
                 }`}
               >
                 <span className="text-[7px] font-mono">QR</span>
               </div>
 
-              {/* 3-Second Guided Hold-Steady Countdown Pill[cite: 25] */}
+              {/* 3-Second Guided Hold-Steady Countdown Pill[cite: 13] */}
               {(fiducialsLocked || isSnapping) && (
-                <div className="absolute bottom-11 inset-x-3 flex justify-center">
+                <div className="absolute bottom-[12%] inset-x-3 flex justify-center">
                   <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2.5 shadow-lg space-y-2 w-full max-w-[260px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
@@ -732,9 +901,9 @@ export function MobileCameraView({
                       <div className="flex items-center gap-1.5">
                         {[1, 2, 3].map((secStep) => {
                           const isFilled =
-                            steadyFrames >= secStep * 4 || isSnapping; //[cite: 25]
+                            steadyFrames >= secStep * 4 || isSnapping; //[cite: 13]
                           const isInProgress =
-                            !isFilled && steadyFrames > (secStep - 1) * 4; //[cite: 25]
+                            !isFilled && steadyFrames > (secStep - 1) * 4; //[cite: 13]
                           return (
                             <span
                               key={secStep}
@@ -764,9 +933,12 @@ export function MobileCameraView({
           </div>
         )}
 
-        {/* Real-time CV Feedback / Duplicate / Wrong-Form Banner[cite: 25] */}
+        {/* Real-time CV Feedback / Duplicate / Wrong-Form Banner[cite: 13] */}
         {warningMessage && !previewUrl && (
-          <div className="absolute top-16 inset-x-4 z-30 flex flex-col gap-2 p-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-16 inset-x-4 z-30 flex flex-col gap-2 p-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg"
+          >
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
               <span>{warningMessage}</span>
@@ -872,7 +1044,7 @@ export function MobileCameraView({
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
-              onClick={captureStill}
+              onClick={() => void captureStill()}
               disabled={isSnapping}
               className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer disabled:opacity-60"
               aria-label="Capture still frame"
@@ -883,7 +1055,7 @@ export function MobileCameraView({
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">
               {isSnapping
-                ? "Capturing high-resolution sheet..."
+                ? "Capturing sharpest frame..."
                 : fiducialsLocked
                 ? `Hold steady for ${secondsRemainingCount}s...`
                 : "Align the 4 black squares inside the corner targets"}

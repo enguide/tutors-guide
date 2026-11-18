@@ -67,8 +67,8 @@ export const CANONICAL_FIDUCIAL_CENTERS_PX: Record<"TL" | "TR" | "BL" | "BR", Po
  */
 export const SHEET_REGIONS_MM = {
   responseBox: { x: 20.0, y: 31.0, w: 175.0, h: 210.0 },
-  /** Top half of response box (Parts A, C, E...) — includes small padding around divider */
-  slot1Crop: { x: 20.0, y: 40.0, w: 175.0, h: 99.5 },
+  /** Top half of response box (Parts A, C, E...) — 1.5mm top inset prevents header line bleed */
+  slot1Crop: { x: 20.0, y: 41.5, w: 175.0, h: 98.0 },
   /** Bottom half of response box (Parts B, D, F...) — extends full way to bottom box border at 241mm */
   slot2Crop: { x: 20.0, y: 138.5, w: 175.0, h: 102.5 },
   /** Generous search window around 18mm footer QR code (x: 161.9mm..179.9mm, y: 255.4mm..273.4mm) */
