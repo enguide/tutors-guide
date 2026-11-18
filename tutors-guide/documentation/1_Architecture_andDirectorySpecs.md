@@ -38,7 +38,7 @@ This document provides a comprehensive structural overview of the standardized t
 ├── config/              # Application-wide static business configs (pricing tiers)
 ├── content/             # Authoritative test content directory (ACT, AP Calc, GRE, SAT)
 ├── hooks/               # Custom React hooks (real-time sync, progress, speech synthesis)
-├── lib/                 # Core domain logic, scoring engines, adaptive branching, telemetry
+├── lib/                 # Core domain logic, scoring engines, adaptive branching, CV/FRQ, telemetry
 ├── prisma/              # Database schema definition, migration history, seeding scripts
 ├── public/              # Static assets (test diagrams, geometry SVGs, global brand icons)
 ├── scripts/             # Build/CI utility scripts (schema & markdown content validator)
@@ -56,12 +56,13 @@ This document provides a comprehensive structural overview of the standardized t
 * **Adaptive Multi-Stage Branching:** Managed by `lib/adaptive/branchingController.ts`. Specifically configured for tests like the Digital SAT (`sat-diagnostic-adaptive-1`), orchestrating transitions from Routing Module 1 (`m1`) to Easy (`m2-easy`) or Hard (`m2-hard`) Section 2 variants based on real-time routing performance.
 * **Resilient State Persistence:** Driven by `app/api/exam/sync/route.ts`, `actions/completeTestSection.ts`, and SectionCheckpoint records in Prisma, pairing localStorage buffering and offline retry queues with non-blocking REST syncs to prevent state loss during network drops or accidental page reloads.
 
-### B. Free Response Question (FRQ) Mobile Scan & Audit Pipeline (`app/scan/`, `actions/frq*`, `lib/cv/`)
+### B. Free Response Question (FRQ) Mobile Scan & Audit Pipeline (`app/scan/`, `actions/frq*`, `lib/cv/`, `lib/frq/`)
 
-* **Cross-Device Hand-Off:** Students taking desktop exams (e.g., AP Calculus) encounter QR code capture prompts (`components/exam/SectionCaptureModal.tsx`).
-* **Mobile Ingestion:** The student's mobile device opens `app/scan/[token]/page.tsx`, leveraging `components/scanner/MobileCameraView.tsx` with computer vision quality checks (`lib/cv/qualityChecks.ts`) and perspective cropping (`lib/frq/cropper.ts`).
-* **Real-Time Token Polling:** The desktop runner hooks into `app/api/capture/[token]/events/route.ts` via `hooks/useCaptureSync.ts`, syncing uploaded pages directly into the active desktop testing state.
-* **Audit Queue:** Admin staff review, inspect, and evaluate raw handwritten uploads using `app/tgadmin/frq-audit/` and `actions/frqAudit.ts`.
+* **Cross-Device Hand-Off:** Students taking desktop exams (e.g., AP Calculus) encounter QR code capture prompts (`components/exam/SectionCaptureModal.tsx`)[cite: 12].
+* **Zero-Tap Mobile Ingestion:** The student's mobile device opens `app/scan/[token]/page.tsx` (`MobileCameraContainer.tsx` + `components/scanner/MobileCameraView.tsx`) using `h-dvh` safe-area layout, a top Question/Sheet dot matrix progress tracker, a `1.2s` (`6 × 200ms`) steady-frame lock with a `50ms` 3-frame sharpest-burst capture, fiducial-guided 4-digit Code-128C (`QQPP`) barcode decoding (`lib/frq/code128.ts`, `lib/frq/manifest.ts`), automatic S3 upload on verified barcode lock, and an auto-closing completion screen (`window.close()` after 4s).
+* **Fiducial Registration & Homography Cropping:** `lib/cv/fiducials.ts` detects the 4 `8mm × 8mm` corner registration targets (using white-paper quiet-zone halos, corner area consistency, diagonal symmetry, and the Top-Left L-cutout orientation signature), while `lib/frq/cropper.ts` warps the image onto a canonical `1700 × 2200` (200 DPI US Letter) canvas and extracts sub-part crops[cite: 12].
+* **Real-Time Token Polling:** The desktop runner hooks into `app/api/capture/[token]/events/route.ts` via `hooks/useCaptureSync.ts`, syncing uploaded pages directly into the active desktop testing state[cite: 12].
+* **Audit Queue:** Admin staff review, inspect, and evaluate raw handwritten uploads using `app/tgadmin/frq-audit/` and `actions/frqAudit.ts`[cite: 12].
 
 ### C. Scoring & Curve Engine (`lib/scoring/`)
 

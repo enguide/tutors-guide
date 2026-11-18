@@ -206,7 +206,7 @@ export async function getCaptureSessionStatus(sessionToken: string) {
 
     const isExpired =
       session.expiresAt < new Date() ||
-      session.status === CaptureSessionStatus.EXPIRED;
+      session.status !== CaptureSessionStatus.ACTIVE;
 
     return {
       success: true,
@@ -231,8 +231,12 @@ export async function getPresignedUploadForSession(
     where: { sessionToken },
   });
 
-  if (!session || session.status === CaptureSessionStatus.EXPIRED || session.expiresAt < new Date()) {
-    return { success: false, error: "Session invalid or expired" };
+  if (
+    !session ||
+    session.status !== CaptureSessionStatus.ACTIVE ||
+    session.expiresAt < new Date()
+  ) {
+    return { success: false, error: "Session is closed or expired." };
   }
 
   try {
@@ -290,8 +294,12 @@ export async function finalizeSubmissionUpload({
       where: { sessionToken },
     });
 
-    if (!sessionRecord) {
-      return { success: false, error: "Session not found." };
+    if (
+      !sessionRecord ||
+      sessionRecord.status !== CaptureSessionStatus.ACTIVE ||
+      sessionRecord.expiresAt < new Date()
+    ) {
+      return { success: false, error: "Session is closed or expired." };
     }
 
     const manifest = sessionRecord.manifestSnapshot as unknown as SectionFrqManifest | null;
@@ -356,6 +364,29 @@ export async function finalizeSubmissionUpload({
   } catch (error) {
     console.error("Error finalizing submission upload:", error);
     return { success: false, error: "Finalizing upload failed." };
+  }
+}
+
+export async function closeCaptureSession(sessionToken: string) {
+  if (!sessionToken) {
+    return { success: false, error: "Missing session token" };
+  }
+
+  try {
+    await prisma.captureSession.updateMany({
+      where: {
+        sessionToken,
+        status: CaptureSessionStatus.ACTIVE,
+      },
+      data: {
+        status: CaptureSessionStatus.CAPTURED,
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("[closeCaptureSession] Error:", error);
+    return { success: false, error: "Failed to close capture session." };
   }
 }
 

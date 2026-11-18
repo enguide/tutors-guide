@@ -186,7 +186,83 @@ Steps by 2 pixels ($y += 2, x += 2$) to achieve sub-10ms performance on low-powe
 * **Specular Glare Detection:** Analyzes the central 60% of the document ($0.2W \to 0.8W$, $0.2H \to 0.8H$). Returns `true` if more than 12% of sampled pixels are saturated white ($R, G, B > 248$), alerting the user to adjust overhead lighting.
 
 
+### `lib/cv/fiducials.ts`
 
+* **Purpose & Scope:** Computer vision detector that locates the four `8mm × 8mm` corner registration targets on grayscale sheet buffers and locks sheet orientation (`0°`, `90°`, `180°`, or `270°`) for projective homography rectification.
+
+
+* **Exports:**
+  * `detectSheetFiducials(gray: Uint8Array, width: number, height: number): DetectedFiducials | null`
+  * Interface: `DetectedFiducials` (`TL`, `TR`, `BL`, `BR`, `confidence`, `rotationAppliedDegrees`)
+
+
+* **Parameters / Inputs:**
+  * `gray`: `Uint8Array` — Single-channel luminance buffer.
+  * `width`, `height`: `number` — Buffer dimensions in pixels.
+
+
+* **Return Value / Emitted State:**
+  * `DetectedFiducials` containing ordered corner centroids and detected rotation angle, or `null` if no valid 4-corner quadrilateral is found.
+
+
+* **Dependencies & Imports:**
+  * `Point2D` from `@/lib/frq/geometry`.
+
+
+* **Key Logic & Edge Cases:**
+  * **Otsu Adaptive Binarization & BFS Blob Extraction:** Computes an Otsu luminance cutoff (`darkCutoff = min(145, max(55, threshold * 0.85))`) and extracts 4-connected dark components filtered by expected target scale (`1.6%–7.5%` of image width), square aspect ratio (`0.65–1.52`), and fill ratio (`0.62–1.0`, rejecting `4.5mm × 2.0mm` margin timing ticks).
+  * **White-Paper Quiet-Zone Halo:** Samples a `0.45×` outer ring around each candidate bounding box and requires `surroundBrightRatio >= 0.72`, rejecting dark browser tabs, PDF toolbars, Windows taskbar icons, and bezel artifacts.
+  * **Internal Quadrilateral Invariants:** Evaluates combinations across the 4 quadrants using internal geometry invariants rather than image-edge proximity: equal corner size consistency (`minArea / maxArea >= 0.45`), opposing edge symmetry (`widthRatio >= 0.78`, `heightRatio >= 0.78`), diagonal symmetry (`min(diag1, diag2) / max(diag1, diag2) >= 0.84`), and canonical US Letter fiducial span aspect ratio (`0.54–0.88`, centered on `177.9mm / 251.4mm ≈ 0.708`).
+  * **Top-Left L-Cutout Orientation Lock:** Measures `internalBrightRatio` inside the inner 60% of each of the 4 corner squares to identify the unique Top-Left target's white L-cutout and cyclically orders `[TL, TR, BR, BL]` clockwise.
+
+---
+
+### `lib/frq/code128.ts`
+
+* **Purpose & Scope:** Pure-TypeScript 1D ISO/IEC 15417 Code-128C (compact numeric `QQPP`) and Code-128B barcode decoder supporting both fiducial-guided perspective scanlines on live mobile cameras and horizontal multi-row sweeps on rectified server sheets.
+
+
+* **Exports:**
+  * `decodeCode128FromGrayscale(gray: Uint8Array, width: number, height: number, sampleRows?: number): string | null`
+  * `decodeCode128BetweenBottomFiducials(gray: Uint8Array, width: number, height: number, bl: Point2DLike, br: Point2DLike, tl: Point2DLike): string | null`
+  * Interface: `Point2DLike`
+
+
+* **Parameters / Inputs:**
+  * `gray`, `width`, `height`: Grayscale pixel buffer and dimensions.
+  * `bl`, `br`, `tl`: Detected fiducial corner coordinates used to project scanlines directly along the bottom footer margin.
+
+
+* **Return Value / Emitted State:**
+  * Decoded barcode string (e.g., `"0101"` for Question 1, Page 1 in Code-128C) or `null` if no valid Modulo-103 verified symbol sequence is found.
+
+
+* **Dependencies & Imports:** None (zero-dependency pure TypeScript decoder).
+
+
+* **Key Logic & Edge Cases:**
+  * **Code-128C (`Start Code 105`) & Code-128B (`Start Code 104`) Support:** Decodes 4-digit `QQPP` numeric barcodes (`57` modules total, yielding `1.15mm` bars that oversample at `10+` pixels per bar) as well as legacy ASCII Code-128B strings, enforcing Modulo-103 checksum validation and bidirectional (0° / 180°) decoding.
+  * **Fiducial-Guided Perspective Scanlines (`decodeCode128BetweenBottomFiducials`):** Samples `2.0×` oversampled vectors parallel to `BL -> BR` across perpendicular offsets (`-0.032` to `+0.024` of `TL -> BL` height) with a 48-sample sliding-window local mean threshold, making decoding immune to distance, zoom, tilt, and uneven lighting gradients.
+
+---
+
+### `lib/frq/manifest.ts`
+
+* **Purpose & Scope:** Builds section-level and test-wide FRQ packet manifests (`SectionFrqManifest`) from question frontmatter and parses/validates decoded sheet barcodes and QR codes against the active exam manifest.
+
+
+* **Exports:**
+  * `resolveQuestionSubParts(question: QuestionFrontmatter): FrqSubPartDefinition[]`
+  * `buildSectionFrqManifest(testId, sectionId, questions, sectionTitle?): SectionFrqManifest`
+  * `buildTestFrqManifest(testId, sections): SectionFrqManifest`
+  * `parseSelfDescribingSheetQr(rawText: string): DecodedSheetQr | null`
+  * `matchQrAgainstManifest(manifest: SectionFrqManifest, qr: DecodedSheetQr): SheetQrMatchResult`
+  * Interfaces & Types: `ManifestSubPart`, `ManifestSheet`, `ManifestQuestion`, `SectionFrqManifest`, `DecodedSheetQr`, `SheetQrMatchResult`
+
+
+* **Key Logic & Edge Cases:**
+  * **Two-Slot Sheet Pagination:** Maps `FRQ_HANDWRITTEN` sub-parts (`A, B, C, D...`) onto 2-slot physical sheets (`pageNumber = Math.floor(idx / 2) + 1`, `slotIndex = idx % 2`) with composite keys (`{sectionId}::{questionId}::p{pageNumber}`).
+  * **Multi-Format Code Parsing & Validation:** `parseSelfDescribingSheetQr` parses 4-digit Code-128C `QQPP` strings (`"0101"`), pipe-delimited strings, and legacy semicolon key-value QR strings; `matchQrAgainstManifest` resolves sequential booklet page numbers (`1..12`) back to question-relative sheet indices (`1` or `2`) and flags `WRONG_FORM` or `NOT_IN_TEST` mismatches.
 
 
 ---

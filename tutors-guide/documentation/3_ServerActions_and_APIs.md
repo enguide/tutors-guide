@@ -395,69 +395,51 @@ This section covers the operational business logic layer of the application, enc
 
 ### `actions/frqCapture.ts`
 
-* **Purpose & Scope:** Coordinates the cross-device optical capture pipeline for handwritten work, issuing QR pairing tokens, generating pre-signed S3 upload parameters, and triggering asynchronous computer vision cropping.
+* **Purpose & Scope:** Coordinates the cross-device optical capture pipeline for handwritten work, resolving test-wide or section-scoped FRQ manifests, issuing QR pairing tokens, generating pre-signed S3 upload parameters, triggering asynchronous computer vision cropping, and finalizing FRQ section and composite scores[cite: 8].
 
 
 * **Exports:**
-* `getOrCreateCaptureSession(params: CreateCaptureSessionParams)`
-
-
-* `getPresignedUploadForSession(sessionToken, contentType, targetQuestionId?, pageNumber?)`
-
-
-* `finalizeSubmissionUpload(params)`
-
-
+  * `getOrCreateCaptureSession(params: CreateCaptureSessionParams)`[cite: 8]
+  * `getCaptureSessionStatus(sessionToken: string)`
+  * `getPresignedUploadForSession(sessionToken, contentType, targetQuestionId?, pageNumber?, targetSectionId?)`[cite: 8]
+  * `finalizeSubmissionUpload(params)`[cite: 8]
+  * `closeCaptureSession(sessionToken: string)`
+  * `finalizeTestFrqCapture(testId: string, category: Category)`
+  * Interface: `CreateCaptureSessionParams`
 
 
 * **Parameters / Props:**
-* `getOrCreateCaptureSession`: `{ testId: string; sectionId: string; questionId?: string }`.
-
-
-* `getPresignedUploadForSession`: `sessionToken` (`string`), `contentType` (`string`), optional `targetQuestionId` (`string`), `pageNumber` (`number`, default `1`).
-
-
-* `finalizeSubmissionUpload`: Session token, S3 `storageKey`, `publicUrl`, `mimeType`, `fileSizeBytes`, `questionId`, and `pageNumber`.
-
-
+  * `getOrCreateCaptureSession`: `{ testId: string; sectionId?: string; questionId?: string }` (omit `sectionId` for test-wide capture; pass `sectionId` for single-section sandbox)[cite: 8].
+  * `getCaptureSessionStatus`: `sessionToken` (`string`).
+  * `getPresignedUploadForSession`: `sessionToken` (`string`), `contentType` (`string`), optional `targetQuestionId` (`string`), `pageNumber` (`number`, default `1`), optional `targetSectionId` (`string`)[cite: 8].
+  * `finalizeSubmissionUpload`: `{ sessionToken, storageKey, publicUrl, mimeType, fileSizeBytes?, sectionId?, questionId?, pageNumber? }`[cite: 8].
+  * `closeCaptureSession`: `sessionToken` (`string`).
+  * `finalizeTestFrqCapture`: `testId` (`string`), `category` (`Category`).
 
 
 * **Return Value / Emitted State:**
-* `getOrCreateCaptureSession`: `{ success: true, sessionToken, expiresAt, submissions }`.
-
-
-* `getPresignedUploadForSession`: `{ success: true, presigned: PresignedPost, session: SessionDetails }`.
-
-
-* `finalizeSubmissionUpload`: `{ success: true, submission: FrqSubmission }`.
-
-
+  * `getOrCreateCaptureSession`: `{ success: true, sessionToken, expiresAt, manifest, submissions }`[cite: 8].
+  * `getCaptureSessionStatus`: `{ success: true, isExpired, manifest, submissions }`.
+  * `getPresignedUploadForSession`: `{ success: true, presigned: PresignedPost, session: SessionDetails }`[cite: 8].
+  * `finalizeSubmissionUpload`: `{ success: true, submission: FrqSubmission }`[cite: 8].
+  * `closeCaptureSession` / `finalizeTestFrqCapture`: `{ success: true }` or `{ success: false, error: string }`.
 
 
 * **Dependencies & Imports:**
-* `crypto` from `crypto`, `auth` from `@/lib/auth`, `prisma` from `@/lib/prisma`.
-
-
-* `createPresignedUploadPost` from `@/lib/storage/s3`.
-
-
-* `processAndCropFrqSubmission` from `@/lib/frq/cropper`.
-
-
+  * `crypto` from `crypto`, `after` from `next/server`, `auth` from `@/lib/auth`, `prisma` from `@/lib/prisma`[cite: 8].
+  * `createPresignedUploadPost` from `@/lib/storage/s3`[cite: 8].
+  * `getSectionById`, `getTestMetadata` from `@/lib/contentLoader`.
+  * `SectionFrqManifest`, `buildSectionFrqManifest`, `buildTestFrqManifest` from `@/lib/frq/manifest`.
+  * `calculateSectionScaledScore`, `synthesizeExamComposite` from `@/lib/scoring/scoringEngine`.
+  * `processAndCropFrqSubmission` from `@/lib/frq/cropper`[cite: 8].
+  * `CaptureSessionStatus`, `Category`, `FrqSubmissionStatus`, `Prisma` from `@prisma/client`.
 
 
 * **Key Logic & Edge Cases:**
-* **Session Reusability Window:** Checks for an existing active session with at least 2 minutes of remaining validity; otherwise creates a new 30-minute token session.
-
-
-* **Direct S3 Upload Offloading:** Pre-signs upload URLs so that mobile devices and desktop fallback pickers upload heavy image payloads directly to object storage rather than streaming through Next.js server memory.
-
-
-* **Asynchronous CV Pipeline Trigger:** Upon persisting an uploaded submission in Prisma, fires `processAndCropFrqSubmission(submission.id)` asynchronously in the background without blocking the HTTP response.
-
-
-
-
+  * **45-Minute Session Window & Strict `ACTIVE` Lifecycle Enforcement:** Reuses an existing `ACTIVE` session if more than 2 minutes remain (`expiresAt > now + 2m`); otherwise creates a 45-minute token session with a cached `manifestSnapshot`. `getCaptureSessionStatus`, `getPresignedUploadForSession`, and `finalizeSubmissionUpload` strictly require `status === CaptureSessionStatus.ACTIVE && expiresAt > now`, blocking late uploads once a session is marked `CAPTURED` or `EXPIRED`[cite: 8].
+  * **Direct S3 Upload Offloading & Composite Upsert:** Pre-signs S3 POST uploads (`submissions/{testId}/{secId}/{qId}/p{pageNumber}_{timestamp}.{ext}`) and upserts `FrqSubmission` on `profileId_testId_sectionId_questionId_pageNumber` so sheet replacements overwrite cleanly without duplicates[cite: 8].
+  * **Post-Response CV Cropping (`after`):** Schedules `processAndCropFrqSubmission(submission.id)` via Next.js `after()` so homography warping and sub-part cropping run reliably in the background after returning the upload response.
+  * **Test Score Finalization & Session Closure (`finalizeTestFrqCapture`):** Aggregates `FrqSubCrop` points and transcriptions into `Response` and `Result` records per section, re-synthesizes `TestSummary` composite scores, and transitions all `ACTIVE` capture sessions for the test to `CaptureSessionStatus.CAPTURED` (`closeCaptureSession` provides a score-free equivalent for sandbox sessions).
 
 ---
 
