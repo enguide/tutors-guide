@@ -66,6 +66,7 @@ export function MobileCameraView({
   onSuccess,
 }: MobileCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [streamActive, setStreamActive] = useState(false);
@@ -77,7 +78,7 @@ export function MobileCameraView({
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
   const [steadyFrames, setSteadyFrames] = useState<number>(0);
 
-  // Live QR-detected sheet during framing (enables any-order scanning)
+  // Live QR-detected sheet during framing
   const [liveDetectedSheet, setLiveDetectedSheet] = useState<ManifestSheet | null>(null);
   const [duplicateSheetCandidate, setDuplicateSheetCandidate] =
     useState<ManifestSheet | null>(null);
@@ -91,15 +92,12 @@ export function MobileCameraView({
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [detectedQr, setDetectedQr] = useState<DecodedSheetQr | null>(null);
-  // Locked sheet resolved directly from QR code (cannot be overridden by student dropdown)
   const [verifiedQrSheet, setVerifiedQrSheet] = useState<ManifestSheet | null>(null);
-  // Manual fallback selection used ONLY when QR code could not be decoded
   const [manualFallbackKey, setManualFallbackKey] = useState<string | null>(null);
 
   const steadyCountRef = useRef<number>(0);
   const isSnappingRef = useRef<boolean>(false);
 
-  // If QR was decoded and matched, verifiedQrSheet is authoritative and immutable
   const selectedSheetKey =
     verifiedQrSheet?.sheetKey ||
     manualFallbackKey ||
@@ -118,9 +116,9 @@ export function MobileCameraView({
     return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
   }, [verifiedQrSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
 
-  // 1. Initialize rear-facing camera at highest available resolution
+  // 1. Initialize rear-facing camera once and keep video node mounted across retakes
   useEffect(() => {
-    let currentStream: MediaStream | null = null;
+    let isCancelled = false;
 
     async function startCamera() {
       try {
@@ -133,7 +131,12 @@ export function MobileCameraView({
           audio: false,
         });
 
-        currentStream = stream;
+        if (isCancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -148,13 +151,15 @@ export function MobileCameraView({
     startCamera();
 
     return () => {
-      if (currentStream) {
-        currentStream.getTracks().forEach((track) => track.stop());
+      isCancelled = true;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
     };
   }, []);
 
-  // 2. Capture high-res 2200px still + fast 900px QR decode + strict form/duplicate check
+  // 2. Capture high-res 2200px still + 1200px full-frame QR decode
   const captureStill = useCallback(() => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
@@ -194,10 +199,10 @@ export function MobileCameraView({
 
       ctx.drawImage(video, 0, 0, outW, outH);
 
-      // Fast QR scan on a 900px working canvas (~12ms)
+      // Scan at 1200px across full frame so rotated/portrait orientations always decode
       let decodedMeta: DecodedSheetQr | null = null;
       try {
-        const qrScale = Math.min(900 / longestEdge, 1.0);
+        const qrScale = Math.min(1200 / longestEdge, 1.0);
         const qCanvasW = Math.round(outW * qrScale);
         const qCanvasH = Math.round(outH * qrScale);
         const qrCanvas = document.createElement("canvas");
@@ -207,21 +212,12 @@ export function MobileCameraView({
 
         if (qCtx) {
           qCtx.drawImage(captureCanvas, 0, 0, qCanvasW, qCanvasH);
-
-          const subW = Math.round(qCanvasW * 0.48);
-          const subH = Math.round(qCanvasH * 0.38);
-          const subImg = qCtx.getImageData(qCanvasW - subW, qCanvasH - subH, subW, subH);
-          const subCode = jsQR(subImg.data, subW, subH);
-          if (subCode?.data) {
-            decodedMeta = parseSelfDescribingSheetQr(subCode.data);
-          }
-
-          if (!decodedMeta) {
-            const fullImg = qCtx.getImageData(0, 0, qCanvasW, qCanvasH);
-            const fullCode = jsQR(fullImg.data, qCanvasW, qCanvasH);
-            if (fullCode?.data) {
-              decodedMeta = parseSelfDescribingSheetQr(fullCode.data);
-            }
+          const fullImg = qCtx.getImageData(0, 0, qCanvasW, qCanvasH);
+          const fullCode = jsQR(fullImg.data, qCanvasW, qCanvasH, {
+            inversionAttempts: "attemptBoth",
+          });
+          if (fullCode?.data) {
+            decodedMeta = parseSelfDescribingSheetQr(fullCode.data);
           }
         }
       } catch (qrErr) {
@@ -241,7 +237,6 @@ export function MobileCameraView({
           return;
         }
 
-        // Also enforce duplicate check if triggered via manual shutter tap
         const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
         const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
         if (isAlreadyUploaded && !isExplicitReplace) {
@@ -257,7 +252,6 @@ export function MobileCameraView({
         setDetectedQr(decodedMeta);
         setVerifiedQrSheet(match.sheet);
       } else if (liveDetectedSheet) {
-        // Retain sheet locked during live framing if 900px pass had transient glare
         setVerifiedQrSheet(liveDetectedSheet);
       }
 
@@ -275,7 +269,7 @@ export function MobileCameraView({
     });
   }, [manifest, uploadedSheetKeys, allowedReplaceKeys, liveDetectedSheet]);
 
-  // 3. Real-time frame quality + 4-corner fiducial + live QR form/duplicate check (250ms)
+  // 3. Real-time frame quality + fiducial-inside-guide check + live QR verification
   const analyzeFrame = useCallback(() => {
     if (
       !videoRef.current ||
@@ -291,7 +285,7 @@ export function MobileCameraView({
     const canvas = analysisCanvasRef.current;
     if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
-    const scale = Math.min(480 / video.videoWidth, 1.0);
+    const scale = Math.min(640 / Math.max(video.videoWidth, video.videoHeight), 1.0);
     const w = Math.round(video.videoWidth * scale);
     const h = Math.round(video.videoHeight * scale);
     canvas.width = w;
@@ -328,7 +322,7 @@ export function MobileCameraView({
 
     const detected = detectSheetFiducials(gray, w, h);
     if (!detected) {
-      setWarningMessage("Align all 4 black corner squares inside the frame.");
+      setWarningMessage("Align all 4 black corner squares inside the corner targets.");
       setFiducialsLocked(false);
       setDuplicateSheetCandidate(null);
       steadyCountRef.current = 0;
@@ -336,12 +330,22 @@ export function MobileCameraView({
       return;
     }
 
-    // Live pre-capture QR verification (<3ms on 480px quadrant)
+    // Ensure the 4 detected fiducials actually span a reasonable portion of the frame
+    const spanX = Math.abs(detected.TR.x - detected.TL.x) / w;
+    const spanY = Math.abs(detected.BL.y - detected.TL.y) / h;
+    if (spanX < 0.35 || spanY < 0.45) {
+      setWarningMessage("Move closer so the sheet fills the viewfinder guide.");
+      setFiducialsLocked(false);
+      steadyCountRef.current = 0;
+      setSteadyFrames(0);
+      return;
+    }
+
+    // Live QR scan across full 640px frame (handles both portrait and landscape sensors)
     if (manifest) {
-      const qrW = Math.round(w * 0.48);
-      const qrH = Math.round(h * 0.38);
-      const qrImg = ctx.getImageData(w - qrW, h - qrH, qrW, qrH);
-      const qrCode = jsQR(qrImg.data, qrW, qrH);
+      const qrCode = jsQR(frameData.data, w, h, {
+        inversionAttempts: "dontInvert",
+      });
 
       if (qrCode?.data) {
         const liveMeta = parseSelfDescribingSheetQr(qrCode.data);
@@ -489,6 +493,7 @@ export function MobileCameraView({
     }
   };
 
+  // Re-attaches existing MediaStream immediately on Retake without unmounting <video>
   const handleRetake = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
@@ -507,6 +512,13 @@ export function MobileCameraView({
     setSteadyFrames(0);
     setIsProcessing(false);
     setWarningMessage(null);
+
+    if (videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.play().catch(() => {});
+    }
   };
 
   const steadyPercent = Math.min(
@@ -556,64 +568,75 @@ export function MobileCameraView({
         </div>
       </div>
 
-      {/* Live Video Stream or Captured Preview */}
-      <div className="relative flex-1 flex items-center justify-center overflow-hidden">
-        {previewUrl ? (
+      {/* Live Video Stream (always mounted so Retake is instant) + Captured Preview */}
+      <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black">
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          className={previewUrl ? "hidden" : "w-full h-full object-contain"}
+        />
+
+        {previewUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={previewUrl}
             alt="Captured Exam Sheet"
             className="w-full h-full object-contain"
           />
-        ) : (
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
         )}
 
-        {/* Live Viewfinder Guide */}
+        {/* Exact US Letter Proportional Viewfinder Guide */}
         {!previewUrl && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center px-4 py-14">
             <div
-              className={`relative w-full max-w-sm aspect-[215.9/279.4] border-2 rounded-xl transition-all duration-150 ${
+              className={`relative h-full max-w-full aspect-[215.9/279.4] border-2 rounded-lg transition-all duration-150 ${
                 fiducialsLocked
                   ? "border-emerald-400 shadow-[0_0_28px_rgba(52,211,153,0.45)]"
-                  : "border-white/40"
+                  : "border-white/45"
               }`}
             >
+              {/* True Fiducial Corner Boxes matching LaTeX coordinates (15mm/215.9mm, 10mm/279.4mm) */}
               <div
-                className={`absolute -top-1.5 -left-1.5 w-7 h-7 border-t-4 border-l-4 rounded-tl-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                className={`absolute top-[3.6%] left-[6.9%] w-4 h-4 border-2 ${
+                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
                 }`}
               />
               <div
-                className={`absolute -top-1.5 -right-1.5 w-7 h-7 border-t-4 border-r-4 rounded-tr-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                className={`absolute top-[3.6%] right-[6.9%] w-4 h-4 border-2 ${
+                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
                 }`}
               />
               <div
-                className={`absolute -bottom-1.5 -left-1.5 w-7 h-7 border-b-4 border-l-4 rounded-bl-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                className={`absolute bottom-[3.6%] left-[6.9%] w-4 h-4 border-2 ${
+                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
                 }`}
               />
               <div
-                className={`absolute -bottom-1.5 -right-1.5 w-7 h-7 border-b-4 border-r-4 rounded-br-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                className={`absolute bottom-[3.6%] right-[6.9%] w-4 h-4 border-2 ${
+                  fiducialsLocked ? "border-emerald-400 bg-emerald-400/20" : "border-white/80"
                 }`}
               />
 
-              <div className="absolute top-[50%] inset-x-4 border-b border-dashed border-white/30 flex justify-end">
-                <span className="text-[9px] font-mono text-white/60 tracking-wider pr-1">
+              {/* Exact Part Divider Line at y = 139mm / 279.4mm (49.75%) */}
+              <div className="absolute top-[49.75%] inset-x-[9.3%] border-b border-dashed border-white/45 flex justify-end">
+                <span className="text-[9px] font-mono text-white/75 tracking-wider pr-1 -mt-3.5">
                   PART DIVIDER
                 </span>
               </div>
 
+              {/* Footer QR Target Box matching bottom-right QR zone */}
+              <div
+                className={`absolute bottom-[2.2%] right-[10.6%] w-7 h-7 border border-dashed rounded-xs flex items-center justify-center ${
+                  liveDetectedSheet ? "border-emerald-400 text-emerald-300" : "border-white/40 text-white/50"
+                }`}
+              >
+                <span className="text-[7px] font-mono">QR</span>
+              </div>
+
               {/* 3-Second Guided Hold-Steady Countdown Pill */}
               {(fiducialsLocked || isSnapping) && (
-                <div className="absolute bottom-3 inset-x-3 flex justify-center">
+                <div className="absolute bottom-10 inset-x-3 flex justify-center">
                   <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2.5 shadow-lg space-y-2 w-full max-w-[260px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
@@ -691,7 +714,7 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Bottom Controls + Locked QR Verification Badge (or Unverified Fallback Dropdown) */}
+      {/* Bottom Controls + Locked QR Verification Badge */}
       <div className="relative z-20 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center gap-3">
         {previewUrl ? (
           <div className="w-full max-w-sm space-y-3">
@@ -787,7 +810,7 @@ export function MobileCameraView({
                 ? "Capturing high-resolution sheet..."
                 : fiducialsLocked
                 ? `Hold steady for ${secondsRemainingCount}s...`
-                : "Frame any sheet's 4 black corner squares"}
+                : "Align the 4 black squares inside the corner targets"}
             </span>
           </div>
         )}

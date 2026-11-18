@@ -207,17 +207,20 @@ export function parseSelfDescribingSheetQr(rawText: string): DecodedSheetQr | nu
       return acc;
     }, {} as Record<string, string>);
 
-    if (!segments.Q && !segments.QID) return null;
+    const rawQ = segments.Q;
+    const rawQid = segments.I || segments.QID;
+    if (!rawQ && !rawQid) return null;
 
-    const qNum = segments.Q ? parseInt(segments.Q, 10) : NaN;
-    const pNum = parseInt(segments.PAGE || segments.PG || "1", 10);
-    const parts = segments.PARTS ? segments.PARTS.split("") : [];
+    const qNum = rawQ ? parseInt(rawQ, 10) : NaN;
+    const pNum = parseInt(segments.P || segments.PAGE || segments.PG || "1", 10);
+    const rawParts = segments.R || segments.PARTS;
+    const parts = rawParts ? rawParts.split("") : [];
 
     return {
-      formId: segments.FORM,
+      formId: segments.F || segments.FORM,
       examCode: segments.EXAM,
-      sectionId: segments.SEC,
-      questionId: segments.QID,
+      sectionId: segments.S || segments.SEC,
+      questionId: rawQid,
       questionNumber: Number.isFinite(qNum) ? qNum : 0,
       pageNumber: Number.isFinite(pNum) ? pNum : 1,
       parts,
