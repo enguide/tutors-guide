@@ -33,6 +33,8 @@ interface MobileCameraContainerProps {
   initialSubmissions: InitialMobileSubmission[];
 }
 
+const AUTO_CLOSE_SECONDS = 4;
+
 export function MobileCameraContainer({
   sessionToken,
   defaultQuestionId,
@@ -43,7 +45,25 @@ export function MobileCameraContainer({
   const [submissions, setSubmissions] = useState<InitialMobileSubmission[]>(
     initialSubmissions
   );
-  const [mode, setMode] = useState<"camera" | "checklist">("camera");
+
+  const initialUploadedCount = useMemo(() => {
+    const keys = new Set<string>();
+    for (const sub of initialSubmissions) {
+      if (
+        sub.status !== FrqSubmissionStatus.NEEDS_RETAKE &&
+        sub.status !== FrqSubmissionStatus.FAILED
+      ) {
+        keys.add(`${sub.sectionId}::${sub.questionId}::p${sub.pageNumber}`);
+      }
+    }
+    return keys.size;
+  }, [initialSubmissions]);
+
+  const [mode, setMode] = useState<"camera" | "checklist" | "complete">(() =>
+    manifest && initialUploadedCount >= manifest.totalSheets ? "complete" : "camera"
+  );
+  const [closeCountdown, setCloseCountdown] = useState<number>(AUTO_CLOSE_SECONDS);
+
   const [uploadToast, setUploadToast] = useState<{
     id: string;
     questionNumber?: number;
@@ -55,12 +75,30 @@ export function MobileCameraContainer({
     useState<ManifestSheet | null>(null);
   const [allowReplaceExplicit, setAllowReplaceExplicit] = useState(false);
 
-  // Auto-dismiss the non-blocking confirmation toast after 3.5 seconds
   useEffect(() => {
     if (!uploadToast) return;
-    const timer = setTimeout(() => setUploadToast(null), 3500);
+    const timer = setTimeout(() => setUploadToast(null), 3000);
     return () => clearTimeout(timer);
   }, [uploadToast]);
+
+  // Countdown & automatic tab close once all sheets are submitted
+  useEffect(() => {
+    if (mode !== "complete" || closeCountdown <= 0) return;
+
+    const timer = setTimeout(() => {
+      const next = closeCountdown - 1;
+      setCloseCountdown(next);
+      if (next <= 0) {
+        try {
+          window.close();
+        } catch {
+          // Browsers that block script window.close() keep showing the static "Safe to close" message
+        }
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [mode, closeCountdown]);
 
   const submissionBySheetKey = useMemo(() => {
     const map = new Map<string, InitialMobileSubmission>();
@@ -111,13 +149,45 @@ export function MobileCameraContainer({
     );
   }
 
-  // Checklist / Packet Progress View (also shown automatically once all sheets are captured)
+  // Final Auto-Closing Completion Screen (no accidental rescan triggers)
+  if (mode === "complete") {
+    return (
+      <div className="w-full h-dvh flex flex-col items-center justify-center p-6 text-center text-zinc-100 bg-zinc-950 select-none">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5 border border-emerald-500/30 shadow-[0_0_30px_rgba(52,211,153,0.2)]">
+          <CheckCircle2 className="w-9 h-9" />
+        </div>
+
+        <h2 className="text-xl font-bold text-white">
+          All {manifest?.totalSheets ?? completedSheetCount} Sheets Submitted!
+        </h2>
+
+        <div className="mt-4 p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 max-w-xs space-y-2">
+          <div className="flex items-center justify-center gap-2 text-emerald-300 font-semibold text-sm">
+            <MonitorCheck className="w-4 h-4 shrink-0" />
+            <span>Return to Your Computer</span>
+          </div>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Your handwritten responses are synced to your exam. Click{" "}
+            <span className="font-semibold text-zinc-200">Complete & View Results</span> on your desktop screen to finish.
+          </p>
+        </div>
+
+        <div className="mt-6 text-xs font-mono text-zinc-400">
+          {closeCountdown <= 0
+            ? "You may now close this window or lock your phone."
+            : `Closing window in ${closeCountdown}s...`}
+        </div>
+      </div>
+    );
+  }
+
+  // Mid-Session Checklist Drawer (opened by tapping the top Q1–Q6 dot tracker)
   if (mode === "checklist" && manifest) {
     return (
-      <div className="w-full h-dvh flex flex-col bg-zinc-950 text-zinc-100 p-5 select-none">
+      <div className="w-full h-dvh flex flex-col bg-zinc-950 text-zinc-100 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] select-none">
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div>
-            <h2 className="text-base font-bold">Response Packet Checklist</h2>
+            <h2 className="text-base font-bold">Response Packet Progress</h2>
             <p className="text-xs text-zinc-400 mt-0.5">
               {completedSheetCount} of {manifest.totalSheets} sheets captured
             </p>
@@ -129,31 +199,12 @@ export function MobileCameraContainer({
               setAllowReplaceExplicit(false);
               setMode("camera");
             }}
-            className={`px-3.5 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer ${
-              allComplete
-                ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
-                : "bg-emerald-600 hover:bg-emerald-500 text-white"
-            }`}
+            className="px-3.5 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer"
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>{allComplete ? "Rescan" : "Open Camera"}</span>
+            <span>Back to Camera</span>
           </button>
         </div>
-
-        {allComplete && (
-          <div className="mt-4 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-start gap-3">
-            <MonitorCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="text-sm font-bold text-emerald-300">
-                All {manifest.totalSheets} Sheets Uploaded & Synced!
-              </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                You are finished using your phone. Return to your computer screen and click{" "}
-                <span className="font-bold text-white">Complete & View Results</span> to finish your exam.
-              </p>
-            </div>
-          </div>
-        )}
 
         <div className="flex-1 overflow-y-auto py-4 space-y-2.5">
           {manifest.sheets.map((sheet) => {
@@ -214,11 +265,7 @@ export function MobileCameraContainer({
 
         <div className="pt-3 border-t border-zinc-800 flex items-center justify-center gap-2 text-xs text-zinc-400">
           <Smartphone className="w-4 h-4 text-emerald-400" />
-          <span>
-            {allComplete
-              ? "Safe to lock phone & submit on computer"
-              : "Scan pages in any order — auto-matched via barcode"}
-          </span>
+          <span>Scan pages in any order — auto-matched via barcode</span>
         </div>
       </div>
     );
@@ -229,7 +276,7 @@ export function MobileCameraContainer({
       {/* Non-blocking Confirmation Toast over Live Camera */}
       {uploadToast && (
         <div className="absolute top-14 inset-x-4 z-40 pointer-events-none flex justify-center">
-          <div className="bg-emerald-950/95 backdrop-blur-md border border-emerald-400/50 text-emerald-100 px-3.5 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 max-w-sm w-full">
+          <div className="bg-emerald-950/95 backdrop-blur-md border border-emerald-400/50 text-emerald-100 px-3.5 py-2 rounded-xl shadow-xl flex items-center gap-2.5 max-w-sm w-full">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-white truncate">
@@ -257,7 +304,7 @@ export function MobileCameraContainer({
         uploadedSheetKeys={uploadedSheetKeys}
         initialAllowReplace={allowReplaceExplicit}
         completedCount={completedSheetCount}
-        onOpenChecklist={manifest ? () => setMode("checklist") : undefined}
+        onOpenChecklist={manifest && !allComplete ? () => setMode("checklist") : undefined}
         onSuccess={(result) => {
           const nextKeys = new Set(uploadedSheetKeys);
           nextKeys.add(`${result.sectionId}::${result.questionId}::p${result.pageNumber}`);
@@ -287,14 +334,14 @@ export function MobileCameraContainer({
           setExplicitTargetSheet(null);
           setAllowReplaceExplicit(false);
 
-          // Automatically transition to checklist completion screen once all sheets are captured
+          // Once all sheets are submitted, show the clean auto-closing confirmation screen
           if (manifest && nextKeys.size >= manifest.totalSheets) {
             setUploadToast(null);
-            setMode("checklist");
+            setCloseCountdown(AUTO_CLOSE_SECONDS);
+            setMode("complete");
             return;
           }
 
-          // Otherwise stay right on the live camera with a brief confirmation toast
           setUploadToast({
             id: result.submissionId,
             questionNumber: result.questionNumber,

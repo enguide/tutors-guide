@@ -53,8 +53,9 @@ interface MobileCameraViewProps {
 
 const BLUR_THRESHOLD = 95.0;
 const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x2200 server canvas
-const ANALYSIS_INTERVAL_MS = 250;
-const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown
+const ANALYSIS_INTERVAL_MS = 200;
+const REQUIRED_STEADY_FRAMES = 6; // 6 * 200ms = 1.2 seconds verified steady lock
+const FRAMES_PER_COUNTDOWN_STEP = 3; // 2 crisp countdown steps
 
 function evaluateFiducialGeometry(
   f: DetectedFiducials,
@@ -271,7 +272,6 @@ export function MobileCameraView({
     return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
   }, [verifiedSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
 
-  // Active sheet key currently targeted/detected so its dot pulses in the top tracker
   const highlightedSheetKey =
     verifiedSheet?.sheetKey || liveDetectedSheet?.sheetKey || null;
 
@@ -358,7 +358,7 @@ export function MobileCameraView({
     [uploadedSheetKeys, allowedReplaceKeys]
   );
 
-  // 2. Burst-of-3 sharpest frame capture + fiducial-guided 1D Code-128C verification
+  // 2. Burst-of-3 sharpest frame capture (50ms spacing) + fiducial-guided 1D Code-128C verification
   const captureStill = useCallback(async () => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
@@ -386,7 +386,7 @@ export function MobileCameraView({
 
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, 80));
+          await new Promise((r) => setTimeout(r, 50));
         }
 
         const candidate = document.createElement("canvas");
@@ -792,14 +792,17 @@ export function MobileCameraView({
     100,
     Math.round((steadyFrames / REQUIRED_STEADY_FRAMES) * 100)
   );
-  const completedSeconds = Math.min(3, Math.floor(steadyFrames / 4));
-  const secondsRemainingCount = Math.max(1, 3 - completedSeconds);
+  const completedSteps = Math.min(
+    2,
+    Math.floor(steadyFrames / FRAMES_PER_COUNTDOWN_STEP)
+  );
+  const secondsRemainingCount = Math.max(1, 2 - completedSteps);
 
   return (
     <div className="relative w-full h-dvh bg-black flex flex-col justify-between overflow-hidden select-none">
       <canvas ref={analysisCanvasRef} className="hidden" />
 
-      {/* Top Question & Sheet Dot Matrix Tracker (replaces verbose text + 0/12 pill) */}
+      {/* Top Question & Sheet Dot Matrix Tracker */}
       <div className="shrink-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2.5 bg-zinc-950/95 border-b border-zinc-800/80">
         {manifest && manifest.questions.length > 0 ? (
           <button
@@ -870,7 +873,7 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Live Video Stream + Captured Preview (flex-1 min-h-0 guarantees bottom bar stays above Android nav) */}
+      {/* Live Video Stream + Captured Preview */}
       <div
         onClick={handleTapToFocus}
         className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden bg-black"
@@ -929,7 +932,7 @@ export function MobileCameraView({
                 }`}
               />
 
-              {/* 3-Second Guided Hold-Steady Countdown Pill */}
+              {/* Crisp 1.2-Second Hold-Steady Countdown Pill */}
               {(fiducialsLocked || isSnapping) && (
                 <div className="absolute bottom-4 inset-x-3 flex justify-center">
                   <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[260px]">
@@ -949,15 +952,16 @@ export function MobileCameraView({
                       </span>
 
                       <div className="flex items-center gap-1.5">
-                        {[1, 2, 3].map((secStep) => {
+                        {[1, 2].map((step) => {
                           const isFilled =
-                            steadyFrames >= secStep * 4 || isSnapping;
+                            steadyFrames >= step * FRAMES_PER_COUNTDOWN_STEP || isSnapping;
                           const isInProgress =
-                            !isFilled && steadyFrames > (secStep - 1) * 4;
+                            !isFilled &&
+                            steadyFrames > (step - 1) * FRAMES_PER_COUNTDOWN_STEP;
                           return (
                             <span
-                              key={secStep}
-                              className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                              key={step}
+                              className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
                                 isFilled
                                   ? "bg-emerald-400 scale-110 shadow-[0_0_8px_rgba(52,211,153,0.95)]"
                                   : isInProgress
@@ -972,7 +976,7 @@ export function MobileCameraView({
 
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-400 rounded-full transition-all duration-200 ease-linear"
+                        className="h-full bg-emerald-400 rounded-full transition-all duration-150 ease-linear"
                         style={{ width: `${isSnapping ? 100 : steadyPercent}%` }}
                       />
                     </div>
@@ -1012,7 +1016,7 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Bottom Controls + Safe-Area Padding so Android/iOS nav bars never cover buttons */}
+      {/* Bottom Controls + Safe-Area Padding */}
       <div className="shrink-0 relative z-20 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-zinc-950 border-t border-zinc-800/80 flex flex-col items-center gap-2.5">
         {previewUrl ? (
           <div className="w-full max-w-sm space-y-2.5">
