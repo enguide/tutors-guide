@@ -71,8 +71,8 @@ export const SHEET_REGIONS_MM = {
   slot1Crop: { x: 20.0, y: 40.0, w: 175.0, h: 99.5 },
   /** Bottom half of response box (Parts B, D, F...) — extends full way to bottom box border at 241mm */
   slot2Crop: { x: 20.0, y: 138.5, w: 175.0, h: 102.5 },
-  /** Generous search window around footer QR code (x: 192.9mm, y: 271.4mm) */
-  footerQrSearch: { x: 168.0, y: 248.0, w: 42.0, h: 28.0 },
+  /** Generous search window around 18mm footer QR code (x: 161.9mm..179.9mm, y: 255.4mm..273.4mm) */
+  footerQrSearch: { x: 148.0, y: 244.0, w: 48.0, h: 32.0 },
 } as const;
 
 export function mmPointToCanonicalPx(pt: Point2D): Point2D {

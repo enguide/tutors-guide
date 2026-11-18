@@ -197,7 +197,25 @@ export function buildTestFrqManifest(
  */
 export function parseSelfDescribingSheetQr(rawText: string): DecodedSheetQr | null {
   try {
-    const segments = rawText.split(";").reduce((acc, segment) => {
+    const trimmed = rawText.trim();
+
+    // 1. Ultra-compact Version-1 QR format: "<formId>|<questionNumber>|<pageNumber>"
+    if (trimmed.includes("|") && !trimmed.includes(";")) {
+      const [rawForm, rawQ, rawPg] = trimmed.split("|");
+      const qNum = parseInt(rawQ || "", 10);
+      const pNum = parseInt(rawPg || "1", 10);
+      if (rawForm && Number.isFinite(qNum)) {
+        return {
+          formId: rawForm.trim(),
+          questionNumber: qNum,
+          pageNumber: Number.isFinite(pNum) ? pNum : 1,
+          parts: [],
+        };
+      }
+    }
+
+    // 2. Key-value formats ("F:...;S:...;I:...;Q:...;P:...;R:..." or legacy "EXAM:...;Q:...")
+    const segments = trimmed.split(";").reduce((acc, segment) => {
       const colonIdx = segment.indexOf(":");
       if (colonIdx > 0) {
         const key = segment.slice(0, colonIdx).trim();
