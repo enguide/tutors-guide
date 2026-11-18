@@ -22,12 +22,13 @@ interface BlobCandidate {
   area: number;
   fillRatio: number;
   internalBrightRatio: number;
+  surroundBrightRatio: number;
 }
 
 /**
  * Detects the 4 corner registration fiducials (8mm x 8mm squares, with Top-Left L-cutout)
- * on a grayscale luminance buffer.
- * Designed to run in <12ms on an ~850px-wide downsampled image.
+ * on a grayscale luminance buffer using white-paper surround verification and internal
+ * diagonal/aspect invariants.
  */
 export function detectSheetFiducials(
   gray: Uint8Array,
@@ -46,7 +47,6 @@ export function detectSheetFiducials(
   }
 
   // Expected fiducial side length is ~8mm on a ~215.9mm sheet (~3.7% of sheet width).
-  // Allow generous scale range (1.6% to 7.5% of width) for varying camera distances.
   const minSide = Math.max(8, Math.round(width * 0.016));
   const maxSide = Math.round(width * 0.075);
   const minArea = minSide * minSide * 0.55;
@@ -88,7 +88,6 @@ export function detectSheetFiducials(
         if (py < minY) minY = py;
         if (py > maxY) maxY = py;
 
-        // 4-connected neighbors
         if (px > 0) {
           const n = idx - 1;
           if (mask[n] === 1 && visited[n] === 0) {
@@ -125,7 +124,7 @@ export function detectSheetFiducials(
       const bh = maxY - minY + 1;
       if (bw < minSide || bw > maxSide || bh < minSide || bh > maxSide) continue;
 
-      // Reject elongated timing ticks (4.5mm x 2.0mm -> aspect ~2.25) and lines
+      // Reject elongated timing ticks (4.5mm x 2.0mm) and lines
       const aspect = bw / bh;
       if (aspect < 0.65 || aspect > 1.52) continue;
 
@@ -133,6 +132,31 @@ export function detectSheetFiducials(
       const fillRatio = area / bboxArea;
       // Solid square has fillRatio ~0.88-1.0; Top-Left L-cutout square has fillRatio ~0.70-0.86
       if (fillRatio < 0.62 || fillRatio > 1.0) continue;
+
+      // White paper quiet-zone halo check:
+      // Every true fiducial sits on white paper with >= 4mm clear margin on all 4 sides.
+      // Rejects dark browser tabs, taskbar icons, and bezel artifacts.
+      const padX = Math.max(3, Math.round(bw * 0.45));
+      const padY = Math.max(3, Math.round(bh * 0.45));
+      const outerMinX = Math.max(0, minX - padX);
+      const outerMaxX = Math.min(width - 1, maxX + padX);
+      const outerMinY = Math.max(0, minY - padY);
+      const outerMaxY = Math.min(height - 1, maxY + padY);
+
+      let ringTotal = 0;
+      let ringBright = 0;
+      for (let ry = outerMinY; ry <= outerMaxY; ry++) {
+        for (let rx = outerMinX; rx <= outerMaxX; rx++) {
+          // Skip the candidate's own inner bounding box (with 1px buffer)
+          if (rx >= minX - 1 && rx <= maxX + 1 && ry >= minY - 1 && ry <= maxY + 1) {
+            continue;
+          }
+          ringTotal++;
+          if (mask[ry * width + rx] === 0) ringBright++;
+        }
+      }
+      const surroundBrightRatio = ringTotal > 0 ? ringBright / ringTotal : 0;
+      if (surroundBrightRatio < 0.72) continue;
 
       // Measure bright pixels inside the inner 60% of the bounding box to detect the L-cutout
       const innerMinX = minX + Math.floor(bw * 0.2);
@@ -160,6 +184,7 @@ export function detectSheetFiducials(
         area,
         fillRatio,
         internalBrightRatio: innerTotal > 0 ? innerBright / innerTotal : 0,
+        surroundBrightRatio,
       });
     }
   }
@@ -168,57 +193,115 @@ export function detectSheetFiducials(
     return null;
   }
 
-  // 3. Pick the best corner candidate in each of the 4 outer image quadrants
+  // 3. Evaluate top white-surround candidates in each quadrant using internal geometry invariants
   const midX = width * 0.5;
   const midY = height * 0.5;
 
-  const pickBestCorner = (
-    filterFn: (c: BlobCandidate) => boolean,
-    cornerTarget: Point2D
-  ): BlobCandidate | null => {
-    const matching = candidates.filter(filterFn);
-    if (matching.length === 0) return null;
+  const topQuadrantCandidates = (
+    filterFn: (c: BlobCandidate) => boolean
+  ): BlobCandidate[] =>
+    candidates
+      .filter(filterFn)
+      .sort((a, b) => b.surroundBrightRatio * b.fillRatio - a.surroundBrightRatio * a.fillRatio)
+      .slice(0, 4);
 
-    // Score by proximity to the outer corner + high squareness/fill
-    matching.sort((a, b) => {
-      const distA = Math.hypot(a.cx - cornerTarget.x, a.cy - cornerTarget.y);
-      const distB = Math.hypot(b.cx - cornerTarget.x, b.cy - cornerTarget.y);
-      return distA - distB;
-    });
-    return matching[0];
-  };
-
-  const cTL = pickBestCorner((c) => c.cx < midX && c.cy < midY, { x: 0, y: 0 });
-  const cTR = pickBestCorner((c) => c.cx >= midX && c.cy < midY, { x: width, y: 0 });
-  const cBL = pickBestCorner((c) => c.cx < midX && c.cy >= midY, { x: 0, y: height });
-  const cBR = pickBestCorner((c) => c.cx >= midX && c.cy >= midY, { x: width, y: height });
-
-  if (!cTL || !cTR || !cBL || !cBR) {
-    return null;
-  }
-
-  // 4. Geometric quadrilateral sanity check (opposing edges should have compatible lengths)
-  const topWidth = Math.hypot(cTR.cx - cTL.cx, cTR.cy - cTL.cy);
-  const bottomWidth = Math.hypot(cBR.cx - cBL.cx, cBR.cy - cBL.cy);
-  const leftHeight = Math.hypot(cBL.cx - cTL.cx, cBL.cy - cTL.cy);
-  const rightHeight = Math.hypot(cBR.cx - cTR.cx, cBR.cy - cTR.cy);
+  const tlList = topQuadrantCandidates((c) => c.cx < midX && c.cy < midY);
+  const trList = topQuadrantCandidates((c) => c.cx >= midX && c.cy < midY);
+  const blList = topQuadrantCandidates((c) => c.cx < midX && c.cy >= midY);
+  const brList = topQuadrantCandidates((c) => c.cx >= midX && c.cy >= midY);
 
   if (
-    topWidth < width * 0.35 ||
-    bottomWidth < width * 0.35 ||
-    leftHeight < height * 0.45 ||
-    rightHeight < height * 0.45
+    tlList.length === 0 ||
+    trList.length === 0 ||
+    blList.length === 0 ||
+    brList.length === 0
   ) {
     return null;
   }
 
-  const widthRatio = Math.min(topWidth, bottomWidth) / Math.max(topWidth, bottomWidth);
-  const heightRatio = Math.min(leftHeight, rightHeight) / Math.max(leftHeight, rightHeight);
-  if (widthRatio < 0.72 || heightRatio < 0.72) {
+  let bestQuad: {
+    cTL: BlobCandidate;
+    cTR: BlobCandidate;
+    cBL: BlobCandidate;
+    cBR: BlobCandidate;
+    score: number;
+    confidence: number;
+  } | null = null;
+
+  for (const cTL of tlList) {
+    for (const cTR of trList) {
+      for (const cBL of blList) {
+        for (const cBR of brList) {
+          // A. Equal physical corner size check (all 4 targets are 8mm x 8mm)
+          const areas = [cTL.area, cTR.area, cBL.area, cBR.area];
+          const minA = Math.min(...areas);
+          const maxA = Math.max(...areas);
+          const sizeConsistency = minA / Math.max(maxA, 1);
+          if (sizeConsistency < 0.45) continue;
+
+          // B. Opposing edge parallelism / length symmetry
+          const topWidth = Math.hypot(cTR.cx - cTL.cx, cTR.cy - cTL.cy);
+          const bottomWidth = Math.hypot(cBR.cx - cBL.cx, cBR.cy - cBL.cy);
+          const leftHeight = Math.hypot(cBL.cx - cTL.cx, cBL.cy - cTL.cy);
+          const rightHeight = Math.hypot(cBR.cx - cTR.cx, cBR.cy - cTR.cy);
+
+          if (
+            topWidth < width * 0.32 ||
+            bottomWidth < width * 0.32 ||
+            leftHeight < height * 0.42 ||
+            rightHeight < height * 0.42
+          ) {
+            continue;
+          }
+
+          const widthRatio =
+            Math.min(topWidth, bottomWidth) / Math.max(topWidth, bottomWidth);
+          const heightRatio =
+            Math.min(leftHeight, rightHeight) / Math.max(leftHeight, rightHeight);
+          if (widthRatio < 0.78 || heightRatio < 0.78) continue;
+
+          // C. Internal diagonal symmetry invariant (rectanglediagonals are equal: TL<->BR == TR<->BL)
+          const diag1 = Math.hypot(cBR.cx - cTL.cx, cBR.cy - cTL.cy);
+          const diag2 = Math.hypot(cBL.cx - cTR.cx, cBL.cy - cTR.cy);
+          const diagRatio = Math.min(diag1, diag2) / Math.max(diag1, diag2);
+          if (diagRatio < 0.84) continue;
+
+          // D. Canonical fiducial span aspect ratio check (177.9mm / 251.4mm = 0.7076)
+          const avgW = (topWidth + bottomWidth) * 0.5;
+          const avgH = (leftHeight + rightHeight) * 0.5;
+          const spanAspect = avgW / Math.max(avgH, 1);
+          if (spanAspect < 0.54 || spanAspect > 0.88) continue;
+
+          const avgSurround =
+            (cTL.surroundBrightRatio +
+              cTR.surroundBrightRatio +
+              cBL.surroundBrightRatio +
+              cBR.surroundBrightRatio) *
+            0.25;
+
+          const confidence = Math.min(widthRatio, heightRatio, diagRatio);
+          const score =
+            diagRatio * 2.0 +
+            widthRatio +
+            heightRatio +
+            sizeConsistency +
+            avgSurround * 1.5;
+
+          if (!bestQuad || score > bestQuad.score) {
+            bestQuad = { cTL, cTR, cBL, cBR, score, confidence };
+          }
+        }
+      }
+    }
+  }
+
+  if (!bestQuad) {
     return null;
   }
 
-  // 5. Orientation check via Top-Left L-cutout signature (highest internalBrightRatio)
+  const { cTL, cTR, cBL, cBR, confidence } = bestQuad;
+
+  // 4. Orientation check via Top-Left L-cutout signature (highest internalBrightRatio)
   // Ordered clockwise starting at image top-left: [cTL, cTR, cBR, cBL]
   const clockwise = [cTL, cTR, cBR, cBL];
   let lCutoutIndex = 0;
@@ -230,10 +313,11 @@ export function detectSheetFiducials(
     }
   }
 
-  // Only rotate if the L-cutout signal is distinctly brighter than the solid squares
   const avgOtherBright =
-    clockwise.reduce((sum, c, idx) => (idx === lCutoutIndex ? sum : sum + c.internalBrightRatio), 0) /
-    3;
+    clockwise.reduce(
+      (sum, c, idx) => (idx === lCutoutIndex ? sum : sum + c.internalBrightRatio),
+      0
+    ) / 3;
   const hasClearOrientation = maxBright > 0.08 && maxBright > avgOtherBright + 0.05;
   const shift = hasClearOrientation ? lCutoutIndex : 0;
 
@@ -256,7 +340,7 @@ export function detectSheetFiducials(
     TR: { x: oriented[1].cx, y: oriented[1].cy },
     BR: { x: oriented[2].cx, y: oriented[2].cy },
     BL: { x: oriented[3].cx, y: oriented[3].cy },
-    confidence: Math.min(widthRatio, heightRatio),
+    confidence,
     rotationAppliedDegrees: rotationMap[shift] ?? 0,
   };
 }
