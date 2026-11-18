@@ -21,6 +21,7 @@ CODE128_PATTERNS.forEach((pat, idx) => {
 });
 
 const START_CODE_B = 104;
+const START_CODE_C = 105;
 const STOP_CODE = 106;
 
 export interface Point2DLike {
@@ -52,8 +53,11 @@ function tryDecodeRunLengths(runs: number[], isBar: boolean[]): string | null {
     if (!isBar[startIdx]) continue;
 
     const startPat = quantizeSixRuns(runs.slice(startIdx, startIdx + 6));
-    if (startPat !== CODE128_PATTERNS[START_CODE_B]) continue;
+    const isCodeB = startPat === CODE128_PATTERNS[START_CODE_B];
+    const isCodeC = startPat === CODE128_PATTERNS[START_CODE_C];
+    if (!isCodeB && !isCodeC) continue;
 
+    const startCodeVal = isCodeC ? START_CODE_C : START_CODE_B;
     const codes: number[] = [];
     let cursor = startIdx + 6;
     let foundStop = false;
@@ -89,22 +93,30 @@ function tryDecodeRunLengths(runs: number[], isBar: boolean[]): string | null {
     const checkDigit = codes[codes.length - 1];
     const dataCodes = codes.slice(0, -1);
 
-    let checksum = START_CODE_B;
+    let checksum = startCodeVal;
     for (let i = 0; i < dataCodes.length; i++) {
       checksum += dataCodes[i] * (i + 1);
     }
     if (checksum % 103 !== checkDigit) continue;
 
-    // Convert Code-128B values (0..94) to ASCII (32..126)
-    let decoded = "";
-    for (const c of dataCodes) {
-      if (c >= 0 && c <= 94) {
-        decoded += String.fromCharCode(c + 32);
+    if (isCodeC) {
+      // Each symbol 0..99 represents a 2-digit decimal pair "00".."99"
+      let decoded = "";
+      for (const c of dataCodes) {
+        if (c >= 0 && c <= 99) {
+          decoded += String(c).padStart(2, "0");
+        }
       }
-    }
-
-    if (decoded.length > 0) {
-      return decoded;
+      if (decoded.length > 0) return decoded;
+    } else {
+      // Code-128B values (0..94) -> ASCII (32..126)
+      let decoded = "";
+      for (const c of dataCodes) {
+        if (c >= 0 && c <= 94) {
+          decoded += String.fromCharCode(c + 32);
+        }
+      }
+      if (decoded.length > 0) return decoded;
     }
   }
 
@@ -113,7 +125,7 @@ function tryDecodeRunLengths(runs: number[], isBar: boolean[]): string | null {
 
 /**
  * Scans multiple horizontal rows across a grayscale image buffer (1 channel, width * height)
- * to decode a 1D Code-128B barcode (supports both 0-degree and 180-degree orientations).
+ * to decode a 1D Code-128C or Code-128B barcode (supports both 0-degree and 180-degree orientations).
  */
 export function decodeCode128FromGrayscale(
   gray: Uint8Array,
@@ -172,9 +184,9 @@ export function decodeCode128FromGrayscale(
 }
 
 /**
- * Samples scanlines directly along the vector between detected BL and BR fiducials
- * (with slight downward perpendicular offsets to cover the centered bottom-margin barcode).
- * Immune to page distance, zoom level, and in-plane rotation on mobile cameras.
+ * Samples oversampled scanlines directly along the vector between detected BL and BR fiducials
+ * (with slight downward/upward perpendicular offsets to cover the centered bottom-margin barcode).
+ * Immune to page distance, zoom level, uneven lighting, and in-plane rotation on mobile cameras.
  */
 export function decodeCode128BetweenBottomFiducials(
   gray: Uint8Array,
@@ -196,11 +208,9 @@ export function decodeCode128BetweenBottomFiducials(
   const vx = downX / downLen;
   const vy = downY / downLen;
 
-  // On the physical sheet: fiducial centers sit at y = 265.4mm;
-  // barcode spans y = 260mm..269.4mm (-5.4mm to +4.0mm relative to BL-BR line).
-  // Relative to BL-TL height (251.4mm), that is -0.022 to +0.018 of page height.
-  const numSamples = Math.min(900, Math.round(spanLen * 1.25));
-  const offsets = [-0.022, -0.016, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015, 0.02];
+  // Oversample at 2.0x pixel density across the BL->BR span so every bar gets 10+ samples
+  const numSamples = Math.min(1800, Math.round(spanLen * 2.0));
+  const offsets = [-0.032, -0.024, -0.016, -0.008, 0.0, 0.008, 0.016, 0.024];
 
   for (const relOffset of offsets) {
     const shiftX = vx * (relOffset * downLen);
@@ -218,8 +228,8 @@ export function decodeCode128BetweenBottomFiducials(
       }
     }
 
-    // Local sliding-window adaptive threshold (radius 32 samples) to handle uneven lighting/glare
-    const radius = 32;
+    // Local sliding-window adaptive threshold (radius 48 samples) to handle uneven lighting/glare
+    const radius = 48;
     const prefix = new Int32Array(numSamples + 1);
     for (let i = 0; i < numSamples; i++) {
       prefix[i + 1] = prefix[i] + line[i];
@@ -234,7 +244,6 @@ export function decodeCode128BetweenBottomFiducials(
       const lo = Math.max(0, i - radius);
       const hi = Math.min(numSamples, i + radius + 1);
       const localMean = (prefix[hi] - prefix[lo]) / (hi - lo);
-      // Require noticeable contrast below local mean so faint paper texture never triggers bars
       const pxIsBar = line[i] < localMean - 14;
 
       if (i === 0) {

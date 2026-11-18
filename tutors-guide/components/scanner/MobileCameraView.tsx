@@ -131,7 +131,7 @@ function evaluateFiducialGeometry(
 }
 
 /**
- * Decodes the 1D Code-128B footer barcode directly along the BL->BR fiducial vector
+ * Decodes the 1D Code-128C/B footer barcode directly along the BL->BR fiducial vector
  * at native resolution (plus BarcodeDetector and legacy QR fallback).
  */
 async function decodeSheetFooterCode(
@@ -369,7 +369,7 @@ export function MobileCameraView({
     [uploadedSheetKeys, allowedReplaceKeys]
   );
 
-  // 2. Burst-of-3 sharpest frame capture + fiducial-guided 1D Code-128B verification
+  // 2. Burst-of-3 sharpest frame capture + fiducial-guided 1D Code-128C verification
   const captureStill = useCallback(async () => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
@@ -491,7 +491,7 @@ export function MobileCameraView({
     }
   }, [manifest, liveDetectedSheet, isSheetBlockedAsDuplicate]);
 
-  // 3. Real-time frame quality + geometry + fiducial-guided Code-128B scan
+  // 3. Real-time frame quality + geometry + fiducial-guided Code-128C scan
   const analyzeFrame = useCallback(async () => {
     if (
       !videoRef.current ||
@@ -597,7 +597,7 @@ export function MobileCameraView({
       }
       prevFiducialsRef.current = { f: detected, w, h };
 
-      // Live 1D Code-128B scan along the BL->BR fiducial vector
+      // Live 1D Code-128C scan along the BL->BR fiducial vector
       if (manifest) {
         const liveMeta = await decodeSheetFooterCode(
           video,
@@ -869,7 +869,7 @@ export function MobileCameraView({
           />
         )}
 
-        {/* Clean Minimal US Letter Outer Frame Guide (no redundant internal markers) */}
+        {/* Clean Minimal US Letter Outer Frame Guide */}
         {!previewUrl && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div

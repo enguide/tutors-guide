@@ -190,17 +190,29 @@ export function buildTestFrqManifest(
 }
 
 /**
- * Parses compact pipe-delimited QR codes:
- *   4-part: "<formId>|<sectionId>|<questionNumber>|<pageNumber>"
- *   3-part: "<formId>|<questionNumber>|<pageNumber>"
- * as well as key-value and legacy QR codes:
- *   "F:...;S:...;I:...;Q:...;P:...;R:..." or "EXAM:AB_2026;Q:1;PG:4;PARTS:AB"
+ * Parses sheet barcodes and QR codes:
+ *   - 4-digit Code-128C: "QQPP" (e.g., "0101" = Question 1, Page 1)
+ *   - Pipe-delimited Code-128B / QR: "<formId>|<questionNumber>|<pageNumber>"
+ *   - Legacy key-value QR: "F:...;S:...;I:...;Q:...;P:...;R:..." or "EXAM:AB_2026;Q:1;PG:4;PARTS:AB"
  */
 export function parseSelfDescribingSheetQr(rawText: string): DecodedSheetQr | null {
   try {
     const trimmed = rawText.trim();
 
-    // 1. Compact Version-1 / Version-2 pipe format
+    // 0. Compact 4-digit Code-128C payload: "QQPP" (e.g., "0101" = Q1 Page 1)
+    if (/^\d{4}$/.test(trimmed)) {
+      const qNum = parseInt(trimmed.slice(0, 2), 10);
+      const pNum = parseInt(trimmed.slice(2, 4), 10);
+      if (qNum > 0 && pNum > 0) {
+        return {
+          questionNumber: qNum,
+          pageNumber: pNum,
+          parts: [],
+        };
+      }
+    }
+
+    // 1. Compact pipe-delimited format: "<formId>|<questionNumber>|<pageNumber>"
     if (trimmed.includes("|") && !trimmed.includes(";")) {
       const partsArr = trimmed.split("|");
       if (partsArr.length >= 4) {
@@ -271,13 +283,13 @@ export type SheetQrMatchResult =
   | { status: "NOT_IN_TEST"; reason: string };
 
 /**
- * Validates and resolves a decoded QR payload against the active test/section manifest.
+ * Validates and resolves a decoded barcode/QR payload against the active test/section manifest.
  */
 export function matchQrAgainstManifest(
   manifest: SectionFrqManifest,
   qr: DecodedSheetQr
 ): SheetQrMatchResult {
-  // 1. Strict form check when FORM is present in QR
+  // 1. Strict form check when FORM is present in payload
   if (qr.formId && qr.formId !== manifest.testId) {
     return {
       status: "WRONG_FORM",
