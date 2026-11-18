@@ -224,6 +224,7 @@ export function MobileCameraView({
   const [streamActive, setStreamActive] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [autoUploadingLabel, setAutoUploadingLabel] = useState<string | null>(null);
   const [isSnapping, setIsSnapping] = useState(false);
   const [focusPulse, setFocusPulse] = useState(false);
 
@@ -239,6 +240,7 @@ export function MobileCameraView({
       : new Set()
   );
 
+  // Only populated when barcode could not be decoded and manual fallback confirmation is required
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [detectedCode, setDetectedCode] = useState<DecodedSheetQr | null>(null);
@@ -248,6 +250,7 @@ export function MobileCameraView({
   const steadyCountRef = useRef<number>(0);
   const isSnappingRef = useRef<boolean>(false);
   const isAnalyzingRef = useRef<boolean>(false);
+  const isUploadingRef = useRef<boolean>(false);
   const lockedSheetRef = useRef<ManifestSheet | null>(null);
   const lastNormalizedFiducialsRef = useRef<DetectedFiducials | null>(null);
   const prevFiducialsRef = useRef<{ f: DetectedFiducials; w: number; h: number } | null>(
@@ -358,9 +361,169 @@ export function MobileCameraView({
     [uploadedSheetKeys, allowedReplaceKeys]
   );
 
-  // 2. Burst-of-3 sharpest frame capture (50ms spacing) + fiducial-guided 1D Code-128C verification
+  const resetScannerState = useCallback(() => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    isSnappingRef.current = false;
+    isUploadingRef.current = false;
+    prevFiducialsRef.current = null;
+    lockedSheetRef.current = null;
+    lastNormalizedFiducialsRef.current = null;
+    setIsSnapping(false);
+    setCapturedBlob(null);
+    setDetectedCode(null);
+    setVerifiedSheet(null);
+    setManualFallbackKey(null);
+    setLiveDetectedSheet(null);
+    setDuplicateSheetCandidate(null);
+    setPreviewUrl(null);
+    setFiducialsLocked(false);
+    steadyCountRef.current = 0;
+    setSteadyFrames(0);
+    setIsProcessing(false);
+    setAutoUploadingLabel(null);
+    setWarningMessage(null);
+
+    if (videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.play().catch(() => {});
+    }
+  }, [previewUrl]);
+
+  // Shared upload executor used by both zero-tap auto-submit and manual fallback submit
+  const performUpload = useCallback(
+    async (
+      blob: Blob,
+      targetSheet: ManifestSheet | null,
+      codeMeta: DecodedSheetQr | null,
+      isAutoMode: boolean
+    ) => {
+      if (isUploadingRef.current) return;
+
+      if (isSheetBlockedAsDuplicate(targetSheet)) {
+        setDuplicateSheetCandidate(targetSheet);
+        setWarningMessage(
+          `Q${targetSheet!.questionNumber} Sheet ${targetSheet!.pageNumber} is already uploaded — flip to another page.`
+        );
+        return;
+      }
+
+      isUploadingRef.current = true;
+      setIsProcessing(true);
+      setWarningMessage(null);
+
+      const targetPageNumber =
+        targetSheet?.pageNumber || codeMeta?.pageNumber || 1;
+      const targetParts = targetSheet
+        ? targetSheet.parts.map((p) => p.label)
+        : codeMeta?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]);
+
+      if (isAutoMode) {
+        const label = targetSheet
+          ? `Uploading Q${targetSheet.questionNumber} • Sheet ${targetSheet.pageNumber} (${targetParts.join(
+              " & "
+            )})...`
+          : "Uploading captured sheet...";
+        setAutoUploadingLabel(label);
+      }
+
+      const targetSectionId =
+        targetSheet?.sectionId ||
+        codeMeta?.sectionId ||
+        manifest?.sectionId ||
+        manifest?.sheets[0]?.sectionId ||
+        "";
+      const targetQuestionId =
+        targetSheet?.questionId ||
+        codeMeta?.questionId ||
+        defaultQuestionId ||
+        manifest?.questions[0]?.questionId;
+      
+      const targetQuestionNumber =
+        targetSheet?.questionNumber || codeMeta?.questionNumber;
+
+      try {
+        const presignRes = await getPresignedUploadForSession(
+          sessionToken,
+          "image/jpeg",
+          targetQuestionId,
+          targetPageNumber,
+          targetSectionId
+        );
+
+        if (!presignRes.success || !presignRes.presigned) {
+          throw new Error(presignRes.error || "Failed to authorize upload");
+        }
+
+        const { url, fields, key, publicUrl } = presignRes.presigned;
+
+        const formData = new FormData();
+        Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+        formData.append("file", blob, "sheet.jpg");
+
+        const uploadRes = await fetch(url, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Direct upload to storage bucket failed");
+        }
+
+        const finalizeRes = await finalizeSubmissionUpload({
+          sessionToken,
+          storageKey: key,
+          publicUrl,
+          mimeType: "image/jpeg",
+          fileSizeBytes: blob.size,
+          sectionId: targetSectionId,
+          questionId: targetQuestionId,
+          pageNumber: targetPageNumber,
+        });
+
+        if (!finalizeRes.success || !finalizeRes.submission) {
+          throw new Error(finalizeRes.error || "Failed to commit record in database");
+        }
+
+        resetScannerState();
+
+        onSuccess({
+          submissionId: finalizeRes.submission.id,
+          sectionId: finalizeRes.submission.sectionId,
+          questionId: finalizeRes.submission.questionId,
+          questionNumber: targetQuestionNumber,
+          pageNumber: targetPageNumber,
+          parts: targetParts,
+        });
+      } catch (err) {
+        console.error(err);
+        isUploadingRef.current = false;
+        setIsProcessing(false);
+        setAutoUploadingLabel(null);
+        setWarningMessage(
+          err instanceof Error ? err.message : "Upload failed. Please hold steady to retry."
+        );
+        // Reset steady counter so the student can immediately retry without being stuck
+        steadyCountRef.current = 0;
+        setSteadyFrames(0);
+      }
+    },
+    [
+      isSheetBlockedAsDuplicate,
+      manifest,
+      defaultQuestionId,
+      sessionToken,
+      resetScannerState,
+      onSuccess,
+    ]
+  );
+
+  // 2. Burst-of-3 sharpest frame capture -> immediate auto-upload when barcode is verified
   const captureStill = useCallback(async () => {
-    if (!videoRef.current || isSnappingRef.current) return;
+    if (!videoRef.current || isSnappingRef.current || isUploadingRef.current) return;
     isSnappingRef.current = true;
     setIsSnapping(true);
 
@@ -442,6 +605,8 @@ export function MobileCameraView({
               ? `Wrong exam booklet (${match.actualForm}). Expected ${match.expectedForm}.`
               : match.reason
           );
+          steadyCountRef.current = 0;
+          setSteadyFrames(0);
           return;
         }
         resolvedCandidate = match.sheet;
@@ -454,31 +619,36 @@ export function MobileCameraView({
         setWarningMessage(
           `Q${resolvedCandidate!.questionNumber} Sheet ${resolvedCandidate!.pageNumber} is already uploaded — flip to another page.`
         );
+        steadyCountRef.current = 0;
+        setSteadyFrames(0);
         return;
       }
 
+      const blob = await new Promise<Blob | null>((resolve) => {
+        bestCanvas!.toBlob((b) => resolve(b), "image/jpeg", 0.92);
+      });
+      if (!blob) return;
+
+      // Fast path: barcode verified -> skip manual confirmation & upload immediately!
       if (resolvedCandidate) {
         setVerifiedSheet(resolvedCandidate);
+        await performUpload(blob, resolvedCandidate, decodedMeta, true);
+        return;
       }
 
-      await new Promise<void>((resolve) => {
-        bestCanvas!.toBlob(
-          (blob) => {
-            if (blob) {
-              setCapturedBlob(blob);
-              setPreviewUrl(URL.createObjectURL(blob));
-            }
-            resolve();
-          },
-          "image/jpeg",
-          0.92
-        );
-      });
+      // Fallback path: barcode unreadable -> show preview + manual sheet selector
+      setCapturedBlob(blob);
+      setPreviewUrl(URL.createObjectURL(blob));
     } finally {
       isSnappingRef.current = false;
       setIsSnapping(false);
     }
-  }, [manifest, liveDetectedSheet, isSheetBlockedAsDuplicate]);
+  }, [
+    manifest,
+    liveDetectedSheet,
+    isSheetBlockedAsDuplicate,
+    performUpload,
+  ]);
 
   // 3. Real-time frame quality + geometry + fiducial-guided Code-128C scan
   const analyzeFrame = useCallback(async () => {
@@ -486,6 +656,7 @@ export function MobileCameraView({
       !videoRef.current ||
       !analysisCanvasRef.current ||
       isProcessing ||
+      isUploadingRef.current ||
       capturedBlob ||
       isSnappingRef.current ||
       isAnalyzingRef.current
@@ -666,126 +837,9 @@ export function MobileCameraView({
     return () => clearInterval(interval);
   }, [streamActive, capturedBlob, analyzeFrame]);
 
-  const handleRetake = useCallback(() => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    isSnappingRef.current = false;
-    prevFiducialsRef.current = null;
-    lockedSheetRef.current = null;
-    lastNormalizedFiducialsRef.current = null;
-    setIsSnapping(false);
-    setCapturedBlob(null);
-    setDetectedCode(null);
-    setVerifiedSheet(null);
-    setManualFallbackKey(null);
-    setLiveDetectedSheet(null);
-    setDuplicateSheetCandidate(null);
-    setPreviewUrl(null);
-    setFiducialsLocked(false);
-    steadyCountRef.current = 0;
-    setSteadyFrames(0);
-    setIsProcessing(false);
-    setWarningMessage(null);
-
-    if (videoRef.current && streamRef.current) {
-      if (videoRef.current.srcObject !== streamRef.current) {
-        videoRef.current.srcObject = streamRef.current;
-      }
-      videoRef.current.play().catch(() => {});
-    }
-  }, [previewUrl]);
-
-  const handleUpload = async () => {
+  const handleManualFallbackUpload = async () => {
     if (!capturedBlob) return;
-
-    if (isSheetBlockedAsDuplicate(resolvedTargetSheet)) {
-      setWarningMessage(
-        `Q${resolvedTargetSheet!.questionNumber} Sheet ${resolvedTargetSheet!.pageNumber} is already uploaded.`
-      );
-      return;
-    }
-
-    setIsProcessing(true);
-    setWarningMessage(null);
-
-    const targetSectionId =
-      resolvedTargetSheet?.sectionId ||
-      detectedCode?.sectionId ||
-      manifest?.sectionId ||
-      manifest?.sheets[0]?.sectionId ||
-      "";
-    const targetQuestionId =
-      resolvedTargetSheet?.questionId ||
-      detectedCode?.questionId ||
-      defaultQuestionId ||
-      manifest?.questions[0]?.questionId;
-    const targetPageNumber =
-      resolvedTargetSheet?.pageNumber || detectedCode?.pageNumber || 1;
-    const targetQuestionNumber =
-      resolvedTargetSheet?.questionNumber || detectedCode?.questionNumber;
-    const targetParts = resolvedTargetSheet
-      ? resolvedTargetSheet.parts.map((p) => p.label)
-      : detectedCode?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]);
-
-    try {
-      const presignRes = await getPresignedUploadForSession(
-        sessionToken,
-        "image/jpeg",
-        targetQuestionId,
-        targetPageNumber,
-        targetSectionId
-      );
-
-      if (!presignRes.success || !presignRes.presigned) {
-        throw new Error(presignRes.error || "Failed to authorize upload");
-      }
-
-      const { url, fields, key, publicUrl } = presignRes.presigned;
-
-      const formData = new FormData();
-      Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
-      formData.append("file", capturedBlob, "sheet.jpg");
-
-      const uploadRes = await fetch(url, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Direct upload to storage bucket failed");
-      }
-
-      const finalizeRes = await finalizeSubmissionUpload({
-        sessionToken,
-        storageKey: key,
-        publicUrl,
-        mimeType: "image/jpeg",
-        fileSizeBytes: capturedBlob.size,
-        sectionId: targetSectionId,
-        questionId: targetQuestionId,
-        pageNumber: targetPageNumber,
-      });
-
-      if (!finalizeRes.success || !finalizeRes.submission) {
-        throw new Error(finalizeRes.error || "Failed to commit record in database");
-      }
-
-      handleRetake();
-
-      onSuccess({
-        submissionId: finalizeRes.submission.id,
-        sectionId: finalizeRes.submission.sectionId,
-        questionId: finalizeRes.submission.questionId,
-        questionNumber: targetQuestionNumber,
-        pageNumber: targetPageNumber,
-        parts: targetParts,
-      });
-    } catch (err) {
-      console.error(err);
-      setWarningMessage(err instanceof Error ? err.message : "Upload failed. Please retake.");
-      setIsProcessing(false);
-    }
+    await performUpload(capturedBlob, resolvedTargetSheet, detectedCode, false);
   };
 
   const steadyPercent = Math.min(
@@ -873,7 +927,7 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Live Video Stream + Captured Preview */}
+      {/* Live Video Stream + Fallback Preview */}
       <div
         onClick={handleTapToFocus}
         className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden bg-black"
@@ -903,7 +957,9 @@ export function MobileCameraView({
                 aspectRatio: "215.9 / 279.4",
               }}
               className={`relative border-2 rounded-lg transition-all duration-150 ${
-                fiducialsLocked
+                autoUploadingLabel
+                  ? "border-emerald-400 shadow-[0_0_32px_rgba(52,211,153,0.55)]"
+                  : fiducialsLocked
                   ? "border-emerald-400 shadow-[0_0_28px_rgba(52,211,153,0.45)]"
                   : focusPulse
                   ? "border-blue-400"
@@ -913,82 +969,93 @@ export function MobileCameraView({
               {/* Clean Corner Brackets */}
               <div
                 className={`absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 rounded-tl-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                  fiducialsLocked || autoUploadingLabel ? "border-emerald-400" : "border-white"
                 }`}
               />
               <div
                 className={`absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 rounded-tr-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                  fiducialsLocked || autoUploadingLabel ? "border-emerald-400" : "border-white"
                 }`}
               />
               <div
                 className={`absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 rounded-bl-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                  fiducialsLocked || autoUploadingLabel ? "border-emerald-400" : "border-white"
                 }`}
               />
               <div
                 className={`absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 rounded-br-md ${
-                  fiducialsLocked ? "border-emerald-400" : "border-white"
+                  fiducialsLocked || autoUploadingLabel ? "border-emerald-400" : "border-white"
                 }`}
               />
 
-              {/* Crisp 1.2-Second Hold-Steady Countdown Pill */}
-              {(fiducialsLocked || isSnapping) && (
-                <div className="absolute bottom-4 inset-x-3 flex justify-center">
-                  <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[260px]">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
-                        {isSnapping ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                            <span>CAPTURING...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ScanLine className="w-3.5 h-3.5 shrink-0" />
-                            <span>HOLD STEADY • {secondsRemainingCount}s</span>
-                          </>
-                        )}
-                      </span>
-
-                      <div className="flex items-center gap-1.5">
-                        {[1, 2].map((step) => {
-                          const isFilled =
-                            steadyFrames >= step * FRAMES_PER_COUNTDOWN_STEP || isSnapping;
-                          const isInProgress =
-                            !isFilled &&
-                            steadyFrames > (step - 1) * FRAMES_PER_COUNTDOWN_STEP;
-                          return (
-                            <span
-                              key={step}
-                              className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
-                                isFilled
-                                  ? "bg-emerald-400 scale-110 shadow-[0_0_8px_rgba(52,211,153,0.95)]"
-                                  : isInProgress
-                                  ? "bg-emerald-400/50 animate-pulse"
-                                  : "bg-zinc-700"
-                              }`}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-400 rounded-full transition-all duration-150 ease-linear"
-                        style={{ width: `${isSnapping ? 100 : steadyPercent}%` }}
-                      />
-                    </div>
+              {/* Auto-Upload Status Overlay (replaces manual Submit/Retake confirmation when barcode verified) */}
+              {autoUploadingLabel ? (
+                <div className="absolute inset-x-3 bottom-4 flex justify-center">
+                  <div className="bg-emerald-950/95 backdrop-blur-md border border-emerald-400/60 rounded-xl px-4 py-2.5 shadow-xl flex items-center gap-2.5 max-w-[290px] w-full">
+                    <Loader2 className="w-4 h-4 text-emerald-300 animate-spin shrink-0" />
+                    <span className="text-xs font-bold text-white truncate">
+                      {autoUploadingLabel}
+                    </span>
                   </div>
                 </div>
+              ) : (
+                (fiducialsLocked || isSnapping) && (
+                  <div className="absolute bottom-4 inset-x-3 flex justify-center">
+                    <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[260px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
+                          {isSnapping ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                              <span>CAPTURING...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ScanLine className="w-3.5 h-3.5 shrink-0" />
+                              <span>HOLD STEADY • {secondsRemainingCount}s</span>
+                            </>
+                          )}
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                          {[1, 2].map((step) => {
+                            const isFilled =
+                              steadyFrames >= step * FRAMES_PER_COUNTDOWN_STEP || isSnapping;
+                            const isInProgress =
+                              !isFilled &&
+                              steadyFrames > (step - 1) * FRAMES_PER_COUNTDOWN_STEP;
+                            return (
+                              <span
+                                key={step}
+                                className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
+                                  isFilled
+                                    ? "bg-emerald-400 scale-110 shadow-[0_0_8px_rgba(52,211,153,0.95)]"
+                                    : isInProgress
+                                    ? "bg-emerald-400/50 animate-pulse"
+                                    : "bg-zinc-700"
+                                }`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-400 rounded-full transition-all duration-150 ease-linear"
+                          style={{ width: `${isSnapping ? 100 : steadyPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
             </div>
           </div>
         )}
 
         {/* Real-time CV Feedback / Duplicate / Wrong-Form Banner */}
-        {warningMessage && !previewUrl && (
+        {warningMessage && !previewUrl && !autoUploadingLabel && (
           <div
             onClick={(e) => e.stopPropagation()}
             className="absolute top-3 inset-x-4 z-30 flex flex-col gap-2 p-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg"
@@ -1016,7 +1083,7 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Bottom Controls + Safe-Area Padding */}
+      {/* Bottom Controls (Only shows manual confirmation if barcode could not be decoded) */}
       <div className="shrink-0 relative z-20 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-zinc-950 border-t border-zinc-800/80 flex flex-col items-center gap-2.5">
         {previewUrl ? (
           <div className="w-full max-w-sm space-y-2.5">
@@ -1067,7 +1134,7 @@ export function MobileCameraView({
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={handleRetake}
+                onClick={resetScannerState}
                 disabled={isProcessing}
                 className="flex-1 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
               >
@@ -1076,7 +1143,7 @@ export function MobileCameraView({
               </button>
               <button
                 type="button"
-                onClick={handleUpload}
+                onClick={handleManualFallbackUpload}
                 disabled={isProcessing}
                 className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-colors disabled:opacity-50 cursor-pointer"
               >
@@ -1099,7 +1166,7 @@ export function MobileCameraView({
             <button
               type="button"
               onClick={() => void captureStill()}
-              disabled={isSnapping}
+              disabled={isSnapping || isProcessing}
               className="w-14 h-14 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer disabled:opacity-60"
               aria-label="Capture still frame"
             >
@@ -1108,7 +1175,9 @@ export function MobileCameraView({
               </div>
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">
-              {isSnapping
+              {autoUploadingLabel
+                ? "Syncing page — prepare next sheet..."
+                : isSnapping
                 ? "Capturing sharpest frame..."
                 : fiducialsLocked
                 ? `Hold steady for ${secondsRemainingCount}s...`
