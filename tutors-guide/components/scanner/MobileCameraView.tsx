@@ -7,9 +7,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ZapOff,
   Loader2,
-  ListChecks,
   ScanLine,
   Lock,
 } from "lucide-react";
@@ -71,7 +69,6 @@ function evaluateFiducialGeometry(
   const avgW = (topW + botW) / 2;
   const avgH = (leftH + rightH) / 2;
 
-  // Require the sheet to fill ~75%+ of the viewfinder guide so barcode bars & handwriting are high-DPI
   if (avgW / frameW < 0.48 || avgH / frameH < 0.62) {
     return {
       valid: false,
@@ -79,7 +76,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // Reject captures where corner squares are jammed right against the sensor edge
   const minMarginX = frameW * 0.02;
   const minMarginY = frameH * 0.02;
   const allPts = [f.TL, f.TR, f.BL, f.BR];
@@ -98,7 +94,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // Keystone / perspective skew ratio check
   const widthRatio = topW / Math.max(botW, 1);
   const heightRatio = leftH / Math.max(rightH, 1);
   if (widthRatio < 0.86 || widthRatio > 1.16 || heightRatio < 0.86 || heightRatio > 1.16) {
@@ -108,7 +103,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // In-plane rotation check (< ~6 degrees tilt)
   const topAngleDeg = Math.abs((Math.atan2(f.TR.y - f.TL.y, f.TR.x - f.TL.x) * 180) / Math.PI);
   const botAngleDeg = Math.abs((Math.atan2(f.BR.y - f.BL.y, f.BR.x - f.BL.x) * 180) / Math.PI);
   if (topAngleDeg > 6.5 || botAngleDeg > 6.5) {
@@ -118,7 +112,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // US Letter fiducial span aspect ratio check (~0.708)
   const observedAspect = avgW / Math.max(avgH, 1);
   if (observedAspect < 0.56 || observedAspect > 0.88) {
     return {
@@ -130,10 +123,6 @@ function evaluateFiducialGeometry(
   return { valid: true };
 }
 
-/**
- * Decodes the 1D Code-128C/B footer barcode directly along the BL->BR fiducial vector
- * at native resolution (plus BarcodeDetector and legacy QR fallback).
- */
 async function decodeSheetFooterCode(
   source: HTMLVideoElement | HTMLCanvasElement,
   srcW: number,
@@ -143,7 +132,6 @@ async function decodeSheetFooterCode(
 ): Promise<DecodedSheetQr | null> {
   if (srcW <= 0 || srcH <= 0) return null;
 
-  // 1. Native hardware-accelerated BarcodeDetector
   if (typeof window !== "undefined" && "BarcodeDetector" in window) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -162,7 +150,6 @@ async function decodeSheetFooterCode(
     }
   }
 
-  // 2. Render source to a high-res grayscale buffer (up to 1800px) and sample along BL->BR
   const scale = Math.min(1800 / Math.max(srcW, srcH), 1.0);
   const scanW = Math.round(srcW * scale);
   const scanH = Math.round(srcH * scale);
@@ -194,7 +181,6 @@ async function decodeSheetFooterCode(
     }
   }
 
-  // Fallback horizontal sweep across lower half
   const lowerStart = Math.floor(scanH * 0.5);
   const lowerText = decodeCode128FromGrayscale(
     gray.subarray(lowerStart * scanW),
@@ -207,7 +193,6 @@ async function decodeSheetFooterCode(
     if (parsed) return parsed;
   }
 
-  // 3. Optional full-frame jsQR fallback for legacy 2D QR sheets
   if (includeLegacyQrFallback) {
     const code = jsQR(rgba, scanW, scanH, {
       inversionAttempts: "attemptBoth",
@@ -285,6 +270,10 @@ export function MobileCameraView({
     }
     return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
   }, [verifiedSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
+
+  // Active sheet key currently targeted/detected so its dot pulses in the top tracker
+  const highlightedSheetKey =
+    verifiedSheet?.sheetKey || liveDetectedSheet?.sheetKey || null;
 
   const applyContinuousFocusConstraints = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -597,7 +586,6 @@ export function MobileCameraView({
       }
       prevFiducialsRef.current = { f: detected, w, h };
 
-      // Live 1D Code-128C scan along the BL->BR fiducial vector
       if (manifest) {
         const liveMeta = await decodeSheetFooterCode(
           video,
@@ -708,7 +696,6 @@ export function MobileCameraView({
     }
   }, [previewUrl]);
 
-  // 4. Upload captured sheet to S3/R2, trigger server homography cropper, and reset for next sheet
   const handleUpload = async () => {
     if (!capturedBlob) return;
 
@@ -809,49 +796,84 @@ export function MobileCameraView({
   const secondsRemainingCount = Math.max(1, 3 - completedSeconds);
 
   return (
-    <div className="relative w-full h-screen bg-black flex flex-col justify-between overflow-hidden select-none">
+    <div className="relative w-full h-dvh bg-black flex flex-col justify-between overflow-hidden select-none">
       <canvas ref={analysisCanvasRef} className="hidden" />
 
-      {/* Top Telemetry & Checklist Trigger */}
-      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/85 to-transparent">
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-              fiducialsLocked ? "bg-emerald-400 animate-ping" : "bg-amber-400"
-            }`}
-          />
-          <span className="text-xs font-mono font-semibold tracking-wide text-zinc-100 truncate">
-            {liveDetectedSheet
-              ? `DETECTED: Q${liveDetectedSheet.questionNumber} SHEET ${liveDetectedSheet.pageNumber} (${liveDetectedSheet.parts
-                  .map((p) => p.label)
-                  .join("&")})`
-              : "SCAN ANY SHEET IN BOOKLET"}
-          </span>
-        </div>
+      {/* Top Question & Sheet Dot Matrix Tracker (replaces verbose text + 0/12 pill) */}
+      <div className="shrink-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2.5 bg-zinc-950/95 border-b border-zinc-800/80">
+        {manifest && manifest.questions.length > 0 ? (
+          <button
+            type="button"
+            onClick={onOpenChecklist}
+            disabled={!onOpenChecklist}
+            aria-label={`Captured ${completedCount} of ${manifest.totalSheets} sheets. Tap to view checklist.`}
+            className="w-full flex items-center justify-center flex-wrap gap-1.5 cursor-pointer"
+          >
+            {manifest.questions.map((q) => {
+              const allQSheetsDone = q.sheets.every((s) =>
+                uploadedSheetKeys.has(s.sheetKey)
+              );
+              const isAnyQSheetActive = q.sheets.some(
+                (s) => s.sheetKey === highlightedSheetKey
+              );
 
-        <div className="flex items-center gap-2 shrink-0">
-          {onOpenChecklist && manifest && (
-            <button
-              type="button"
-              onClick={onOpenChecklist}
-              className="px-2.5 py-1 rounded-full bg-zinc-800/90 border border-zinc-700 text-[11px] font-semibold text-zinc-200 flex items-center gap-1.5 cursor-pointer"
-            >
-              <ListChecks className="w-3.5 h-3.5 text-emerald-400" />
-              <span>
-                {completedCount}/{manifest.totalSheets}
-              </span>
-            </button>
-          )}
-          <div className="hidden sm:flex items-center gap-1 text-xs text-zinc-400">
-            <ZapOff className="w-3.5 h-3.5" />
+              return (
+                <div
+                  key={`${q.sectionId}::${q.questionId}`}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] font-mono font-bold transition-colors ${
+                    isAnyQSheetActive
+                      ? "bg-amber-500/20 border-amber-400/70 text-amber-200"
+                      : allQSheetsDone
+                      ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-300"
+                      : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  <span>Q{q.questionNumber}</span>
+                  <span className="flex items-center gap-1">
+                    {q.sheets.map((s) => {
+                      const isDone = uploadedSheetKeys.has(s.sheetKey);
+                      const isActive = s.sheetKey === highlightedSheetKey;
+                      const partsLabel = s.parts.map((p) => p.label).join("");
+
+                      return (
+                        <span
+                          key={s.sheetKey}
+                          title={`Q${q.questionNumber} Sheet ${s.pageNumber} (${partsLabel})`}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            isActive
+                              ? "bg-amber-300 ring-2 ring-amber-300/60 scale-110"
+                              : isDone
+                              ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.75)]"
+                              : "border border-zinc-500 bg-transparent"
+                          }`}
+                        />
+                      );
+                    })}
+                  </span>
+                </div>
+              );
+            })}
+          </button>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-0.5">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                fiducialsLocked ? "bg-emerald-400 animate-ping" : "bg-amber-400"
+              }`}
+            />
+            <span className="text-xs font-mono font-semibold text-zinc-200">
+              {completedCount > 0
+                ? `${completedCount} SHEET${completedCount === 1 ? "" : "S"} CAPTURED`
+                : "SCAN ANY SHEET IN BOOKLET"}
+            </span>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Live Video Stream + Captured Preview */}
+      {/* Live Video Stream + Captured Preview (flex-1 min-h-0 guarantees bottom bar stays above Android nav) */}
       <div
         onClick={handleTapToFocus}
-        className="relative flex-1 flex items-center justify-center overflow-hidden bg-black"
+        className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden bg-black"
       >
         <video
           ref={videoRef}
@@ -871,10 +893,10 @@ export function MobileCameraView({
 
         {/* Clean Minimal US Letter Outer Frame Guide */}
         {!previewUrl && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-2">
             <div
               style={{
-                width: "min(92vw, calc((100dvh - 180px) * 0.7727))",
+                width: "min(90vw, calc((100dvh - 210px) * 0.7727))",
                 aspectRatio: "215.9 / 279.4",
               }}
               className={`relative border-2 rounded-lg transition-all duration-150 ${
@@ -909,8 +931,8 @@ export function MobileCameraView({
 
               {/* 3-Second Guided Hold-Steady Countdown Pill */}
               {(fiducialsLocked || isSnapping) && (
-                <div className="absolute bottom-5 inset-x-3 flex justify-center">
-                  <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2.5 shadow-lg space-y-2 w-full max-w-[260px]">
+                <div className="absolute bottom-4 inset-x-3 flex justify-center">
+                  <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2 shadow-lg space-y-1.5 w-full max-w-[260px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
                         {isSnapping ? (
@@ -965,7 +987,7 @@ export function MobileCameraView({
         {warningMessage && !previewUrl && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-16 inset-x-4 z-30 flex flex-col gap-2 p-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg"
+            className="absolute top-3 inset-x-4 z-30 flex flex-col gap-2 p-3 bg-zinc-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl text-amber-200 text-xs shadow-lg"
           >
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
@@ -990,12 +1012,12 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Bottom Controls + Locked Barcode Verification Badge */}
-      <div className="relative z-20 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center gap-3">
+      {/* Bottom Controls + Safe-Area Padding so Android/iOS nav bars never cover buttons */}
+      <div className="shrink-0 relative z-20 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-zinc-950 border-t border-zinc-800/80 flex flex-col items-center gap-2.5">
         {previewUrl ? (
-          <div className="w-full max-w-sm space-y-3">
+          <div className="w-full max-w-sm space-y-2.5">
             {verifiedSheet ? (
-              <div className="bg-emerald-950/90 border border-emerald-500/40 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2">
+              <div className="bg-emerald-950/90 border border-emerald-500/40 rounded-xl px-3.5 py-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span className="text-[11px] font-semibold text-emerald-300 shrink-0">
@@ -1011,7 +1033,7 @@ export function MobileCameraView({
             ) : (
               manifest &&
               manifest.sheets.length > 0 && (
-                <div className="bg-zinc-900/95 border border-amber-500/40 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                <div className="bg-zinc-900/95 border border-amber-500/40 rounded-xl p-2 flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold text-amber-300 shrink-0 pl-1">
                     Code Unclear:
                   </span>
@@ -1033,7 +1055,7 @@ export function MobileCameraView({
             )}
 
             {warningMessage && (
-              <div className="p-2.5 bg-red-950/80 border border-red-500/40 rounded-lg text-red-200 text-xs">
+              <div className="p-2 bg-red-950/80 border border-red-500/40 rounded-lg text-red-200 text-xs">
                 {warningMessage}
               </div>
             )}
@@ -1069,16 +1091,16 @@ export function MobileCameraView({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-1.5">
             <button
               type="button"
               onClick={() => void captureStill()}
               disabled={isSnapping}
-              className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer disabled:opacity-60"
+              className="w-14 h-14 rounded-full border-4 border-white flex items-center justify-center p-1 bg-white/20 active:scale-95 transition-transform cursor-pointer disabled:opacity-60"
               aria-label="Capture still frame"
             >
               <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                <Camera className="w-6 h-6 text-black" />
+                <Camera className="w-5 h-5 text-black" />
               </div>
             </button>
             <span className="text-[11px] text-zinc-400 font-medium">

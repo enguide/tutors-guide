@@ -68,7 +68,7 @@ export default async function MobileScanPage({
   );
 
   return (
-    <main className="w-full h-screen bg-black overflow-hidden">
+    <main className="w-full h-dvh bg-black overflow-hidden">
       <MobileCameraContainer
         sessionToken={token}
         defaultQuestionId={session.questionId ?? undefined}

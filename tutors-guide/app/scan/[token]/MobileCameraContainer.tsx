@@ -101,7 +101,7 @@ export function MobileCameraContainer({
 
   if (isExpired) {
     return (
-      <div className="w-full h-screen flex flex-col items-center justify-center p-6 text-center text-zinc-100 bg-zinc-950">
+      <div className="w-full h-dvh flex flex-col items-center justify-center p-6 text-center text-zinc-100 bg-zinc-950">
         <Clock className="w-12 h-12 text-amber-500 mb-4" />
         <h2 className="text-xl font-bold">Session Expired</h2>
         <p className="text-xs text-zinc-400 mt-2 max-w-xs leading-relaxed">
@@ -114,7 +114,7 @@ export function MobileCameraContainer({
   // Checklist / Packet Progress View (also shown automatically once all sheets are captured)
   if (mode === "checklist" && manifest) {
     return (
-      <div className="w-full h-screen flex flex-col bg-zinc-950 text-zinc-100 p-5 select-none">
+      <div className="w-full h-dvh flex flex-col bg-zinc-950 text-zinc-100 p-5 select-none">
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div>
             <h2 className="text-base font-bold">Response Packet Checklist</h2>
@@ -225,7 +225,7 @@ export function MobileCameraContainer({
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    <div className="relative w-full h-dvh overflow-hidden bg-black">
       {/* Non-blocking Confirmation Toast over Live Camera */}
       {uploadToast && (
         <div className="absolute top-14 inset-x-4 z-40 pointer-events-none flex justify-center">
