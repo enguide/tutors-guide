@@ -235,6 +235,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
     let resolvedQuestionId = submission.questionId;
     let resolvedPageNumber = submission.pageNumber;
     let resolvedSheet: ManifestSheet | null = null;
+    let auditReasonOverride: string | undefined;
 
     if (manifest) {
       if (qrData) {
@@ -252,10 +253,23 @@ export async function processAndCropFrqSubmission(submissionId: string) {
           });
           return [];
         }
+
+        // Flag if client-submitted target differed from authoritative footer QR
+        if (
+          matchResult.sheet.sectionId !== submission.sectionId ||
+          matchResult.sheet.questionId !== submission.questionId ||
+          matchResult.sheet.pageNumber !== submission.pageNumber
+        ) {
+          auditReasonOverride = `QR_MISMATCH_AUTO_CORRECTED (submitted ${submission.questionId} p${submission.pageNumber}, QR=${matchResult.sheet.questionId} p${matchResult.sheet.pageNumber})`;
+        }
+
         resolvedSectionId = matchResult.sheet.sectionId;
         resolvedQuestionId = matchResult.sheet.questionId;
         resolvedPageNumber = matchResult.sheet.pageNumber;
         resolvedSheet = matchResult.sheet;
+      } else {
+        // Footer QR could not be decoded even after perspective rectification -> flag for human verification
+        auditReasonOverride = "UNREADABLE_FOOTER_QR_MANUAL_ASSIGNMENT";
       }
 
       if (!resolvedSheet) {
@@ -383,9 +397,9 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       return createdCrops;
     });
 
-    // 7. Trigger downstream evaluator pass
+    // 7. Trigger downstream evaluator pass (preserving any QR discrepancy/unreadable audit flag)
     await Promise.allSettled(
-      savedCrops.map((c) => evaluateFrqSubCropMock(c.id))
+      savedCrops.map((c) => evaluateFrqSubCropMock(c.id, auditReasonOverride))
     );
 
     return savedCrops;

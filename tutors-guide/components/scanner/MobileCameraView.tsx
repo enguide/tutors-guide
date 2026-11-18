@@ -11,6 +11,7 @@ import {
   Loader2,
   ListChecks,
   ScanLine,
+  Lock,
 } from "lucide-react";
 import jsQR from "jsqr";
 import { calculateLaplacianVariance, checkLightingGlare } from "@/lib/cv/qualityChecks";
@@ -90,27 +91,32 @@ export function MobileCameraView({
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [detectedQr, setDetectedQr] = useState<DecodedSheetQr | null>(null);
-  const [manualSheetOverride, setManualSheetOverride] = useState<string | null>(null);
+  // Locked sheet resolved directly from QR code (cannot be overridden by student dropdown)
+  const [verifiedQrSheet, setVerifiedQrSheet] = useState<ManifestSheet | null>(null);
+  // Manual fallback selection used ONLY when QR code could not be decoded
+  const [manualFallbackKey, setManualFallbackKey] = useState<string | null>(null);
 
   const steadyCountRef = useRef<number>(0);
   const isSnappingRef = useRef<boolean>(false);
 
-  // Priority: Explicit dropdown override -> Live QR-detected sheet -> Next uncaptured sheet
+  // If QR was decoded and matched, verifiedQrSheet is authoritative and immutable
   const selectedSheetKey =
-    manualSheetOverride ||
+    verifiedQrSheet?.sheetKey ||
+    manualFallbackKey ||
     liveDetectedSheet?.sheetKey ||
     suggestedSheet?.sheetKey ||
     manifest?.sheets[0]?.sheetKey ||
     "";
 
   const resolvedTargetSheet = useMemo<ManifestSheet | null>(() => {
+    if (verifiedQrSheet) return verifiedQrSheet;
     if (!manifest) return null;
     if (selectedSheetKey) {
       const byKey = manifest.sheets.find((s) => s.sheetKey === selectedSheetKey);
       if (byKey) return byKey;
     }
     return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
-  }, [manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
+  }, [verifiedQrSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
 
   // 1. Initialize rear-facing camera at highest available resolution
   useEffect(() => {
@@ -148,7 +154,7 @@ export function MobileCameraView({
     };
   }, []);
 
-  // 2. Capture high-res 2200px still + fast 900px QR decode
+  // 2. Capture high-res 2200px still + fast 900px QR decode + strict form/duplicate check
   const captureStill = useCallback(() => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
@@ -234,8 +240,25 @@ export function MobileCameraView({
           );
           return;
         }
+
+        // Also enforce duplicate check if triggered via manual shutter tap
+        const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
+        const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
+        if (isAlreadyUploaded && !isExplicitReplace) {
+          isSnappingRef.current = false;
+          setIsSnapping(false);
+          setDuplicateSheetCandidate(match.sheet);
+          setWarningMessage(
+            `Q${match.sheet.questionNumber} Sheet ${match.sheet.pageNumber} is already uploaded — flip to another page.`
+          );
+          return;
+        }
+
         setDetectedQr(decodedMeta);
-        setManualSheetOverride(match.sheet.sheetKey);
+        setVerifiedQrSheet(match.sheet);
+      } else if (liveDetectedSheet) {
+        // Retain sheet locked during live framing if 900px pass had transient glare
+        setVerifiedQrSheet(liveDetectedSheet);
       }
 
       captureCanvas.toBlob(
@@ -250,7 +273,7 @@ export function MobileCameraView({
         0.92
       );
     });
-  }, [manifest]);
+  }, [manifest, uploadedSheetKeys, allowedReplaceKeys, liveDetectedSheet]);
 
   // 3. Real-time frame quality + 4-corner fiducial + live QR form/duplicate check (250ms)
   const analyzeFrame = useCallback(() => {
@@ -338,10 +361,8 @@ export function MobileCameraView({
             return;
           }
 
-          // Matched a valid sheet in this exam! Auto-route to it (any-order scanning)
           setLiveDetectedSheet(match.sheet);
 
-          // Block accidental duplicate capture unless user explicitly tapped "Replace Scan"
           const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
           const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
 
@@ -476,7 +497,8 @@ export function MobileCameraView({
     setIsSnapping(false);
     setCapturedBlob(null);
     setDetectedQr(null);
-    setManualSheetOverride(null);
+    setVerifiedQrSheet(null);
+    setManualFallbackKey(null);
     setLiveDetectedSheet(null);
     setDuplicateSheetCandidate(null);
     setPreviewUrl(null);
@@ -669,29 +691,46 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Bottom Controls + Sheet Assignment Confirmation */}
+      {/* Bottom Controls + Locked QR Verification Badge (or Unverified Fallback Dropdown) */}
       <div className="relative z-20 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center gap-3">
         {previewUrl ? (
           <div className="w-full max-w-sm space-y-3">
-            {manifest && manifest.sheets.length > 0 && (
-              <div className="bg-zinc-900/95 border border-zinc-700 rounded-xl p-2.5 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-zinc-400 shrink-0 pl-1">
-                  {detectedQr ? "QR Verified:" : "Assign Sheet:"}
-                </span>
-                <select
-                  value={selectedSheetKey}
-                  onChange={(e) => setManualSheetOverride(e.target.value)}
-                  disabled={isProcessing}
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
-                >
-                  {manifest.sheets.map((s) => (
-                    <option key={s.sheetKey} value={s.sheetKey}>
-                      Q{s.questionNumber} • Sheet {s.pageNumber} (Parts{" "}
-                      {s.parts.map((p) => p.label).join(" & ")})
-                    </option>
-                  ))}
-                </select>
+            {verifiedQrSheet ? (
+              <div className="bg-emerald-950/90 border border-emerald-500/40 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="text-[11px] font-semibold text-emerald-300 shrink-0">
+                    QR Locked:
+                  </span>
+                  <span className="text-xs font-bold text-white truncate">
+                    Q{verifiedQrSheet.questionNumber} • Sheet {verifiedQrSheet.pageNumber} (Parts{" "}
+                    {verifiedQrSheet.parts.map((p) => p.label).join(" & ")})
+                  </span>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               </div>
+            ) : (
+              manifest &&
+              manifest.sheets.length > 0 && (
+                <div className="bg-zinc-900/95 border border-amber-500/40 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-amber-300 shrink-0 pl-1">
+                    QR Unclear:
+                  </span>
+                  <select
+                    value={selectedSheetKey}
+                    onChange={(e) => setManualFallbackKey(e.target.value)}
+                    disabled={isProcessing}
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-500"
+                  >
+                    {manifest.sheets.map((s) => (
+                      <option key={s.sheetKey} value={s.sheetKey}>
+                        Q{s.questionNumber} • Sheet {s.pageNumber} (Parts{" "}
+                        {s.parts.map((p) => p.label).join(" & ")})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
             )}
 
             {warningMessage && (

@@ -12,9 +12,12 @@ export interface MockRubricCriterion {
 
 /**
  * Simulates an evaluator pass on cropped sub-parts.
- * In Epic 17, this gets replaced by the Dual-Engine Vision Consensus & o3-mini/o1 reasoning pipeline.
+ * Preserves any upstream QR verification audit flags passed from cropper.ts.
  */
-export async function evaluateFrqSubCropMock(cropId: string) {
+export async function evaluateFrqSubCropMock(
+  cropId: string,
+  auditReasonOverride?: string
+) {
   const crop = await prisma.frqSubCrop.findUnique({
     where: { id: cropId },
     include: { frqSubmission: true },
@@ -22,16 +25,13 @@ export async function evaluateFrqSubCropMock(cropId: string) {
 
   if (!crop) return null;
 
-  // Simulate evaluation delay
   await new Promise((res) => setTimeout(res, 800));
 
-  // Synthetic transcription and criteria matching AP Calculus AB/BC standards
   const isPartA = crop.subPartLabel === "A" || crop.subPartLabel === "C";
   const mockTranscription = isPartA
     ? "\\int_{0}^{4} R(t)\\,dt = 32.4"
     : "f'(2) = \\lim_{h \\to 0} \\frac{f(2+h)-f(2)}{h} = -3";
 
-  // Deterministic mock scoring based on label
   const mockRubric: MockRubricCriterion[] = isPartA
     ? [
         {
@@ -65,7 +65,11 @@ export async function evaluateFrqSubCropMock(cropId: string) {
   const pointsAwarded = mockRubric.reduce((acc, c) => acc + (c.earned ? c.points : 0), 0);
   const pointsPossible = mockRubric.reduce((acc, c) => acc + c.points, 0);
 
-  // Update crop with mock scores and transcription
+  const needsHumanAudit = Boolean(auditReasonOverride) || crop.subPartLabel === "D";
+  const auditReason =
+    auditReasonOverride ??
+    (crop.subPartLabel === "D" ? "SYNTHETIC_UNCERTAINTY_FLAG" : null);
+
   const updatedCrop = await prisma.frqSubCrop.update({
     where: { id: cropId },
     data: {
@@ -73,13 +77,11 @@ export async function evaluateFrqSubCropMock(cropId: string) {
       pointsAwarded,
       pointsPossible,
       rubricBreakdown: mockRubric as any,
-      // For demonstration, keep false unless sub-part is 'D' to test the review queue
-      needsHumanAudit: crop.subPartLabel === "D",
-      auditReason: crop.subPartLabel === "D" ? "SYNTHETIC_UNCERTAINTY_FLAG" : null,
+      needsHumanAudit,
+      auditReason,
     },
   });
 
-  // Check if all crops in the parent submission are evaluated
   const remainingUnevaluated = await prisma.frqSubCrop.count({
     where: {
       frqSubmissionId: crop.frqSubmissionId,
@@ -98,7 +100,10 @@ export async function evaluateFrqSubCropMock(cropId: string) {
     await prisma.frqSubmission.update({
       where: { id: crop.frqSubmissionId },
       data: {
-        status: hasAuditFlag > 0 ? FrqSubmissionStatus.PENDING_AUDIT : FrqSubmissionStatus.EVALUATED,
+        status:
+          hasAuditFlag > 0
+            ? FrqSubmissionStatus.PENDING_AUDIT
+            : FrqSubmissionStatus.EVALUATED,
       },
     });
   }
