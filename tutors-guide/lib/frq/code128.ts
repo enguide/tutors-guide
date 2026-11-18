@@ -23,6 +23,11 @@ CODE128_PATTERNS.forEach((pat, idx) => {
 const START_CODE_B = 104;
 const STOP_CODE = 106;
 
+export interface Point2DLike {
+  x: number;
+  y: number;
+}
+
 function quantizeSixRuns(runs: number[]): string | null {
   let total = 0;
   for (let i = 0; i < 6; i++) total += runs[i];
@@ -145,6 +150,97 @@ export function decodeCode128FromGrayscale(
     for (let x = 1; x < width; x++) {
       const pxIsBar = gray[rowOffset + x] < threshold;
       if (pxIsBar === currentIsBar) {
+        runLen++;
+      } else {
+        runs.push(runLen);
+        isBar.push(currentIsBar);
+        currentIsBar = pxIsBar;
+        runLen = 1;
+      }
+    }
+    runs.push(runLen);
+    isBar.push(currentIsBar);
+
+    const forward = tryDecodeRunLengths(runs, isBar);
+    if (forward) return forward;
+
+    const backward = tryDecodeRunLengths([...runs].reverse(), [...isBar].reverse());
+    if (backward) return backward;
+  }
+
+  return null;
+}
+
+/**
+ * Samples scanlines directly along the vector between detected BL and BR fiducials
+ * (with slight downward perpendicular offsets to cover the centered bottom-margin barcode).
+ * Immune to page distance, zoom level, and in-plane rotation on mobile cameras.
+ */
+export function decodeCode128BetweenBottomFiducials(
+  gray: Uint8Array,
+  width: number,
+  height: number,
+  bl: Point2DLike,
+  br: Point2DLike,
+  tl: Point2DLike
+): string | null {
+  const dx = br.x - bl.x;
+  const dy = br.y - bl.y;
+  const spanLen = Math.hypot(dx, dy);
+  if (spanLen < 120) return null;
+
+  // Unit downward vector perpendicular to bottom edge (using TL -> BL direction)
+  const downX = bl.x - tl.x;
+  const downY = bl.y - tl.y;
+  const downLen = Math.hypot(downX, downY) || 1;
+  const vx = downX / downLen;
+  const vy = downY / downLen;
+
+  // On the physical sheet: fiducial centers sit at y = 265.4mm;
+  // barcode spans y = 260mm..269.4mm (-5.4mm to +4.0mm relative to BL-BR line).
+  // Relative to BL-TL height (251.4mm), that is -0.022 to +0.018 of page height.
+  const numSamples = Math.min(900, Math.round(spanLen * 1.25));
+  const offsets = [-0.022, -0.016, -0.01, -0.005, 0.0, 0.005, 0.01, 0.015, 0.02];
+
+  for (const relOffset of offsets) {
+    const shiftX = vx * (relOffset * downLen);
+    const shiftY = vy * (relOffset * downLen);
+
+    const line = new Uint8Array(numSamples);
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / (numSamples - 1);
+      const sx = Math.round(bl.x + dx * t + shiftX);
+      const sy = Math.round(bl.y + dy * t + shiftY);
+      if (sx >= 0 && sx < width && sy >= 0 && sy < height) {
+        line[i] = gray[sy * width + sx];
+      } else {
+        line[i] = 255;
+      }
+    }
+
+    // Local sliding-window adaptive threshold (radius 32 samples) to handle uneven lighting/glare
+    const radius = 32;
+    const prefix = new Int32Array(numSamples + 1);
+    for (let i = 0; i < numSamples; i++) {
+      prefix[i + 1] = prefix[i] + line[i];
+    }
+
+    const runs: number[] = [];
+    const isBar: boolean[] = [];
+    let currentIsBar = false;
+    let runLen = 0;
+
+    for (let i = 0; i < numSamples; i++) {
+      const lo = Math.max(0, i - radius);
+      const hi = Math.min(numSamples, i + radius + 1);
+      const localMean = (prefix[hi] - prefix[lo]) / (hi - lo);
+      // Require noticeable contrast below local mean so faint paper texture never triggers bars
+      const pxIsBar = line[i] < localMean - 14;
+
+      if (i === 0) {
+        currentIsBar = pxIsBar;
+        runLen = 1;
+      } else if (pxIsBar === currentIsBar) {
         runLen++;
       } else {
         runs.push(runLen);

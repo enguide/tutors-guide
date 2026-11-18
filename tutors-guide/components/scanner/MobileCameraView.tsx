@@ -23,7 +23,10 @@ import {
   matchQrAgainstManifest,
   parseSelfDescribingSheetQr,
 } from "@/lib/frq/manifest";
-import { decodeCode128FromGrayscale } from "@/lib/frq/code128";
+import {
+  decodeCode128BetweenBottomFiducials,
+  decodeCode128FromGrayscale,
+} from "@/lib/frq/code128";
 import {
   getPresignedUploadForSession,
   finalizeSubmissionUpload,
@@ -68,36 +71,59 @@ function evaluateFiducialGeometry(
   const avgW = (topW + botW) / 2;
   const avgH = (leftH + rightH) / 2;
 
-  if (avgW / frameW < 0.36 || avgH / frameH < 0.46) {
+  // Require the sheet to fill ~75%+ of the viewfinder guide so barcode bars & handwriting are high-DPI
+  if (avgW / frameW < 0.48 || avgH / frameH < 0.62) {
     return {
       valid: false,
-      reason: "Move closer so the sheet fills the viewfinder guide.",
+      reason: "Move closer so the sheet fills the frame.",
     };
   }
 
+  // Reject captures where corner squares are jammed right against the sensor edge
+  const minMarginX = frameW * 0.02;
+  const minMarginY = frameH * 0.02;
+  const allPts = [f.TL, f.TR, f.BL, f.BR];
+  if (
+    allPts.some(
+      (pt) =>
+        pt.x < minMarginX ||
+        pt.x > frameW - minMarginX ||
+        pt.y < minMarginY ||
+        pt.y > frameH - minMarginY
+    )
+  ) {
+    return {
+      valid: false,
+      reason: "Step back slightly so all 4 black corners stay inside the border.",
+    };
+  }
+
+  // Keystone / perspective skew ratio check
   const widthRatio = topW / Math.max(botW, 1);
   const heightRatio = leftH / Math.max(rightH, 1);
-  if (widthRatio < 0.85 || widthRatio > 1.18 || heightRatio < 0.85 || heightRatio > 1.18) {
+  if (widthRatio < 0.86 || widthRatio > 1.16 || heightRatio < 0.86 || heightRatio > 1.16) {
     return {
       valid: false,
       reason: "Hold phone parallel (flat) directly above the page.",
     };
   }
 
+  // In-plane rotation check (< ~6 degrees tilt)
   const topAngleDeg = Math.abs((Math.atan2(f.TR.y - f.TL.y, f.TR.x - f.TL.x) * 180) / Math.PI);
   const botAngleDeg = Math.abs((Math.atan2(f.BR.y - f.BL.y, f.BR.x - f.BL.x) * 180) / Math.PI);
   if (topAngleDeg > 6.5 || botAngleDeg > 6.5) {
     return {
       valid: false,
-      reason: "Level the page straight inside the guide frame.",
+      reason: "Level the page straight inside the frame.",
     };
   }
 
+  // US Letter fiducial span aspect ratio check (~0.708)
   const observedAspect = avgW / Math.max(avgH, 1);
   if (observedAspect < 0.56 || observedAspect > 0.88) {
     return {
       valid: false,
-      reason: "Align all 4 black corner squares with the corner targets.",
+      reason: "Align all 4 black corner squares inside the frame.",
     };
   }
 
@@ -105,20 +131,19 @@ function evaluateFiducialGeometry(
 }
 
 /**
- * Decodes the centered 1D Code-128B footer barcode (and any legacy QR codes):
- * 1. Hardware-accelerated BarcodeDetector (`code_128` + `qr_code`).
- * 2. Pure-TypeScript 1D Code-128B scanline decoder on the bottom band (1:1 native resolution).
- * 3. Full-frame jsQR fallback for legacy QR-coded sheets.
+ * Decodes the 1D Code-128B footer barcode directly along the BL->BR fiducial vector
+ * at native resolution (plus BarcodeDetector and legacy QR fallback).
  */
 async function decodeSheetFooterCode(
   source: HTMLVideoElement | HTMLCanvasElement,
   srcW: number,
   srcH: number,
+  fiducialsNorm: DetectedFiducials | null,
   includeLegacyQrFallback = false
 ): Promise<DecodedSheetQr | null> {
   if (srcW <= 0 || srcH <= 0) return null;
 
-  // 1. Native hardware-accelerated BarcodeDetector (supports code_128 + qr_code)
+  // 1. Native hardware-accelerated BarcodeDetector
   if (typeof window !== "undefined" && "BarcodeDetector" in window) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,60 +158,62 @@ async function decodeSheetFooterCode(
         }
       }
     } catch {
-      // Fall back to software Code-128 / jsQR decoders
+      // Fall back to software Code-128 decoder
     }
   }
 
-  // 2. Software 1D Code-128B scan across the bottom 30% band at 1:1 native resolution
-  const bandH = Math.min(520, Math.round(srcH * 0.3));
-  const bandW = Math.min(1800, srcW);
-  const bandCanvas = document.createElement("canvas");
-  bandCanvas.width = bandW;
-  bandCanvas.height = bandH;
-  const bCtx = bandCanvas.getContext("2d", { willReadFrequently: true });
-  if (bCtx) {
-    bCtx.drawImage(
-      source,
-      0,
-      srcH - bandH,
-      srcW,
-      bandH,
-      0,
-      0,
-      bandW,
-      bandH
-    );
-    const rgba = bCtx.getImageData(0, 0, bandW, bandH).data;
-    const gray = new Uint8Array(bandW * bandH);
-    for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
-      gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0;
-    }
+  // 2. Render source to a high-res grayscale buffer (up to 1800px) and sample along BL->BR
+  const scale = Math.min(1800 / Math.max(srcW, srcH), 1.0);
+  const scanW = Math.round(srcW * scale);
+  const scanH = Math.round(srcH * scale);
+  const scanCanvas = document.createElement("canvas");
+  scanCanvas.width = scanW;
+  scanCanvas.height = scanH;
+  const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
 
-    const code128Text = decodeCode128FromGrayscale(gray, bandW, bandH, 28);
-    if (code128Text) {
-      const parsed = parseSelfDescribingSheetQr(code128Text);
+  ctx.drawImage(source, 0, 0, scanW, scanH);
+  const rgba = ctx.getImageData(0, 0, scanW, scanH).data;
+  const gray = new Uint8Array(scanW * scanH);
+  for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
+    gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0;
+  }
+
+  if (fiducialsNorm) {
+    const guidedText = decodeCode128BetweenBottomFiducials(
+      gray,
+      scanW,
+      scanH,
+      { x: fiducialsNorm.BL.x * scanW, y: fiducialsNorm.BL.y * scanH },
+      { x: fiducialsNorm.BR.x * scanW, y: fiducialsNorm.BR.y * scanH },
+      { x: fiducialsNorm.TL.x * scanW, y: fiducialsNorm.TL.y * scanH }
+    );
+    if (guidedText) {
+      const parsed = parseSelfDescribingSheetQr(guidedText);
       if (parsed) return parsed;
     }
   }
 
+  // Fallback horizontal sweep across lower half
+  const lowerStart = Math.floor(scanH * 0.5);
+  const lowerText = decodeCode128FromGrayscale(
+    gray.subarray(lowerStart * scanW),
+    scanW,
+    scanH - lowerStart,
+    32
+  );
+  if (lowerText) {
+    const parsed = parseSelfDescribingSheetQr(lowerText);
+    if (parsed) return parsed;
+  }
+
   // 3. Optional full-frame jsQR fallback for legacy 2D QR sheets
   if (includeLegacyQrFallback) {
-    const scale = Math.min(1100 / Math.max(srcW, srcH), 1.0);
-    const scanW = Math.round(srcW * scale);
-    const scanH = Math.round(srcH * scale);
-    const scanCanvas = document.createElement("canvas");
-    scanCanvas.width = scanW;
-    scanCanvas.height = scanH;
-    const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
-    if (ctx) {
-      ctx.drawImage(source, 0, 0, scanW, scanH);
-      const imgData = ctx.getImageData(0, 0, scanW, scanH);
-      const code = jsQR(imgData.data, scanW, scanH, {
-        inversionAttempts: "attemptBoth",
-      });
-      if (code?.data) {
-        return parseSelfDescribingSheetQr(code.data);
-      }
+    const code = jsQR(rgba, scanW, scanH, {
+      inversionAttempts: "attemptBoth",
+    });
+    if (code?.data) {
+      return parseSelfDescribingSheetQr(code.data);
     }
   }
 
@@ -236,6 +263,7 @@ export function MobileCameraView({
   const isSnappingRef = useRef<boolean>(false);
   const isAnalyzingRef = useRef<boolean>(false);
   const lockedSheetRef = useRef<ManifestSheet | null>(null);
+  const lastNormalizedFiducialsRef = useRef<DetectedFiducials | null>(null);
   const prevFiducialsRef = useRef<{ f: DetectedFiducials; w: number; h: number } | null>(
     null
   );
@@ -341,7 +369,7 @@ export function MobileCameraView({
     [uploadedSheetKeys, allowedReplaceKeys]
   );
 
-  // 2. Burst-of-3 sharpest frame capture + 1D Code-128B verification + duplicate guard
+  // 2. Burst-of-3 sharpest frame capture + fiducial-guided 1D Code-128B verification
   const captureStill = useCallback(async () => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
@@ -403,7 +431,13 @@ export function MobileCameraView({
 
       let decodedMeta: DecodedSheetQr | null = null;
       try {
-        decodedMeta = await decodeSheetFooterCode(bestCanvas, outW, outH, true);
+        decodedMeta = await decodeSheetFooterCode(
+          bestCanvas,
+          outW,
+          outH,
+          lastNormalizedFiducialsRef.current,
+          true
+        );
       } catch (decodeErr) {
         console.warn("Client barcode/QR scan warning:", decodeErr);
       }
@@ -457,7 +491,7 @@ export function MobileCameraView({
     }
   }, [manifest, liveDetectedSheet, isSheetBlockedAsDuplicate]);
 
-  // 3. Real-time frame quality + geometry + sticky Code-128B duplicate guard
+  // 3. Real-time frame quality + geometry + fiducial-guided Code-128B scan
   const analyzeFrame = useCallback(async () => {
     if (
       !videoRef.current ||
@@ -515,9 +549,10 @@ export function MobileCameraView({
       const detected = detectSheetFiducials(gray, w, h);
       if (!detected) {
         lockedSheetRef.current = null;
+        lastNormalizedFiducialsRef.current = null;
         setLiveDetectedSheet(null);
         setDuplicateSheetCandidate(null);
-        setWarningMessage("Align all 4 black corner squares inside the corner targets.");
+        setWarningMessage("Frame the entire sheet so all 4 black corner squares are visible.");
         setFiducialsLocked(false);
         prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
@@ -525,9 +560,17 @@ export function MobileCameraView({
         return;
       }
 
+      lastNormalizedFiducialsRef.current = {
+        ...detected,
+        TL: { x: detected.TL.x / w, y: detected.TL.y / h },
+        TR: { x: detected.TR.x / w, y: detected.TR.y / h },
+        BL: { x: detected.BL.x / w, y: detected.BL.y / h },
+        BR: { x: detected.BR.x / w, y: detected.BR.y / h },
+      };
+
       const geom = evaluateFiducialGeometry(detected, w, h);
       if (!geom.valid) {
-        setWarningMessage(geom.reason || "Align the sheet with the guide frame.");
+        setWarningMessage(geom.reason || "Fill the frame with the response sheet.");
         setFiducialsLocked(false);
         prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
@@ -554,12 +597,13 @@ export function MobileCameraView({
       }
       prevFiducialsRef.current = { f: detected, w, h };
 
-      // Live 1D Code-128B scan directly on full-resolution video element
+      // Live 1D Code-128B scan along the BL->BR fiducial vector
       if (manifest) {
         const liveMeta = await decodeSheetFooterCode(
           video,
           video.videoWidth,
           video.videoHeight,
+          lastNormalizedFiducialsRef.current,
           false
         );
 
@@ -641,6 +685,7 @@ export function MobileCameraView({
     isSnappingRef.current = false;
     prevFiducialsRef.current = null;
     lockedSheetRef.current = null;
+    lastNormalizedFiducialsRef.current = null;
     setIsSnapping(false);
     setCapturedBlob(null);
     setDetectedCode(null);
@@ -739,7 +784,6 @@ export function MobileCameraView({
         throw new Error(finalizeRes.error || "Failed to commit record in database");
       }
 
-      // Immediately return the camera to live capture mode for the next sheet
       handleRetake();
 
       onSuccess({
@@ -825,7 +869,7 @@ export function MobileCameraView({
           />
         )}
 
-        {/* Exact US Letter (215.9mm x 279.4mm) Proportional Viewfinder Guide */}
+        {/* Clean Minimal US Letter Outer Frame Guide (no redundant internal markers) */}
         {!previewUrl && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div
@@ -833,7 +877,7 @@ export function MobileCameraView({
                 width: "min(92vw, calc((100dvh - 180px) * 0.7727))",
                 aspectRatio: "215.9 / 279.4",
               }}
-              className={`relative border-2 rounded-md transition-all duration-150 ${
+              className={`relative border-2 rounded-lg transition-all duration-150 ${
                 fiducialsLocked
                   ? "border-emerald-400 shadow-[0_0_28px_rgba(52,211,153,0.45)]"
                   : focusPulse
@@ -841,70 +885,31 @@ export function MobileCameraView({
                   : "border-white/50"
               }`}
             >
-              {/* Exact 8mm x 8mm Fiducial Target Boxes */}
+              {/* Clean Corner Brackets */}
               <div
-                style={{ left: "6.95%", top: "3.58%", width: "3.71%", height: "2.86%" }}
-                className={`absolute border-2 ${
-                  fiducialsLocked
-                    ? "border-emerald-400 bg-emerald-400/25"
-                    : "border-white/90"
+                className={`absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 rounded-tl-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
                 }`}
               />
               <div
-                style={{ right: "6.95%", top: "3.58%", width: "3.71%", height: "2.86%" }}
-                className={`absolute border-2 ${
-                  fiducialsLocked
-                    ? "border-emerald-400 bg-emerald-400/25"
-                    : "border-white/90"
+                className={`absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 rounded-tr-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
                 }`}
               />
               <div
-                style={{ left: "6.95%", bottom: "3.58%", width: "3.71%", height: "2.86%" }}
-                className={`absolute border-2 ${
-                  fiducialsLocked
-                    ? "border-emerald-400 bg-emerald-400/25"
-                    : "border-white/90"
+                className={`absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 rounded-bl-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
                 }`}
               />
               <div
-                style={{ right: "6.95%", bottom: "3.58%", width: "3.71%", height: "2.86%" }}
-                className={`absolute border-2 ${
-                  fiducialsLocked
-                    ? "border-emerald-400 bg-emerald-400/25"
-                    : "border-white/90"
+                className={`absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 rounded-br-md ${
+                  fiducialsLocked ? "border-emerald-400" : "border-white"
                 }`}
               />
-
-              {/* Exact Part Divider Line at y = 139mm / 279.4mm (49.75%) */}
-              <div
-                style={{ top: "49.75%", left: "9.26%", right: "9.26%" }}
-                className="absolute border-b border-dashed border-white/50 flex justify-end"
-              >
-                <span className="text-[9px] font-mono text-white/80 tracking-wider pr-1 -mt-3.5">
-                  PART DIVIDER
-                </span>
-              </div>
-
-              {/* Centered Bottom-Margin 1D Code-128B Barcode Guide */}
-              <div
-                style={{
-                  left: "27%",
-                  right: "27%",
-                  bottom: "3.4%",
-                  height: "3.6%",
-                }}
-                className={`absolute border border-dashed rounded-xs flex items-center justify-center ${
-                  liveDetectedSheet
-                    ? "border-emerald-400 text-emerald-300 bg-emerald-400/10"
-                    : "border-white/45 text-white/60"
-                }`}
-              >
-                <span className="text-[7px] font-mono tracking-widest">BARCODE</span>
-              </div>
 
               {/* 3-Second Guided Hold-Steady Countdown Pill */}
               {(fiducialsLocked || isSnapping) && (
-                <div className="absolute bottom-[12%] inset-x-3 flex justify-center">
+                <div className="absolute bottom-5 inset-x-3 flex justify-center">
                   <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2.5 shadow-lg space-y-2 w-full max-w-[260px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold tracking-wide text-emerald-300 flex items-center gap-1.5">
@@ -1081,7 +1086,7 @@ export function MobileCameraView({
                 ? "Capturing sharpest frame..."
                 : fiducialsLocked
                 ? `Hold steady for ${secondsRemainingCount}s...`
-                : "Align the 4 black squares inside the corner targets"}
+                : "Fill the frame with the response sheet"}
             </span>
           </div>
         )}
