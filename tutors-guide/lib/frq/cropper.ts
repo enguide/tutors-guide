@@ -24,19 +24,56 @@ import {
   matchQrAgainstManifest,
   parseSelfDescribingSheetQr,
 } from "./manifest";
+import { decodeCode128FromGrayscale } from "./code128";
 import { evaluateFrqSubCropMock } from "./mockEvaluator";
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || process.env.R2_BUCKET_NAME || "";
 
 /**
- * Scans the canonical bottom-right QR region of the perspective-rectified sheet.
+ * Scans the canonical bottom-margin 1D Code-128B barcode first,
+ * falling back to the legacy bottom-right QR region if needed.
  */
-async function extractCanonicalFooterQr(
+async function extractCanonicalFooterCode(
   rectifiedRgbBuffer: Buffer
 ): Promise<DecodedSheetQr | null> {
+  // 1. Primary: Centered 1D Code-128B barcode
+  try {
+    const barBox = mmRectToPixelExtract(SHEET_REGIONS_MM.footerBarcodeSearch);
+    const barGray = await sharp(rectifiedRgbBuffer, {
+      raw: {
+        width: CANONICAL_SHEET_PX.width,
+        height: CANONICAL_SHEET_PX.height,
+        channels: 3,
+      },
+    })
+      .extract({
+        left: barBox.left,
+        top: barBox.top,
+        width: barBox.width,
+        height: barBox.height,
+      })
+      .grayscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const barcodeText = decodeCode128FromGrayscale(
+      new Uint8Array(barGray.data.buffer, barGray.data.byteOffset, barGray.data.byteLength),
+      barGray.info.width,
+      barGray.info.height,
+      24
+    );
+
+    if (barcodeText) {
+      const parsed = parseSelfDescribingSheetQr(barcodeText);
+      if (parsed) return parsed;
+    }
+  } catch (err) {
+    console.warn("[FRQ Cropper] Canonical Code-128 decode warning:", err);
+  }
+
+  // 2. Fallback: Legacy 2D QR code
   try {
     const qrBox = mmRectToPixelExtract(SHEET_REGIONS_MM.footerQrSearch);
-
     const qrRegion = await sharp(rectifiedRgbBuffer, {
       raw: {
         width: CANONICAL_SHEET_PX.width,
@@ -64,8 +101,9 @@ async function extractCanonicalFooterQr(
       return parseSelfDescribingSheetQr(code.data);
     }
   } catch (err) {
-    console.warn("[FRQ Cropper] Canonical QR decode warning:", err);
+    console.warn("[FRQ Cropper] Canonical QR fallback warning:", err);
   }
+
   return null;
 }
 
@@ -125,7 +163,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
   });
 
   try {
-    // 1. Download original full sheet and auto-orient EXIF rotation
     const rawBuffer = await getBufferFromStorage(submission.storageKey);
     const orientedSharp = sharp(rawBuffer).rotate();
     const { data: srcRgb, info: srcInfo } = await orientedSharp
@@ -136,7 +173,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
     const srcWidth = srcInfo.width;
     const srcHeight = srcInfo.height;
 
-    // 2. Downsample to ~850px wide grayscale buffer for <12ms fiducial detection
     const detectWidth = Math.min(850, srcWidth);
     const scaleFactor = detectWidth / srcWidth;
     const detectHeight = Math.round(srcHeight * scaleFactor);
@@ -167,7 +203,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       return [];
     }
 
-    // Scale detected fiducial centers back to full source resolution
     const invScale = 1.0 / scaleFactor;
     const srcCorners: [
       { x: number; y: number },
@@ -206,7 +241,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       return [];
     }
 
-    // 3. Warp full-resolution image onto canonical 1700 x 2200 (200 DPI) US Letter canvas
     const rectifiedRgb = warpRgbBufferBilinear({
       srcData: srcRgb,
       srcWidth,
@@ -226,8 +260,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       .jpeg({ quality: 88 })
       .toBuffer();
 
-    // 4. Decode footer QR from exact canonical position on the rectified sheet
-    const qrData = await extractCanonicalFooterQr(rectifiedRgb);
+    const codeData = await extractCanonicalFooterCode(rectifiedRgb);
     const manifest = submission.captureSession
       ?.manifestSnapshot as unknown as SectionFrqManifest | null;
 
@@ -238,8 +271,8 @@ export async function processAndCropFrqSubmission(submissionId: string) {
     let auditReasonOverride: string | undefined;
 
     if (manifest) {
-      if (qrData) {
-        const matchResult = matchQrAgainstManifest(manifest, qrData);
+      if (codeData) {
+        const matchResult = matchQrAgainstManifest(manifest, codeData);
         if (matchResult.status === "WRONG_FORM" || matchResult.status === "NOT_IN_TEST") {
           await prisma.frqSubmission.update({
             where: { id: submission.id },
@@ -254,13 +287,12 @@ export async function processAndCropFrqSubmission(submissionId: string) {
           return [];
         }
 
-        // Flag if client-submitted target differed from authoritative footer QR
         if (
           matchResult.sheet.sectionId !== submission.sectionId ||
           matchResult.sheet.questionId !== submission.questionId ||
           matchResult.sheet.pageNumber !== submission.pageNumber
         ) {
-          auditReasonOverride = `QR_MISMATCH_AUTO_CORRECTED (submitted ${submission.questionId} p${submission.pageNumber}, QR=${matchResult.sheet.questionId} p${matchResult.sheet.pageNumber})`;
+          auditReasonOverride = `CODE_MISMATCH_AUTO_CORRECTED (submitted ${submission.questionId} p${submission.pageNumber}, barcode=${matchResult.sheet.questionId} p${matchResult.sheet.pageNumber})`;
         }
 
         resolvedSectionId = matchResult.sheet.sectionId;
@@ -268,8 +300,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
         resolvedPageNumber = matchResult.sheet.pageNumber;
         resolvedSheet = matchResult.sheet;
       } else {
-        // Footer QR could not be decoded even after perspective rectification -> flag for human verification
-        auditReasonOverride = "UNREADABLE_FOOTER_QR_MANUAL_ASSIGNMENT";
+        auditReasonOverride = "UNREADABLE_FOOTER_BARCODE_MANUAL_ASSIGNMENT";
       }
 
       if (!resolvedSheet) {
@@ -288,8 +319,8 @@ export async function processAndCropFrqSubmission(submissionId: string) {
 
     const partsToCrop = resolvedSheet
       ? resolvedSheet.parts
-      : (qrData?.parts.length
-          ? qrData.parts
+      : (codeData?.parts.length
+          ? codeData.parts
           : resolvedPageNumber === 2
           ? ["C", "D"]
           : ["A", "B"]
@@ -300,7 +331,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
           slotIndex: (idx % 2) as 0 | 1,
         }));
 
-    // 5. Extract & upload each active sub-part box from rectified sheet
     const cropArtifacts = await Promise.all(
       partsToCrop.map(async (part) => {
         const regionMm =
@@ -338,7 +368,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       })
     );
 
-    // 6. Persist crops and update submission metadata atomically
     const savedCrops = await prisma.$transaction(async (tx) => {
       if (
         resolvedSectionId !== submission.sectionId ||
@@ -385,10 +414,10 @@ export async function processAndCropFrqSubmission(submissionId: string) {
           pageNumber: resolvedPageNumber,
           deskewedSheetUrl,
           detectedExamCode:
-            qrData?.formId ?? qrData?.examCode ?? submission.detectedExamCode,
+            codeData?.formId ?? codeData?.examCode ?? submission.detectedExamCode,
           detectedQuestion:
-            qrData && qrData.questionNumber > 0
-              ? qrData.questionNumber
+            codeData && codeData.questionNumber > 0
+              ? codeData.questionNumber
               : submission.detectedQuestion,
           processingError: null,
         },
@@ -397,7 +426,6 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       return createdCrops;
     });
 
-    // 7. Trigger downstream evaluator pass (preserving any QR discrepancy/unreadable audit flag)
     await Promise.allSettled(
       savedCrops.map((c) => evaluateFrqSubCropMock(c.id, auditReasonOverride))
     );

@@ -23,6 +23,7 @@ import {
   matchQrAgainstManifest,
   parseSelfDescribingSheetQr,
 } from "@/lib/frq/manifest";
+import { decodeCode128FromGrayscale } from "@/lib/frq/code128";
 import {
   getPresignedUploadForSession,
   finalizeSubmissionUpload,
@@ -50,14 +51,10 @@ interface MobileCameraViewProps {
 }
 
 const BLUR_THRESHOLD = 95.0;
-const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x2200 server canvas[cite: 13]
-const ANALYSIS_INTERVAL_MS = 250; //[cite: 13]
-const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown[cite: 13]
+const MAX_UPLOAD_DIMENSION = 2200; // 200 DPI US Letter; matches canonical 1700x2200 server canvas
+const ANALYSIS_INTERVAL_MS = 250;
+const REQUIRED_STEADY_FRAMES = 12; // 12 * 250ms = 3.0 seconds deliberate hold-steady countdown
 
-/**
- * Validates that detected fiducials form an upright, low-keystone US Letter rectangle
- * so perspective warps stay razor-straight without manual cropping.
- */
 function evaluateFiducialGeometry(
   f: DetectedFiducials,
   frameW: number,
@@ -71,7 +68,6 @@ function evaluateFiducialGeometry(
   const avgW = (topW + botW) / 2;
   const avgH = (leftH + rightH) / 2;
 
-  // 1. Minimum size in frame (prevents low-DPI distant captures)
   if (avgW / frameW < 0.36 || avgH / frameH < 0.46) {
     return {
       valid: false,
@@ -79,7 +75,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // 2. Keystone / perspective skew ratio check (phone tilted forward/backward or sideways)
   const widthRatio = topW / Math.max(botW, 1);
   const heightRatio = leftH / Math.max(rightH, 1);
   if (widthRatio < 0.85 || widthRatio > 1.18 || heightRatio < 0.85 || heightRatio > 1.18) {
@@ -89,7 +84,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // 3. In-plane rotation check (< ~6 degrees tilt)
   const topAngleDeg = Math.abs((Math.atan2(f.TR.y - f.TL.y, f.TR.x - f.TL.x) * 180) / Math.PI);
   const botAngleDeg = Math.abs((Math.atan2(f.BR.y - f.BL.y, f.BR.x - f.BL.x) * 180) / Math.PI);
   if (topAngleDeg > 6.5 || botAngleDeg > 6.5) {
@@ -99,7 +93,6 @@ function evaluateFiducialGeometry(
     };
   }
 
-  // 4. Aspect ratio sanity check (US Letter fiducial span is ~177.9mm x 251.4mm => ~0.708)
   const observedAspect = avgW / Math.max(avgH, 1);
   if (observedAspect < 0.56 || observedAspect > 0.88) {
     return {
@@ -112,21 +105,26 @@ function evaluateFiducialGeometry(
 }
 
 /**
- * Decodes the footer QR code using native hardware-accelerated BarcodeDetector first,
- * falling back to 1:1 native-resolution jsQR crops (without downscaling QR modules).
+ * Decodes the centered 1D Code-128B footer barcode (and any legacy QR codes):
+ * 1. Hardware-accelerated BarcodeDetector (`code_128` + `qr_code`).
+ * 2. Pure-TypeScript 1D Code-128B scanline decoder on the bottom band (1:1 native resolution).
+ * 3. Full-frame jsQR fallback for legacy QR-coded sheets.
  */
-async function decodeSheetQrHighRes(
+async function decodeSheetFooterCode(
   source: HTMLVideoElement | HTMLCanvasElement,
   srcW: number,
   srcH: number,
-  includeFullFallback = false
+  includeLegacyQrFallback = false
 ): Promise<DecodedSheetQr | null> {
   if (srcW <= 0 || srcH <= 0) return null;
 
+  // 1. Native hardware-accelerated BarcodeDetector (supports code_128 + qr_code)
   if (typeof window !== "undefined" && "BarcodeDetector" in window) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+      const detector = new (window as any).BarcodeDetector({
+        formats: ["code_128", "qr_code"],
+      });
       const barcodes = await detector.detect(source);
       for (const b of barcodes) {
         if (b?.rawValue) {
@@ -135,53 +133,59 @@ async function decodeSheetQrHighRes(
         }
       }
     } catch {
-      // Fall back to jsQR if BarcodeDetector is unsupported
+      // Fall back to software Code-128 / jsQR decoders
     }
   }
 
-  const cropW = Math.min(900, Math.round(srcW * 0.55));
-  const cropH = Math.min(700, Math.round(srcH * 0.42));
-  const cropCanvas = document.createElement("canvas");
-  cropCanvas.width = cropW;
-  cropCanvas.height = cropH;
-  const ctx = cropCanvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return null;
+  // 2. Software 1D Code-128B scan across the bottom 30% band at 1:1 native resolution
+  const bandH = Math.min(520, Math.round(srcH * 0.3));
+  const bandW = Math.min(1800, srcW);
+  const bandCanvas = document.createElement("canvas");
+  bandCanvas.width = bandW;
+  bandCanvas.height = bandH;
+  const bCtx = bandCanvas.getContext("2d", { willReadFrequently: true });
+  if (bCtx) {
+    bCtx.drawImage(
+      source,
+      0,
+      srcH - bandH,
+      srcW,
+      bandH,
+      0,
+      0,
+      bandW,
+      bandH
+    );
+    const rgba = bCtx.getImageData(0, 0, bandW, bandH).data;
+    const gray = new Uint8Array(bandW * bandH);
+    for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
+      gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0;
+    }
 
-  ctx.drawImage(
-    source,
-    srcW - cropW,
-    srcH - cropH,
-    cropW,
-    cropH,
-    0,
-    0,
-    cropW,
-    cropH
-  );
-  const brData = ctx.getImageData(0, 0, cropW, cropH);
-  const brCode = jsQR(brData.data, cropW, cropH, {
-    inversionAttempts: includeFullFallback ? "attemptBoth" : "dontInvert",
-  });
-  if (brCode?.data) {
-    return parseSelfDescribingSheetQr(brCode.data);
+    const code128Text = decodeCode128FromGrayscale(gray, bandW, bandH, 28);
+    if (code128Text) {
+      const parsed = parseSelfDescribingSheetQr(code128Text);
+      if (parsed) return parsed;
+    }
   }
 
-  if (includeFullFallback) {
-    const scale = Math.min(1400 / Math.max(srcW, srcH), 1.0);
-    const fullW = Math.round(srcW * scale);
-    const fullH = Math.round(srcH * scale);
-    const fullCanvas = document.createElement("canvas");
-    fullCanvas.width = fullW;
-    fullCanvas.height = fullH;
-    const fCtx = fullCanvas.getContext("2d", { willReadFrequently: true });
-    if (fCtx) {
-      fCtx.drawImage(source, 0, 0, fullW, fullH);
-      const fullData = fCtx.getImageData(0, 0, fullW, fullH);
-      const fullCode = jsQR(fullData.data, fullW, fullH, {
+  // 3. Optional full-frame jsQR fallback for legacy 2D QR sheets
+  if (includeLegacyQrFallback) {
+    const scale = Math.min(1100 / Math.max(srcW, srcH), 1.0);
+    const scanW = Math.round(srcW * scale);
+    const scanH = Math.round(srcH * scale);
+    const scanCanvas = document.createElement("canvas");
+    scanCanvas.width = scanW;
+    scanCanvas.height = scanH;
+    const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
+    if (ctx) {
+      ctx.drawImage(source, 0, 0, scanW, scanH);
+      const imgData = ctx.getImageData(0, 0, scanW, scanH);
+      const code = jsQR(imgData.data, scanW, scanH, {
         inversionAttempts: "attemptBoth",
       });
-      if (fullCode?.data) {
-        return parseSelfDescribingSheetQr(fullCode.data);
+      if (code?.data) {
+        return parseSelfDescribingSheetQr(code.data);
       }
     }
   }
@@ -210,11 +214,9 @@ export function MobileCameraView({
   const [isSnapping, setIsSnapping] = useState(false);
   const [focusPulse, setFocusPulse] = useState(false);
 
-  // Live CV telemetry & 3-second hold-steady progress[cite: 13]
   const [fiducialsLocked, setFiducialsLocked] = useState(false);
   const [steadyFrames, setSteadyFrames] = useState<number>(0);
 
-  // Live QR-detected sheet during framing[cite: 13]
   const [liveDetectedSheet, setLiveDetectedSheet] = useState<ManifestSheet | null>(null);
   const [duplicateSheetCandidate, setDuplicateSheetCandidate] =
     useState<ManifestSheet | null>(null);
@@ -224,22 +226,22 @@ export function MobileCameraView({
       : new Set()
   );
 
-  // Captured image state[cite: 13]
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [detectedQr, setDetectedQr] = useState<DecodedSheetQr | null>(null);
-  const [verifiedQrSheet, setVerifiedQrSheet] = useState<ManifestSheet | null>(null);
+  const [detectedCode, setDetectedCode] = useState<DecodedSheetQr | null>(null);
+  const [verifiedSheet, setVerifiedSheet] = useState<ManifestSheet | null>(null);
   const [manualFallbackKey, setManualFallbackKey] = useState<string | null>(null);
 
   const steadyCountRef = useRef<number>(0);
   const isSnappingRef = useRef<boolean>(false);
   const isAnalyzingRef = useRef<boolean>(false);
+  const lockedSheetRef = useRef<ManifestSheet | null>(null);
   const prevFiducialsRef = useRef<{ f: DetectedFiducials; w: number; h: number } | null>(
     null
   );
 
   const selectedSheetKey =
-    verifiedQrSheet?.sheetKey ||
+    verifiedSheet?.sheetKey ||
     manualFallbackKey ||
     liveDetectedSheet?.sheetKey ||
     suggestedSheet?.sheetKey ||
@@ -247,14 +249,14 @@ export function MobileCameraView({
     "";
 
   const resolvedTargetSheet = useMemo<ManifestSheet | null>(() => {
-    if (verifiedQrSheet) return verifiedQrSheet;
+    if (verifiedSheet) return verifiedSheet;
     if (!manifest) return null;
     if (selectedSheetKey) {
       const byKey = manifest.sheets.find((s) => s.sheetKey === selectedSheetKey);
       if (byKey) return byKey;
     }
     return liveDetectedSheet || suggestedSheet || manifest.sheets[0] || null;
-  }, [verifiedQrSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
+  }, [verifiedSheet, manifest, selectedSheetKey, liveDetectedSheet, suggestedSheet]);
 
   const applyContinuousFocusConstraints = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -274,11 +276,10 @@ export function MobileCameraView({
         await track.applyConstraints({ advanced });
       }
     } catch {
-      // Ignore on browsers that don't expose advanced camera constraints
+      // Ignore on unsupported browsers
     }
   }, []);
 
-  // 1. Initialize rear-facing camera once and keep <video> mounted across retakes
   useEffect(() => {
     let isCancelled = false;
 
@@ -291,7 +292,7 @@ export function MobileCameraView({
             height: { ideal: 1920 },
           },
           audio: false,
-        }); //[cite: 13]
+        });
 
         if (isCancelled) {
           stream.getTracks().forEach((track) => track.stop());
@@ -306,8 +307,8 @@ export function MobileCameraView({
           await applyContinuousFocusConstraints();
         }
       } catch (err) {
-        console.error("Camera access error:", err); //[cite: 13]
-        setWarningMessage("Unable to access rear camera. Check browser permissions."); //[cite: 13]
+        console.error("Camera access error:", err);
+        setWarningMessage("Unable to access rear camera. Check browser permissions.");
       }
     }
 
@@ -329,30 +330,40 @@ export function MobileCameraView({
     await applyContinuousFocusConstraints();
   }, [previewUrl, applyContinuousFocusConstraints]);
 
-  // 2. Burst-of-3 sharpest frame capture + full-resolution QR verification
+  const isSheetBlockedAsDuplicate = useCallback(
+    (sheet: ManifestSheet | null): boolean => {
+      if (!sheet) return false;
+      return (
+        uploadedSheetKeys.has(sheet.sheetKey) &&
+        !allowedReplaceKeys.has(sheet.sheetKey)
+      );
+    },
+    [uploadedSheetKeys, allowedReplaceKeys]
+  );
+
+  // 2. Burst-of-3 sharpest frame capture + 1D Code-128B verification + duplicate guard
   const captureStill = useCallback(async () => {
     if (!videoRef.current || isSnappingRef.current) return;
     isSnappingRef.current = true;
     setIsSnapping(true);
 
     if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate([35, 50, 35]); //[cite: 13]
+      navigator.vibrate([35, 50, 35]);
     }
 
     try {
       const video = videoRef.current;
       if (!video) return;
 
-      const rawW = video.videoWidth || 1920; //[cite: 13]
-      const rawH = video.videoHeight || 1080; //[cite: 13]
+      const rawW = video.videoWidth || 1920;
+      const rawH = video.videoHeight || 1080;
 
       const longestEdge = Math.max(rawW, rawH);
       const scale =
-        longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0; //[cite: 13]
+        longestEdge > MAX_UPLOAD_DIMENSION ? MAX_UPLOAD_DIMENSION / longestEdge : 1.0;
       const outW = Math.round(rawW * scale);
       const outH = Math.round(rawH * scale);
 
-      // Capture 3 rapid frames (~160ms total) and select the highest Laplacian sharpness score
       let bestCanvas: HTMLCanvasElement | null = null;
       let bestSharpness = -1;
 
@@ -369,7 +380,6 @@ export function MobileCameraView({
 
         cCtx.drawImage(video, 0, 0, outW, outH);
 
-        // Measure sharpness on a fast 480px sample
         const sScale = Math.min(480 / Math.max(outW, outH), 1.0);
         const sW = Math.round(outW * sScale);
         const sH = Math.round(outH * sScale);
@@ -391,13 +401,15 @@ export function MobileCameraView({
 
       if (!bestCanvas) return;
 
-      // Decode QR at full native 1:1 resolution on the sharpest burst frame
       let decodedMeta: DecodedSheetQr | null = null;
       try {
-        decodedMeta = await decodeSheetQrHighRes(bestCanvas, outW, outH, true);
-      } catch (qrErr) {
-        console.warn("Client QR scan warning:", qrErr); //[cite: 13]
+        decodedMeta = await decodeSheetFooterCode(bestCanvas, outW, outH, true);
+      } catch (decodeErr) {
+        console.warn("Client barcode/QR scan warning:", decodeErr);
       }
+
+      let resolvedCandidate: ManifestSheet | null =
+        lockedSheetRef.current || liveDetectedSheet;
 
       if (decodedMeta && manifest) {
         const match = matchQrAgainstManifest(manifest, decodedMeta);
@@ -406,24 +418,24 @@ export function MobileCameraView({
             match.status === "WRONG_FORM"
               ? `Wrong exam booklet (${match.actualForm}). Expected ${match.expectedForm}.`
               : match.reason
-          ); //[cite: 13]
+          );
           return;
         }
+        resolvedCandidate = match.sheet;
+        lockedSheetRef.current = match.sheet;
+        setDetectedCode(decodedMeta);
+      }
 
-        const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
-        const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
-        if (isAlreadyUploaded && !isExplicitReplace) {
-          setDuplicateSheetCandidate(match.sheet);
-          setWarningMessage(
-            `Q${match.sheet.questionNumber} Sheet ${match.sheet.pageNumber} is already uploaded — flip to another page.`
-          ); //[cite: 13]
-          return;
-        }
+      if (isSheetBlockedAsDuplicate(resolvedCandidate)) {
+        setDuplicateSheetCandidate(resolvedCandidate);
+        setWarningMessage(
+          `Q${resolvedCandidate!.questionNumber} Sheet ${resolvedCandidate!.pageNumber} is already uploaded — flip to another page.`
+        );
+        return;
+      }
 
-        setDetectedQr(decodedMeta);
-        setVerifiedQrSheet(match.sheet);
-      } else if (liveDetectedSheet) {
-        setVerifiedQrSheet(liveDetectedSheet);
+      if (resolvedCandidate) {
+        setVerifiedSheet(resolvedCandidate);
       }
 
       await new Promise<void>((resolve) => {
@@ -437,15 +449,15 @@ export function MobileCameraView({
           },
           "image/jpeg",
           0.92
-        ); //[cite: 13]
+        );
       });
     } finally {
       isSnappingRef.current = false;
       setIsSnapping(false);
     }
-  }, [manifest, uploadedSheetKeys, allowedReplaceKeys, liveDetectedSheet]);
+  }, [manifest, liveDetectedSheet, isSheetBlockedAsDuplicate]);
 
-  // 3. Real-time frame quality + keystone geometry + motion stability + live QR check
+  // 3. Real-time frame quality + geometry + sticky Code-128B duplicate guard
   const analyzeFrame = useCallback(async () => {
     if (
       !videoRef.current ||
@@ -477,7 +489,7 @@ export function MobileCameraView({
       const frameData = ctx.getImageData(0, 0, w, h);
 
       if (checkLightingGlare(frameData)) {
-        setWarningMessage("Overhead glare detected. Tilt sheet slightly."); //[cite: 13]
+        setWarningMessage("Overhead glare detected. Tilt sheet slightly.");
         setFiducialsLocked(false);
         prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
@@ -487,7 +499,7 @@ export function MobileCameraView({
 
       const blurScore = calculateLaplacianVariance(frameData);
       if (blurScore < BLUR_THRESHOLD) {
-        setWarningMessage("Hold steady — focusing on handwriting..."); //[cite: 13]
+        setWarningMessage("Hold steady — focusing on handwriting...");
         setFiducialsLocked(false);
         steadyCountRef.current = Math.max(0, steadyCountRef.current - 1);
         setSteadyFrames(steadyCountRef.current);
@@ -497,21 +509,22 @@ export function MobileCameraView({
       const rgba = frameData.data;
       const gray = new Uint8Array(w * h);
       for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
-        gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0; //[cite: 13]
+        gray[p] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0;
       }
 
       const detected = detectSheetFiducials(gray, w, h);
       if (!detected) {
+        lockedSheetRef.current = null;
+        setLiveDetectedSheet(null);
+        setDuplicateSheetCandidate(null);
         setWarningMessage("Align all 4 black corner squares inside the corner targets.");
         setFiducialsLocked(false);
-        setDuplicateSheetCandidate(null);
         prevFiducialsRef.current = null;
         steadyCountRef.current = 0;
         setSteadyFrames(0);
         return;
       }
 
-      // Enforce upright, low-keystone geometry so homography warps stay straight
       const geom = evaluateFiducialGeometry(detected, w, h);
       if (!geom.valid) {
         setWarningMessage(geom.reason || "Align the sheet with the guide frame.");
@@ -522,7 +535,6 @@ export function MobileCameraView({
         return;
       }
 
-      // Check inter-frame hand stability (pause countdown if phone is actively shifting)
       let isHandMoving = false;
       if (
         prevFiducialsRef.current &&
@@ -542,9 +554,9 @@ export function MobileCameraView({
       }
       prevFiducialsRef.current = { f: detected, w, h };
 
-      // Live QR scan directly on full-resolution video element
+      // Live 1D Code-128B scan directly on full-resolution video element
       if (manifest) {
-        const liveMeta = await decodeSheetQrHighRes(
+        const liveMeta = await decodeSheetFooterCode(
           video,
           video.videoWidth,
           video.videoHeight,
@@ -555,11 +567,12 @@ export function MobileCameraView({
           const match = matchQrAgainstManifest(manifest, liveMeta);
 
           if (match.status === "WRONG_FORM" || match.status === "NOT_IN_TEST") {
+            lockedSheetRef.current = null;
             setWarningMessage(
               match.status === "WRONG_FORM"
                 ? `Wrong Exam Booklet: Detected "${match.actualForm}", expected "${match.expectedForm}".`
                 : match.reason
-            ); //[cite: 13]
+            );
             setFiducialsLocked(false);
             setDuplicateSheetCandidate(null);
             steadyCountRef.current = 0;
@@ -567,22 +580,21 @@ export function MobileCameraView({
             return;
           }
 
+          lockedSheetRef.current = match.sheet;
           setLiveDetectedSheet(match.sheet);
-
-          const isAlreadyUploaded = uploadedSheetKeys.has(match.sheet.sheetKey);
-          const isExplicitReplace = allowedReplaceKeys.has(match.sheet.sheetKey);
-
-          if (isAlreadyUploaded && !isExplicitReplace) {
-            setDuplicateSheetCandidate(match.sheet);
-            setWarningMessage(
-              `Q${match.sheet.questionNumber} Sheet ${match.sheet.pageNumber} is already uploaded — flip to another page.`
-            ); //[cite: 13]
-            setFiducialsLocked(false);
-            steadyCountRef.current = 0;
-            setSteadyFrames(0);
-            return;
-          }
         }
+      }
+
+      const activeSheet = lockedSheetRef.current;
+      if (isSheetBlockedAsDuplicate(activeSheet)) {
+        setDuplicateSheetCandidate(activeSheet);
+        setWarningMessage(
+          `Q${activeSheet!.questionNumber} Sheet ${activeSheet!.pageNumber} is already uploaded — flip to another page.`
+        );
+        setFiducialsLocked(false);
+        steadyCountRef.current = 0;
+        setSteadyFrames(0);
+        return;
       }
 
       setDuplicateSheetCandidate(null);
@@ -610,8 +622,7 @@ export function MobileCameraView({
     isProcessing,
     capturedBlob,
     manifest,
-    uploadedSheetKeys,
-    allowedReplaceKeys,
+    isSheetBlockedAsDuplicate,
     captureStill,
   ]);
 
@@ -623,99 +634,17 @@ export function MobileCameraView({
     return () => clearInterval(interval);
   }, [streamActive, capturedBlob, analyzeFrame]);
 
-  // 4. Upload captured sheet to S3/R2 and trigger server homography cropper[cite: 13]
-  const handleUpload = async () => {
-    if (!capturedBlob) return;
-    setIsProcessing(true);
-    setWarningMessage(null);
-
-    const targetSectionId =
-      resolvedTargetSheet?.sectionId ||
-      detectedQr?.sectionId ||
-      manifest?.sectionId ||
-      manifest?.sheets[0]?.sectionId ||
-      "";
-    const targetQuestionId =
-      resolvedTargetSheet?.questionId ||
-      detectedQr?.questionId ||
-      defaultQuestionId ||
-      manifest?.questions[0]?.questionId;
-    const targetPageNumber =
-      resolvedTargetSheet?.pageNumber || detectedQr?.pageNumber || 1;
-    const targetQuestionNumber =
-      resolvedTargetSheet?.questionNumber || detectedQr?.questionNumber;
-    const targetParts = resolvedTargetSheet
-      ? resolvedTargetSheet.parts.map((p) => p.label)
-      : detectedQr?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]); //[cite: 13]
-
-    try {
-      const presignRes = await getPresignedUploadForSession(
-        sessionToken,
-        "image/jpeg",
-        targetQuestionId,
-        targetPageNumber,
-        targetSectionId
-      ); //[cite: 13]
-
-      if (!presignRes.success || !presignRes.presigned) {
-        throw new Error(presignRes.error || "Failed to authorize upload"); //[cite: 13]
-      }
-
-      const { url, fields, key, publicUrl } = presignRes.presigned;
-
-      const formData = new FormData();
-      Object.entries(fields).forEach(([k, v]) => formData.append(k, v)); //[cite: 13]
-      formData.append("file", capturedBlob, "sheet.jpg"); //[cite: 13]
-
-      const uploadRes = await fetch(url, {
-        method: "POST",
-        body: formData,
-      }); //[cite: 13]
-
-      if (!uploadRes.ok) {
-        throw new Error("Direct upload to storage bucket failed"); //[cite: 13]
-      }
-
-      const finalizeRes = await finalizeSubmissionUpload({
-        sessionToken,
-        storageKey: key,
-        publicUrl,
-        mimeType: "image/jpeg",
-        fileSizeBytes: capturedBlob.size,
-        sectionId: targetSectionId,
-        questionId: targetQuestionId,
-        pageNumber: targetPageNumber,
-      }); //[cite: 13]
-
-      if (!finalizeRes.success || !finalizeRes.submission) {
-        throw new Error(finalizeRes.error || "Failed to commit record in database"); //[cite: 13]
-      }
-
-      onSuccess({
-        submissionId: finalizeRes.submission.id,
-        sectionId: finalizeRes.submission.sectionId,
-        questionId: finalizeRes.submission.questionId,
-        questionNumber: targetQuestionNumber,
-        pageNumber: targetPageNumber,
-        parts: targetParts,
-      });
-    } catch (err) {
-      console.error(err); //[cite: 13]
-      setWarningMessage(err instanceof Error ? err.message : "Upload failed. Please retake."); //[cite: 13]
-      setIsProcessing(false);
-    }
-  };
-
-  const handleRetake = () => {
+  const handleRetake = useCallback(() => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
     isSnappingRef.current = false;
     prevFiducialsRef.current = null;
+    lockedSheetRef.current = null;
     setIsSnapping(false);
     setCapturedBlob(null);
-    setDetectedQr(null);
-    setVerifiedQrSheet(null);
+    setDetectedCode(null);
+    setVerifiedSheet(null);
     setManualFallbackKey(null);
     setLiveDetectedSheet(null);
     setDuplicateSheetCandidate(null);
@@ -732,14 +661,108 @@ export function MobileCameraView({
       }
       videoRef.current.play().catch(() => {});
     }
+  }, [previewUrl]);
+
+  // 4. Upload captured sheet to S3/R2, trigger server homography cropper, and reset for next sheet
+  const handleUpload = async () => {
+    if (!capturedBlob) return;
+
+    if (isSheetBlockedAsDuplicate(resolvedTargetSheet)) {
+      setWarningMessage(
+        `Q${resolvedTargetSheet!.questionNumber} Sheet ${resolvedTargetSheet!.pageNumber} is already uploaded.`
+      );
+      return;
+    }
+
+    setIsProcessing(true);
+    setWarningMessage(null);
+
+    const targetSectionId =
+      resolvedTargetSheet?.sectionId ||
+      detectedCode?.sectionId ||
+      manifest?.sectionId ||
+      manifest?.sheets[0]?.sectionId ||
+      "";
+    const targetQuestionId =
+      resolvedTargetSheet?.questionId ||
+      detectedCode?.questionId ||
+      defaultQuestionId ||
+      manifest?.questions[0]?.questionId;
+    const targetPageNumber =
+      resolvedTargetSheet?.pageNumber || detectedCode?.pageNumber || 1;
+    const targetQuestionNumber =
+      resolvedTargetSheet?.questionNumber || detectedCode?.questionNumber;
+    const targetParts = resolvedTargetSheet
+      ? resolvedTargetSheet.parts.map((p) => p.label)
+      : detectedCode?.parts || (targetPageNumber === 2 ? ["C", "D"] : ["A", "B"]);
+
+    try {
+      const presignRes = await getPresignedUploadForSession(
+        sessionToken,
+        "image/jpeg",
+        targetQuestionId,
+        targetPageNumber,
+        targetSectionId
+      );
+
+      if (!presignRes.success || !presignRes.presigned) {
+        throw new Error(presignRes.error || "Failed to authorize upload");
+      }
+
+      const { url, fields, key, publicUrl } = presignRes.presigned;
+
+      const formData = new FormData();
+      Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+      formData.append("file", capturedBlob, "sheet.jpg");
+
+      const uploadRes = await fetch(url, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Direct upload to storage bucket failed");
+      }
+
+      const finalizeRes = await finalizeSubmissionUpload({
+        sessionToken,
+        storageKey: key,
+        publicUrl,
+        mimeType: "image/jpeg",
+        fileSizeBytes: capturedBlob.size,
+        sectionId: targetSectionId,
+        questionId: targetQuestionId,
+        pageNumber: targetPageNumber,
+      });
+
+      if (!finalizeRes.success || !finalizeRes.submission) {
+        throw new Error(finalizeRes.error || "Failed to commit record in database");
+      }
+
+      // Immediately return the camera to live capture mode for the next sheet
+      handleRetake();
+
+      onSuccess({
+        submissionId: finalizeRes.submission.id,
+        sectionId: finalizeRes.submission.sectionId,
+        questionId: finalizeRes.submission.questionId,
+        questionNumber: targetQuestionNumber,
+        pageNumber: targetPageNumber,
+        parts: targetParts,
+      });
+    } catch (err) {
+      console.error(err);
+      setWarningMessage(err instanceof Error ? err.message : "Upload failed. Please retake.");
+      setIsProcessing(false);
+    }
   };
 
   const steadyPercent = Math.min(
     100,
     Math.round((steadyFrames / REQUIRED_STEADY_FRAMES) * 100)
-  ); //[cite: 13]
-  const completedSeconds = Math.min(3, Math.floor(steadyFrames / 4)); //[cite: 13]
-  const secondsRemainingCount = Math.max(1, 3 - completedSeconds); //[cite: 13]
+  );
+  const completedSeconds = Math.min(3, Math.floor(steadyFrames / 4));
+  const secondsRemainingCount = Math.max(1, 3 - completedSeconds);
 
   return (
     <div className="relative w-full h-screen bg-black flex flex-col justify-between overflow-hidden select-none">
@@ -781,7 +804,7 @@ export function MobileCameraView({
         </div>
       </div>
 
-      {/* Live Video Stream (tap anywhere to re-trigger focus) + Captured Preview */}
+      {/* Live Video Stream + Captured Preview */}
       <div
         onClick={handleTapToFocus}
         className="relative flex-1 flex items-center justify-center overflow-hidden bg-black"
@@ -818,7 +841,7 @@ export function MobileCameraView({
                   : "border-white/50"
               }`}
             >
-              {/* Exact 8mm x 8mm Fiducial Target Boxes (3.71% W x 2.86% H at true mm offsets) */}
+              {/* Exact 8mm x 8mm Fiducial Target Boxes */}
               <div
                 style={{ left: "6.95%", top: "3.58%", width: "3.71%", height: "2.86%" }}
                 className={`absolute border-2 ${
@@ -862,24 +885,24 @@ export function MobileCameraView({
                 </span>
               </div>
 
-              {/* Exact 18mm x 18mm Footer QR Target Box (right: 36mm/215.9mm = 16.67%, bottom: 6mm/279.4mm = 2.15%) */}
+              {/* Centered Bottom-Margin 1D Code-128B Barcode Guide */}
               <div
                 style={{
-                  right: "16.67%",
-                  bottom: "2.15%",
-                  width: "8.34%",
-                  height: "6.44%",
+                  left: "27%",
+                  right: "27%",
+                  bottom: "3.4%",
+                  height: "3.6%",
                 }}
-                className={`absolute border border-dashed flex items-center justify-center ${
+                className={`absolute border border-dashed rounded-xs flex items-center justify-center ${
                   liveDetectedSheet
-                    ? "border-emerald-400 text-emerald-300"
+                    ? "border-emerald-400 text-emerald-300 bg-emerald-400/10"
                     : "border-white/45 text-white/60"
                 }`}
               >
-                <span className="text-[7px] font-mono">QR</span>
+                <span className="text-[7px] font-mono tracking-widest">BARCODE</span>
               </div>
 
-              {/* 3-Second Guided Hold-Steady Countdown Pill[cite: 13] */}
+              {/* 3-Second Guided Hold-Steady Countdown Pill */}
               {(fiducialsLocked || isSnapping) && (
                 <div className="absolute bottom-[12%] inset-x-3 flex justify-center">
                   <div className="bg-black/85 backdrop-blur-md border border-emerald-400/50 rounded-xl px-3.5 py-2.5 shadow-lg space-y-2 w-full max-w-[260px]">
@@ -901,9 +924,9 @@ export function MobileCameraView({
                       <div className="flex items-center gap-1.5">
                         {[1, 2, 3].map((secStep) => {
                           const isFilled =
-                            steadyFrames >= secStep * 4 || isSnapping; //[cite: 13]
+                            steadyFrames >= secStep * 4 || isSnapping;
                           const isInProgress =
-                            !isFilled && steadyFrames > (secStep - 1) * 4; //[cite: 13]
+                            !isFilled && steadyFrames > (secStep - 1) * 4;
                           return (
                             <span
                               key={secStep}
@@ -933,7 +956,7 @@ export function MobileCameraView({
           </div>
         )}
 
-        {/* Real-time CV Feedback / Duplicate / Wrong-Form Banner[cite: 13] */}
+        {/* Real-time CV Feedback / Duplicate / Wrong-Form Banner */}
         {warningMessage && !previewUrl && (
           <div
             onClick={(e) => e.stopPropagation()}
@@ -962,20 +985,20 @@ export function MobileCameraView({
         )}
       </div>
 
-      {/* Bottom Controls + Locked QR Verification Badge */}
+      {/* Bottom Controls + Locked Barcode Verification Badge */}
       <div className="relative z-20 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col items-center gap-3">
         {previewUrl ? (
           <div className="w-full max-w-sm space-y-3">
-            {verifiedQrSheet ? (
+            {verifiedSheet ? (
               <div className="bg-emerald-950/90 border border-emerald-500/40 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span className="text-[11px] font-semibold text-emerald-300 shrink-0">
-                    QR Locked:
+                    Sheet Locked:
                   </span>
                   <span className="text-xs font-bold text-white truncate">
-                    Q{verifiedQrSheet.questionNumber} • Sheet {verifiedQrSheet.pageNumber} (Parts{" "}
-                    {verifiedQrSheet.parts.map((p) => p.label).join(" & ")})
+                    Q{verifiedSheet.questionNumber} • Sheet {verifiedSheet.pageNumber} (Parts{" "}
+                    {verifiedSheet.parts.map((p) => p.label).join(" & ")})
                   </span>
                 </div>
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -985,7 +1008,7 @@ export function MobileCameraView({
               manifest.sheets.length > 0 && (
                 <div className="bg-zinc-900/95 border border-amber-500/40 rounded-xl p-2.5 flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold text-amber-300 shrink-0 pl-1">
-                    QR Unclear:
+                    Code Unclear:
                   </span>
                   <select
                     value={selectedSheetKey}
