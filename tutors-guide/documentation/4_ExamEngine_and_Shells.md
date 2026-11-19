@@ -23,7 +23,7 @@ This section documents the exam runtime environment, comprising the dynamic test
 * **Parameters / Props:**
 * `params`: `Promise<{ category: string; testId: string; sectionId: string }>`
 
-
+* **Cross-Section Handwritten FRQ Detection (`hasHandwrittenFrqs`):** Scans the active section and sibling sections in `metadata.sections` for any `FRQ_HANDWRITTEN` question so `ExamClient` knows whether to launch the test-wide `SectionCaptureModal` upon completing the final section.
 
 
 * **Return Value / Emitted State:** Renders `<ExamClient/>` populated with resolved section configs, metadata, markdown content, and in-flight server checkpoint state.
@@ -453,44 +453,23 @@ This section documents the exam runtime environment, comprising the dynamic test
 
 ---
 
-### `components/exam/shells/ap/APLayoutAdapter.tsx`
+### `components/exam/shells/ap/APLayoutAdapter.tsx` (and Companion Bluebook AP Shell Components)
 
-* **Purpose & Scope:** Academic layout emulator designed for Advanced Placement examinations (e.g., AP Calculus AB/BC), supporting mathematical rendering, stimulus reference contexts, and handwritten FRQ options.
-
-
-* **Exports:**
-* `APLayoutAdapter: React.FC<TestShellLayoutProps>`
+* **Purpose & Scope:** Recreates the College Board Bluebook testing interface for digital Advanced Placement examinations (e.g., AP Calculus AB/BC), matching Bluebook's direct-start flow (`autoStartSection: true`, no blocking interstitial directions), `#EBF3FA` header/footer chrome, in-canvas review screen, and draggable split-pane layout[cite: 37].
 
 
-
-
-* **Parameters / Props:** Standard `TestShellLayoutProps`.
-
-
-* **Return Value / Emitted State:** Academic interface featuring `<APHeader/>`, `<APQuestionNavigatorPopover/>`, math stimulus sidebars, and `<QuestionOptions variant="ap"/>`.
-
-
-* **Dependencies & Imports:**
-* `APHeader`, `APQuestionNavigatorPopover`.
-
-
-* `MarkdownQuestionRenderer`, `QuestionOptions`.
-
-
-* `ArrowLeft`, `ArrowRight`, `Bookmark` from `lucide-react`.
-
-
+* **Exports & Companion Components:**
+  * `APLayoutAdapter: React.FC<TestShellLayoutProps>` (`components/exam/shells/ap/APLayoutAdapter.tsx`)[cite: 37]
+  * `APHeader` (`components/exam/shells/ap/APHeader.tsx`) & `APDirectionsModal` (`components/exam/shells/ap/APDirectionsModal.tsx`)
+  * `APQuestionNavigatorPopover` (`components/exam/shells/ap/APQuestionNavigatorPopover.tsx`)
+  * `APCheckYourWorkScreen` (`components/exam/shells/ap/APCheckYourWorkScreen.tsx`)
+  * `APFooter` (`components/exam/shells/ap/APFooter.tsx`)
 
 
 * **Key Logic & Edge Cases:**
-* **Section ID Pass-Through:** Forwards `sectionId` directly to `QuestionOptions`, enabling downstream Free Response components (`FrqDesktopRunner`) to coordinate QR optical capture pairing.
-
-
-* **Stimulus-Aware Layout Resolution:** Checks for discrete stimuli or section-wide markdown contexts, automatically allocating a dedicated split pane for reference diagrams and graphs.
-
-
-
-
+  * **Context-Aware AP Directions Dropdown (`APDirectionsModal`):** Accessible anytime via the `Directions` trigger in `APHeader` without blocking section start. Automatically switches between **Section I (Multiple-Choice)** instructions and **Section II (Free-Response handwritten packet & 3-decimal accuracy)** instructions based on whether the section contains `FRQ_HANDWRITTEN` questions.
+  * **Draggable Desktop & Mobile Split Panes:** Supports mouse-drag horizontal resizing (`splitRatioX`, clamped `25%–75%`) on desktop and touch/mouse vertical resizing (`splitRatioY`, clamped `20%–75%`) on mobile, alongside `SATCrossOutIcon` option elimination (restricted to `MC` items) and `ItemBookmarkRibbon` review flags.
+  * **In-Canvas `Check Your Work` Screen (`APCheckYourWorkScreen`):** Replaces modal review overlays; displays question status tiles (including distinct styling for handwritten FRQ items) and reminds students that handwritten packet pages are uploaded once Section II finishes.
 
 ---
 

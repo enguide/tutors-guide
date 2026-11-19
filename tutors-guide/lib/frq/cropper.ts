@@ -30,13 +30,13 @@ import { evaluateFrqSubCropMock } from "./mockEvaluator";
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || process.env.R2_BUCKET_NAME || "";
 
 /**
- * Scans the canonical bottom-margin 1D Code-128B barcode first,
+ * Scans the canonical bottom-margin 1D Code-128B/C barcode first,
  * falling back to the legacy bottom-right QR region if needed.
  */
 async function extractCanonicalFooterCode(
   rectifiedRgbBuffer: Buffer
 ): Promise<DecodedSheetQr | null> {
-  // 1. Primary: Centered 1D Code-128B barcode
+  // 1. Primary: Centered 1D Code-128 barcode
   try {
     const barBox = mmRectToPixelExtract(SHEET_REGIONS_MM.footerBarcodeSearch);
     const barGray = await sharp(rectifiedRgbBuffer, {
@@ -364,6 +364,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
           storageKey: cropKey,
           pointsPossible: part.pointsPossible,
           bbox: rect.normalized,
+          cropBuffer,
         };
       })
     );
@@ -426,8 +427,18 @@ export async function processAndCropFrqSubmission(submissionId: string) {
       return createdCrops;
     });
 
+    const bufferByLabel = new Map<string, Buffer>(
+      cropArtifacts.map((a) => [a.subPartLabel, a.cropBuffer])
+    );
+
     await Promise.allSettled(
-      savedCrops.map((c) => evaluateFrqSubCropMock(c.id, auditReasonOverride))
+      savedCrops.map((c) =>
+        evaluateFrqSubCropMock(
+          c.id,
+          auditReasonOverride,
+          bufferByLabel.get(c.subPartLabel)
+        )
+      )
     );
 
     return savedCrops;

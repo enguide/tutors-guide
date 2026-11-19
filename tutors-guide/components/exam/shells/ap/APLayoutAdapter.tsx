@@ -1,13 +1,39 @@
 // components/exam/shells/ap/APLayoutAdapter.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { TestShellLayoutProps } from "@/types/examLayout";
 import { APHeader } from "./APHeader";
-import { APQuestionNavigatorPopover } from "./APQuestionNavigatorPopover";
+import { APFooter } from "./APFooter";
+import { APCheckYourWorkScreen } from "./APCheckYourWorkScreen";
 import { MarkdownQuestionRenderer } from "@/components/MarkdownQuestionRenderer";
 import { QuestionOptions } from "../../QuestionOptions";
-import { ArrowLeft, ArrowRight, Bookmark } from "lucide-react";
+import { SATCrossOutIcon } from "../sat/SATCrossOutIcon";
+
+function ItemBookmarkRibbon({
+  isFlagged,
+  className = "w-3.5 h-4",
+}: {
+  isFlagged: boolean;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 12 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M0.75 0.75H11.25V14.5L6 10.5L0.75 14.5V0.75Z"
+        fill={isFlagged ? "#C5221F" : "none"}
+        stroke={isFlagged ? "#C5221F" : "currentColor"}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   category,
@@ -19,31 +45,108 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
   state,
   actions,
 }) => {
-  const { frontmatter, content: passageContent } = section;
+  const { frontmatter, content: sectionPassageContent } = section;
   const questions = frontmatter.questions;
-  const isFirstQuestion = state.currentIndex === 0;
-  const isLastQuestion = state.currentIndex === questions.length - 1;
   const isFlagged = Boolean(state.activeAnswer?.flagged);
+  const isFreeResponseSection = questions.some(
+    (q) => q.questionType === "FRQ_HANDWRITTEN"
+  );
 
-  // Resolve discrete question stimulus first, then fall back to section content
+  // In-canvas review screen state
+  const [isReviewActive, setIsReviewActive] = useState(false);
+
+  // Split-pane ratio for desktop (width percentage, default 50%)
+  const [splitRatioX, setSplitRatioX] = useState<number>(50);
+  const isDraggingSplitX = useRef(false);
+
+  // Split-pane ratio for mobile (height percentage, default 45% stimulus, 55% questions)
+  const [splitRatioY, setSplitRatioY] = useState<number>(45);
+  const isDraggingSplitY = useRef(false);
+
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+
+  // Automatically dismiss tools when entering review screen
+  useEffect(() => {
+    if (isReviewActive) {
+      if (state.isCalculatorOpen) actions.toggleCalculator();
+      if (state.isFormulaSheetOpen) actions.openFormulaSheet();
+    }
+  }, [isReviewActive, state.isCalculatorOpen, state.isFormulaSheetOpen, actions]);
+
+  // Desktop Horizontal Split Drag
+  const handleMouseDownSplitX = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingSplitX.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  // Mobile Vertical Split Drag
+  const handleStartSplitY = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    isDraggingSplitY.current = true;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!mainContainerRef.current) return;
+      const rect = mainContainerRef.current.getBoundingClientRect();
+
+      if (isDraggingSplitX.current && "clientX" in e) {
+        const relativeX = e.clientX - rect.left;
+        const rawPercentage = (relativeX / rect.width) * 100;
+        setSplitRatioX(Math.max(25, Math.min(75, rawPercentage)));
+      }
+
+      if (isDraggingSplitY.current) {
+        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+        const relativeY = clientY - rect.top;
+        const rawPercentage = (relativeY / rect.height) * 100;
+        setSplitRatioY(Math.max(20, Math.min(75, rawPercentage)));
+      }
+    };
+
+    const handleEnd = () => {
+      if (isDraggingSplitX.current || isDraggingSplitY.current) {
+        isDraggingSplitX.current = false;
+        isDraggingSplitY.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleEnd);
+    window.addEventListener("touchcancel", handleEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+      window.removeEventListener("touchcancel", handleEnd);
+    };
+  }, []);
+
   const activeStimulus =
-    state.activeQuestion.stimulus ||
-    state.activeQuestion.passage ||
-    (passageContent && passageContent.trim().length > 0 ? passageContent : null);
-
-  const hasStimulus = Boolean(activeStimulus);
+    state.activeQuestion?.stimulus ||
+    state.activeQuestion?.passage ||
+    (sectionPassageContent && sectionPassageContent.trim().length > 0
+      ? sectionPassageContent
+      : null);
 
   const isSplitView =
-    state.activeQuestion.layout === "split"
+    state.activeQuestion?.layout === "split"
       ? true
-      : state.activeQuestion.layout === "single"
+      : state.activeQuestion?.layout === "single"
       ? false
-      : hasStimulus;
+      : effectiveConfig.layout === "split-passage" || Boolean(activeStimulus);
 
-  // Reusable Question Action Bar (Question #, Mark for Review, Cross-out trigger)
   const renderItemActionBar = () => (
-    <div className="flex items-stretch justify-between bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden">
-      {/* Left: Question Badge & Mark for Review */}
+    <div className="flex items-stretch justify-between bg-neutral-100 dark:bg-neutral-800 h-9 select-none overflow-hidden shrink-0">
       <div className="flex items-center">
         <div className="w-9 h-full flex items-center justify-center bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-lg font-sans font-bold">
           {state.activeQuestion.questionNumber}
@@ -52,105 +155,230 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
         <button
           type="button"
           onClick={actions.toggleFlag}
-          className={`h-full flex items-center gap-2 px-3 text-xs font-sans font-medium transition-colors ${
-            isFlagged
-              ? "bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 font-semibold"
-              : "text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white"
-          }`}
+          className="h-full flex items-center gap-2 px-3 text-xs font-sans text-neutral-900 dark:text-neutral-100 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer"
         >
-          <Bookmark
-            className={`w-6 h-6 shrink-0 ${
-              isFlagged
-                ? "fill-neutral-900 dark:fill-neutral-100 text-neutral-900 dark:text-neutral-100"
-                : "text-neutral-700 dark:text-neutral-300"
-            }`}
+          <ItemBookmarkRibbon
+            isFlagged={isFlagged}
+            className="w-3.5 h-4 shrink-0 text-neutral-600 dark:text-neutral-400"
           />
-          <span className="text-sm">Mark for Review</span>
+          <span className={`text-sm ${isFlagged ? "font-bold" : "font-normal"}`}>
+            Mark for Review
+          </span>
         </button>
       </div>
 
-      {/* Right: Master ABC Cross-Out Mode Toggle */}
-      {effectiveConfig.hasCrossOutMode && (
-        <div className="flex items-center pr-2">
-          <button
-            type="button"
-            onClick={actions.toggleCrossOut}
-            title="Eliminate Answer Choices"
-            className={`px-2 py-0.5 rounded-sm text-xs font-sans font-bold tracking-tight transition-colors border ${
-              state.isCrossOutMode
-                ? "bg-neutral-900 text-white border-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100"
-                : "bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-            }`}
-          >
-            <span className="line-through tracking-tighter text-[13px]">ABC</span>
-          </button>
-        </div>
-      )}
+      {effectiveConfig.hasCrossOutMode &&
+        state.activeQuestion.questionType === "MC" && (
+          <div className="flex items-center pr-2">
+            <button
+              type="button"
+              onClick={actions.toggleCrossOut}
+              title="Eliminate Answer Choices"
+              className={`px-1 py-0.75 rounded-sm transition-colors border cursor-pointer flex items-center justify-center ${
+                state.isCrossOutMode
+                  ? "bg-[#2050c8] text-white border-[#292b31]"
+                  : "bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+              }`}
+            >
+              <SATCrossOutIcon
+                className="w-6 h-5"
+                isActive={state.isCrossOutMode}
+              />
+            </button>
+          </div>
+        )}
     </div>
   );
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-neutral-950 select-none">
+    <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-white dark:bg-neutral-950 select-none">
       {/* 1. Header */}
-      <APHeader
-        sectionTitle={frontmatter.sectionTitle}
-        config={effectiveConfig}
-        secondsRemaining={state.secondsRemaining}
-        isTTSPlaying={state.isTTSPlaying}
-        isTTSSupported={state.isTTSSupported}
-        onToggleCalculator={actions.toggleCalculator}
-        onToggleFormulaSheet={actions.openFormulaSheet}
-        onToggleTTS={actions.toggleTTS}
-      />
+      <div className="shrink-0">
+        <APHeader
+          sectionTitle={frontmatter.sectionTitle}
+          config={effectiveConfig}
+          secondsRemaining={state.secondsRemaining}
+          isFreeResponseSection={isFreeResponseSection}
+          isCalculatorOpen={state.isCalculatorOpen}
+          isFormulaSheetOpen={state.isFormulaSheetOpen}
+          isToolsDisabled={isReviewActive}
+          isTTSPlaying={state.isTTSPlaying}
+          isTTSSupported={state.isTTSSupported}
+          onToggleCalculator={actions.toggleCalculator}
+          onToggleFormulaSheet={actions.openFormulaSheet}
+          onToggleTTS={actions.toggleTTS}
+        />
+      </div>
 
-      {/* 2. Main Work Area (Split or Academic Single-Column) */}
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/50">
-        {isSplitView ? (
-          <>
-            {/* Left Pane: Stimulus / Reference Context */}
-            <div className="flex-1 border-b md:border-b-0 md:border-r border-neutral-300 dark:border-neutral-800 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-              <div className="max-w-2xl mx-auto font-serif text-[15.5px] leading-[1.65] font-normal text-neutral-900 dark:text-neutral-100">
-                {activeStimulus ? (
-                  <MarkdownQuestionRenderer
-                    content={activeStimulus}
+      {/* Official Practice Banner */}
+      <div className="w-full px-3 sm:px-8 flex shrink-0 select-none z-20 bg-white dark:bg-neutral-900">
+        <div className="w-full bg-[#1D235F] py-1 sm:py-1.5 rounded-b-xl sm:rounded-b-2xl flex items-center justify-center border-b border-x border-[#151a4a]">
+          <span className="text-white text-[10px] sm:text-[12px] font-sans font-bold tracking-[0.08em] uppercase">
+            This is a practice test
+          </span>
+        </div>
+      </div>
+
+      {/* 2. Main Work Area */}
+      {isReviewActive ? (
+        <APCheckYourWorkScreen
+          sectionTitle={frontmatter.sectionTitle}
+          questions={questions}
+          answers={state.answers}
+          onSelectIndex={(idx) => {
+            actions.setCurrentIndex(idx);
+            setIsReviewActive(false);
+          }}
+        />
+      ) : (
+        <main
+          ref={mainContainerRef}
+          className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden bg-neutral-50/50 dark:bg-neutral-950/50 relative"
+        >
+          {isSplitView ? (
+            <>
+              {/* Left Pane (Desktop Stimulus) */}
+              <div
+                style={{ width: `${splitRatioX}%` }}
+                className="hidden md:block h-full overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900 shrink-0"
+              >
+                <div className="max-w-2xl mx-auto font-serif text-[15.5px] leading-[1.65] font-normal text-neutral-900 dark:text-neutral-100">
+                  {activeStimulus ? (
+                    <MarkdownQuestionRenderer
+                      content={activeStimulus}
+                      category={category}
+                      testId={metadata.id}
+                      manifestBasePath={manifestBasePath}
+                      enableLightbox={state.accommodations.imageMagnification}
+                      className="prose-p:leading-[1.65] prose-p:my-2"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
+                      No reference stimulus required for this item.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Desktop Vertical Drag Divider */}
+              <div
+                onMouseDown={handleMouseDownSplitX}
+                className="hidden md:flex relative w-[4px] bg-[#969595] dark:bg-neutral-600 hover:bg-[#555555] active:bg-[#333333] cursor-col-resize shrink-0 items-center justify-center transition-colors z-20 group"
+              >
+                <div className="absolute inset-y-0 -left-2 -right-2 cursor-col-resize" />
+                <div className="w-3.5 h-6 bg-[#1c1c1c] rounded-xs border border-background/30 flex flex-col items-center justify-center gap-0.5 pointer-events-none select-none">
+                  <div className="flex items-center justify-center gap-[1.5px]">
+                    <span className="w-0 h-0 border-y-[4.5px] border-y-transparent border-r-[3.5px] border-r-white" />
+                    <span className="w-0 h-0 border-y-[4.5px] border-y-transparent border-l-[3.5px] border-l-white" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mobile Top Stimulus Pane */}
+              <div
+                style={{ height: `${splitRatioY}%` }}
+                className="md:hidden w-full shrink-0 overflow-y-auto p-4 sm:p-6 bg-white dark:bg-neutral-900"
+              >
+                <div className="font-serif text-[14.5px] sm:text-[15px] leading-[1.65] text-neutral-900 dark:text-neutral-100">
+                  {activeStimulus ? (
+                    <MarkdownQuestionRenderer
+                      content={activeStimulus}
+                      category={category}
+                      testId={metadata.id}
+                      manifestBasePath={manifestBasePath}
+                      enableLightbox={state.accommodations.imageMagnification}
+                      className="prose-p:leading-[1.65] prose-p:my-2"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
+                      No reference stimulus required.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile Horizontal Drag Divider */}
+              <div
+                onMouseDown={handleStartSplitY}
+                onTouchStart={handleStartSplitY}
+                className="md:hidden relative h-[8px] w-full bg-neutral-200 dark:bg-neutral-800 border-y border-neutral-300 dark:border-neutral-700 cursor-row-resize shrink-0 flex items-center justify-center z-20 active:bg-neutral-300 dark:active:bg-neutral-700"
+              >
+                <div className="w-12 h-1 bg-neutral-400 dark:bg-neutral-500 rounded-full pointer-events-none" />
+              </div>
+
+              {/* Right / Bottom Pane: Question Stem & Choices */}
+              <div
+                key={state.activeQuestion.id}
+                style={{
+                  width:
+                    typeof window !== "undefined" && window.innerWidth >= 768
+                      ? `calc(${100 - splitRatioX}% - 4px)`
+                      : undefined,
+                  height:
+                    typeof window !== "undefined" && window.innerWidth < 768
+                      ? `calc(${100 - splitRatioY}% - 8px)`
+                      : undefined,
+                }}
+                className="w-full flex-1 md:flex-initial min-h-0 overflow-y-auto p-4 sm:p-6 md:p-10 bg-white dark:bg-neutral-900"
+              >
+                <div className="w-full max-w-xl mx-auto space-y-4">
+                  {renderItemActionBar()}
+
+                  <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15px] sm:text-[15.5px] leading-[1.65] font-normal">
+                    <MarkdownQuestionRenderer
+                      content={state.activeQuestion.prompt}
+                      category={category}
+                      testId={metadata.id}
+                      manifestBasePath={manifestBasePath}
+                      enableLightbox={state.accommodations.imageMagnification}
+                      className="prose-p:mb-0"
+                    />
+                  </div>
+
+                  <QuestionOptions
+                    variant="ap"
+                    question={state.activeQuestion}
                     category={category}
                     testId={metadata.id}
+                    sectionId={frontmatter.sectionId}
                     manifestBasePath={manifestBasePath}
-                    enableLightbox={state.accommodations?.imageMagnification ?? true}
-                    className="prose-p:leading-[1.65] prose-p:my-2"
+                    selectedOptionId={state.activeAnswer?.selectedOptionId}
+                    frqAnswer={state.activeAnswer?.frqUserAnswer}
+                    eliminatedOptions={state.activeAnswer?.eliminatedOptions}
+                    isCrossOutMode={state.isCrossOutMode}
+                    onSelectOption={actions.selectOption}
+                    onSetFrqAnswer={actions.setFrqAnswer}
+                    onToggleEliminate={actions.toggleEliminateOption}
                   />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-neutral-400 font-mono text-xs italic">
-                    No reference stimulus required for this item.
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
-
-            {/* Right Pane: Question Stem & Choices */}
-            <div key={state.activeQuestion.id}className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-              <div className="max-w-xl mx-auto space-y-4">
+            </>
+          ) : (
+            /* Single Column */
+            <div
+              key={state.activeQuestion.id}
+              className="w-full flex-1 min-h-0 h-full overflow-y-auto p-4 sm:p-6 md:p-10 bg-white dark:bg-neutral-900"
+            >
+              <div className="w-full max-w-2xl mx-auto space-y-6">
                 {renderItemActionBar()}
 
-                {/* Prompt */}
-                <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15.5px] leading-[1.65] font-normal">
+                <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15px] sm:text-[15.5px] leading-[1.65] font-normal">
                   <MarkdownQuestionRenderer
                     content={state.activeQuestion.prompt}
                     category={category}
                     testId={metadata.id}
                     manifestBasePath={manifestBasePath}
-                    enableLightbox={state.accommodations?.imageMagnification ?? true}
-                    className="prose-p:mb-0"
+                    enableLightbox={state.accommodations.imageMagnification}
+                    className="prose-p:leading-[1.65] prose-p:my-2"
                   />
                 </div>
 
-                {/* Options */}
                 <QuestionOptions
                   variant="ap"
                   question={state.activeQuestion}
                   category={category}
                   testId={metadata.id}
-                  sectionId={section.frontmatter.sectionId} 
+                  sectionId={frontmatter.sectionId}
                   manifestBasePath={manifestBasePath}
                   selectedOptionId={state.activeAnswer?.selectedOptionId}
                   frqAnswer={state.activeAnswer?.frqUserAnswer}
@@ -162,95 +390,46 @@ export const APLayoutAdapter: React.FC<TestShellLayoutProps> = ({
                 />
               </div>
             </div>
-          </>
-        ) : (
-          /* Single Column (Math) */
-          <div key={state.activeQuestion.id} className="flex-1 overflow-y-auto p-6 md:p-10 bg-white dark:bg-neutral-900">
-            <div className="max-w-2xl mx-auto space-y-6">
-              {renderItemActionBar()}
-
-              <div className="text-neutral-900 dark:text-neutral-100 font-serif text-[15.5px] leading-[1.65] font-normal">
-                <MarkdownQuestionRenderer
-                  content={state.activeQuestion.prompt}
-                  category={category}
-                  testId={metadata.id}
-                  manifestBasePath={manifestBasePath}
-                  enableLightbox={state.accommodations?.imageMagnification ?? true}
-                  className="prose-p:leading-[1.65] prose-p:my-2"
-                />
-              </div>
-
-              <QuestionOptions
-                variant="ap"
-                question={state.activeQuestion}
-                category={category}
-                testId={metadata.id}
-                sectionId={section.frontmatter.sectionId}
-                manifestBasePath={manifestBasePath}
-                selectedOptionId={state.activeAnswer?.selectedOptionId}
-                frqAnswer={state.activeAnswer?.frqUserAnswer}
-                eliminatedOptions={state.activeAnswer?.eliminatedOptions}
-                isCrossOutMode={state.isCrossOutMode}
-                onSelectOption={actions.selectOption}
-                onSetFrqAnswer={actions.setFrqAnswer}
-                onToggleEliminate={actions.toggleEliminateOption}
-              />
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* 3. Bottom Bar: 3-Column Grid for True Horizontal Centering */}
-      <footer className="h-16 border-t border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 grid grid-cols-3 items-center select-none z-30">
-        {/* Left Column: Student Profile Name */}
-        <div className="justify-self-start text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-xs">
-          {studentName || "Student Preview"}
-        </div>
-
-        {/* Center Column: Exactly Centered Question Navigator */}
-        <div className="justify-self-center">
-          <APQuestionNavigatorPopover
-            currentIndex={state.currentIndex}
-            questions={questions}
-            answers={state.answers}
-            onSelectIndex={(idx) => actions.setCurrentIndex(idx)}
-            onOpenReviewModal={actions.openReviewModal}
-          />
-        </div>
-
-        {/* Right Column: Navigation Controls */}
-        <div className="justify-self-end flex items-center gap-2">
-          <button
-            type="button"
-            disabled={isFirstQuestion}
-            onClick={() => actions.setCurrentIndex((idx) => Math.max(0, idx - 1))}
-            className="flex items-center gap-1.5 px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-sm text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back
-          </button>
-
-          {isLastQuestion ? (
-            <button
-              type="button"
-              onClick={actions.openReviewModal}
-              className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-xs font-semibold tracking-tight shadow-sm transition-colors"
-            >
-              Review Section
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => actions.setCurrentIndex((idx) => Math.min(questions.length - 1, idx + 1))}
-              className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-sm text-xs font-semibold tracking-tight shadow-sm transition-colors"
-            >
-              Next
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           )}
-        </div>
-      </footer>
+        </main>
+      )}
+
+      {/* 3. Footer */}
+      <div className="shrink-0 pb-[env(safe-area-inset-bottom)] bg-[#EBF3FA] dark:bg-neutral-950">
+        <APFooter
+          currentIndex={state.currentIndex}
+          totalQuestions={questions.length}
+          studentName={studentName}
+          syncStatus={state.syncStatus}
+          sectionTitle={frontmatter.sectionTitle}
+          questions={questions}
+          answers={state.answers}
+          isReviewScreen={isReviewActive}
+          onSelectIndex={(idx) => {
+            actions.setCurrentIndex(idx);
+            setIsReviewActive(false);
+          }}
+          onOpenReviewModal={() => setIsReviewActive(true)}
+          onPrev={() => {
+            if (isReviewActive) {
+              setIsReviewActive(false);
+            } else {
+              actions.setCurrentIndex((idx) => Math.max(0, idx - 1));
+            }
+          }}
+          onNext={() => {
+            if (isReviewActive) {
+              actions.submitSection();
+            } else if (state.currentIndex >= questions.length - 1) {
+              setIsReviewActive(true);
+            } else {
+              actions.setCurrentIndex((idx) =>
+                Math.min(questions.length - 1, idx + 1)
+              );
+            }
+          }}
+        />
+      </div>
     </div>
   );
 };

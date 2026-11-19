@@ -336,14 +336,25 @@ export const SectionCaptureModal: React.FC<SectionCaptureModalProps> = ({
             </div>
 
             {token && (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Live sync active • uploads appear automatically</span>
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Live sync active • uploads appear automatically</span>
+                </div>
+                <a
+                  href={scanUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <span>Open mobile scanner link</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             )}
 
             <p className="text-[11px] text-neutral-400 leading-tight">
-              Point your phone camera at the QR code. Photograph pages in any order — each sheet&apos;s QR code automatically matches it to the right question.
+              Point your phone camera at the QR code above. Photograph pages in any order — each sheet&apos;s footer barcode automatically matches it to the right question.
             </p>
           </div>
 

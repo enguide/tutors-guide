@@ -1,0 +1,113 @@
+# EPIC: Autonomous Optical FRQ Capture, Deterministic Verification & Progressive AI Grading Pipeline
+
+**Objective:** Deliver a zero-friction, end-to-end handwritten Free Response Question (FRQ) ingestion and grading system for AP STEM examinations (AP Calculus AB/BC, Physics, Chemistry) that achieves >99% rubric-level accuracy through deterministic computer vision, Computer Algebra System (CAS) verification, and a three-stage rollout from human-in-the-loop MVP to autonomous AI grading.
+
+---
+
+## 1. Architectural Foundation (Implemented — Stage 1 Ready)
+
+The end-to-end physical-to-digital capture, rectification, and human-in-the-loop grading infrastructure is implemented and operational in production:
+
+### A. Optical Capture & Perspective Rectification
+
+* **Zero-Tap Mobile Scanner (`components/scanner/MobileCameraView.tsx`):** Performs real-time Laplacian blur filtering, specular glare checks, 4-corner fiducial geometry locking, `1.2s` (`6 × 200ms`) steady-frame verification, `50ms` 3-frame sharpest-burst capture, and fiducial-guided 4-digit Code-128C (`QQPP`) barcode decoding. Verified sheets upload directly to S3 via pre-signed POST URLs with zero manual confirmation taps.
+
+
+* **Fiducial Registration & Homography Warping (`lib/cv/fiducials.ts`, `lib/frq/cropper.ts`):** Detects the four `8mm × 8mm` corner registration targets using white-paper quiet-zone halos, internal quadrilateral invariants, and the Top-Left L-cutout orientation signature. Warps captured photos onto a canonical `1700 × 2200` (200 DPI US Letter) canvas and extracts individual sub-part crops (`Slot 1` / `Slot 2`).
+
+
+* **Session Lifecycle & End-of-Exam Hand-Off (`actions/frqCapture.ts`, `components/exam/SectionCaptureModal.tsx`):** Enforces a 45-minute `ACTIVE` capture session window per test attempt, locks sessions to `CAPTURED` upon finalization to prevent post-submission overwrites, and aggregates `FrqSubCrop` scores into `Response`, `Result`, and `TestSummary` records.
+
+
+
+### B. Deterministic Verification & Atomic Rubric Schema
+
+* **Atomic Rubric Schema (`types/content.ts`, `content/ap_calc/.../*.md`):** Structures each FRQ sub-part in section Markdown frontmatter into binary, single-point scoring criteria (`id`, `description`, `points`, `expectedLatex`, `numericTolerance`, `requiredUnits`, `requiresJustification`, `allowConsequentialCarryover`).
+
+
+* **Gate 1 — Deterministic Blank-Box Detector (`lib/frq/inkCheck.ts`):** Evaluates interior dark ink pixel density (`luminance < 165`, inset `16px` to ignore border lines and faint `RGB(235,235,235)` dot grids). Crops with `< 0.35%` ink ratio automatically score `0 / pointsPossible` (`transcription: "[Blank]"`, `needsHumanAudit: false`) with zero human or LLM intervention.
+* **Gate 3 — Pure-TypeScript Symbolic & Numeric CAS Verifier (`lib/frq/casVerifier.ts`):** Uses `nerdamer` to normalize student LaTeX expressions and deterministically verify algebraic equivalence (`simplify((a) - (b)) === 0`), AP 3-decimal numeric rounding tolerance (`±0.001`), univariate function probing, and step-to-step arithmetic consistency.
+
+### C. Stage 1: Human-in-the-Loop MVP (`lib/frq/evaluator.ts`, `app/tgadmin/frq-audit/`)
+
+* **Controlled Rollout Flag (`ACTIVE_GRADING_STAGE = "STAGE_1_HUMAN_MVP"`):** Routes every non-blank sub-part crop to `/tgadmin/frq-audit` (`needsHumanAudit: true`, `auditReason: "STAGE_1_HUMAN_GRADING"`) pre-populated with its exact `.md` atomic rubric checklist.
+
+
+* **One-Click Tutor Audit Workspace (`AuditQueueClient.tsx`, `actions/frqAudit.ts`):** Displays the cropped handwriting alongside the rectified full-sheet toggle, collapsible question prompt, target answer keys, and clickable rubric criterion checkboxes. Tutors award points with single clicks (zero manual LaTeX entry required), generating a structured gold-standard dataset of `(cropImage, humanRubricBreakdown, pointsAwarded)` for Stage 2 benchmarking.
+
+
+
+---
+
+## 2. Roadmap to Stage 2: LLM Shadow Grading & Human Calibration
+
+**Goal:** Integrate the Vision-Language Model (VLM) transcription and rubric evaluation pipeline while retaining mandatory human verification on every inked crop to measure real-world criterion-level agreement against human tutors.
+
+### Execution Steps
+
+1. **Provider SDK & Secret Configuration:**
+* Configure environment credentials and SDK clients for the primary VLM/reasoning provider (and secondary tie-breaker VLM) in `lib/ai/frqModels.ts`.
+
+
+2. **Stage 2 Conditional Dual-VLM Transcription (`lib/frq/evaluator.ts`):**
+* Pass non-blank crops to **Engine A (Primary VLM)** with a strict JSON schema returning `{ transcriptionLatex, extractedEquations[], finalExpression, ambiguousSpans[] }`.
+* Trigger **Engine B (Tie-Breaker VLM)** *only* when `ambiguousSpans.length > 0` (targeting ~8–12% of crops), resolving discrepancies symbolically via `casVerifier.ts`.
+
+
+3. **Deterministic CAS + Structured Criterion Evaluation:**
+* Run `verifyStudentMathSteps()` (`lib/frq/casVerifier.ts`) over `extractedEquations` and `finalExpression` against each criterion's `expectedLatex` and `numericTolerance` to produce deterministic boolean facts (`matchedCriterionIds`, `mismatchedCriterionIds`, `hasArithmeticSlip`).
+* Pass the transcription, deterministic CAS facts, question prompt, and atomic `.md` criteria to the reasoning evaluator to populate `aiEarned`, `aiReason`, and `aiSuggestedPoints` on `StoredRubricPayload`.
+
+
+4. **Shadow Audit UI & Accuracy Telemetry (`AuditQueueClient.tsx`, `actions/frqAudit.ts`):**
+* Switch `ACTIVE_GRADING_STAGE = "STAGE_2_LLM_SHADOW_AUDIT"`.
+* Pre-check the rubric checkboxes in `AuditQueueClient.tsx` with the AI's suggested verdicts (`aiEarned`) and display an **"AI Suggested: X/Y pts"** badge while keeping `needsHumanAudit = true`.
+* Record `aiOverrideDelta` (`pointsAwarded - aiSuggestedPoints`) and per-criterion agreement metrics on `FrqSubCrop.rubricBreakdown` when the tutor commits the audit, building an automated accuracy dashboard in `/tgadmin/frq-audit`.
+
+
+
+---
+
+## 3. Roadmap to Stage 3: Autonomous Grading with Exception-Only Routing
+
+**Goal:** Transition to full autonomous grading once Stage 2 telemetry confirms **>99% point-level agreement** between the AI pipeline and human AP readers across a statistically significant sample of student responses.
+
+### Execution Steps
+
+1. **Flip Pipeline Mode (`ACTIVE_GRADING_STAGE = "STAGE_3_AUTONOMOUS"`):**
+* Disable forced human flagging on routine inked crops (`needsHumanAudit = false`, `FrqSubmissionStatus.EVALUATED`), allowing student results to finalize immediately upon mobile upload completion.
+
+
+
+
+2. **Deterministic Exception Routing Policy (`lib/frq/auditRouter.ts`):**
+* Compute `needsHumanAudit` deterministically in TypeScript—never relying on LLM self-confidence alone—routing a crop to `/tgadmin/frq-audit` **only** when one of the following hard triggers fires:
+
+
+* **Dual-VLM Symbolic Conflict:** Engine A and Engine B disagree on a mathematical step and `areExpressionsEquivalent()` returns `false`.
+* **CAS vs. LLM Verdict Contradiction (False Negative):** `casVerifier.ts` confirms `finalAnswerMatchesKey === true` for a criterion, yet the LLM marked `aiEarned = false`.
+* **CAS vs. LLM Verdict Contradiction (False Positive):** `casVerifier.ts` confirms `finalAnswerMatchesKey === false`, yet the LLM awarded full points without an active `allowConsequentialCarryover` justification.
+* **Qualitative Theorem / Low-Confidence Edge Case:** Criterion has `requiresJustification: true` (e.g., IVT, MVT, Candidates Test) and model criterion confidence falls below threshold (`< 0.85`).
+* **Upstream Optical Warning:** `cropper.ts` recorded a barcode auto-correction or manual fallback assignment (`auditReasonOverride`).
+
+
+
+
+
+
+3. **Student Dispute & Spot-Check Sampling:**
+* Add a **"Request Score Review"** button on the student results inspector (`QuestionResultCard.tsx`) that sets `needsHumanAudit = true` (`auditReason = "STUDENT_DISPUTE_REQUEST"`), plus optional random 2% quality-assurance sampling to continuously monitor model drift.
+
+
+
+---
+
+## 4. Acceptance Criteria & Milestones
+
+| Milestone | Stage | Exit Criteria |
+| --- | --- | --- |
+| **M1: Proof-of-Process & Human MVP** | Stage 1 | 100% of printed packet scans rectify accurately; blank boxes auto-score to `0`; tutors grade inked crops via one-click `.md` rubric checklists; `Result` and `TestSummary` scores update automatically upon audit resolution.
+
+ |
+| **M2: Shadow AI Calibration** | Stage 2 | Conditional dual-VLM + `casVerifier.ts` pre-populates rubric checklists; tutors review and override AI suggestions; telemetry logs criterion-level agreement across $\ge 200$ audited sub-parts. |
+| **M3: Autonomous Production** | Stage 3 | Point-level agreement exceeds **99.0%** in Stage 2; `STAGE_3_AUTONOMOUS` enabled; human audit queue handles only deterministic CAS/VLM exceptions (<5–8% of crops) and student disputes. 

@@ -1,90 +1,167 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/frq/mockEvaluator.ts
 import { prisma } from "@/lib/prisma";
-import { FrqSubmissionStatus } from "@prisma/client";
+import { getSectionById, getTestMetadata } from "@/lib/contentLoader";
+import { analyzeCropInkDensity } from "./inkCheck";
+import { FrqSubmissionStatus, Prisma } from "@prisma/client";
 
-export interface MockRubricCriterion {
+export interface StoredRubricCriterion {
+  id: string;
   criterion: string;
   earned: boolean;
   points: number;
+  pointsPossible: number;
   reason: string;
+  expectedLatex?: string;
+  numericTolerance?: number;
+  requiredUnits?: string;
+  requiresJustification?: boolean;
+  allowConsequentialCarryover?: boolean;
 }
 
 /**
- * Simulates an evaluator pass on cropped sub-parts.
- * Preserves any upstream QR verification audit flags passed from cropper.ts.
+ * Deterministic Proof-of-Process Evaluator (0 LLM tokens):
+ * 1. Runs ink density analysis on the rectified crop buffer.
+ *    - Blank boxes (< 0.35% dark interior pixels) auto-score to 0 with no human audit needed.
+ * 2. Hydrates real atomic rubric criteria from the test's Markdown frontmatter.
+ * 3. Routes non-blank boxes into the human audit queue (/tgadmin/frq-audit) with the
+ *    exact rubric checklist ready for tutor verification.
  */
 export async function evaluateFrqSubCropMock(
   cropId: string,
-  auditReasonOverride?: string
+  auditReasonOverride?: string,
+  cropJpegBuffer?: Buffer
 ) {
   const crop = await prisma.frqSubCrop.findUnique({
     where: { id: cropId },
-    include: { frqSubmission: true },
+    include: {
+      frqSubmission: {
+        include: {
+          test: { select: { category: true } },
+        },
+      },
+    },
   });
 
   if (!crop) return null;
 
-  await new Promise((res) => setTimeout(res, 800));
+  const { frqSubmission } = crop;
 
-  const isPartA = crop.subPartLabel === "A" || crop.subPartLabel === "C";
-  const mockTranscription = isPartA
-    ? "\\int_{0}^{4} R(t)\\,dt = 32.4"
-    : "f'(2) = \\lim_{h \\to 0} \\frac{f(2+h)-f(2)}{h} = -3";
+  // 1. Load authoritative question & sub-part rubric from Markdown frontmatter
+  let subPartCriteria: StoredRubricCriterion[] = [];
+  let fallbackNotes = "";
+  let totalPointsPossible = crop.pointsPossible || 1.0;
 
-  const mockRubric: MockRubricCriterion[] = isPartA
-    ? [
-        {
-          criterion: "Integral setup with correct limits [0, 4]",
-          earned: true,
-          points: 1.0,
-          reason: "Correct limits and integrand specified.",
-        },
-        {
-          criterion: "Terminal evaluation and units",
-          earned: true,
-          points: 1.0,
-          reason: "Accurately calculated with proper units of measurement.",
-        },
-      ]
-    : [
-        {
-          criterion: "Difference quotient setup or derivative formula",
-          earned: true,
-          points: 1.0,
-          reason: "Correctly applied definition of derivative.",
-        },
-        {
-          criterion: "Terminal evaluation",
+  try {
+    const categorySlug = frqSubmission.test.category.toLowerCase();
+    const metadata = await getTestMetadata(categorySlug, frqSubmission.testId);
+    const resolvedCat = metadata?.category?.toLowerCase() || categorySlug;
+    const parsedSection = await getSectionById(
+      resolvedCat,
+      frqSubmission.testId,
+      frqSubmission.sectionId
+    );
+
+    const question = parsedSection?.frontmatter.questions.find(
+      (q) => q.id === frqSubmission.questionId
+    );
+    const subPartDef = question?.subParts?.find(
+      (sp) => sp.label.trim().toUpperCase() === crop.subPartLabel.trim().toUpperCase()
+    );
+
+    if (subPartDef) {
+      if (typeof subPartDef.points === "number" && subPartDef.points > 0) {
+        totalPointsPossible = subPartDef.points;
+      }
+      fallbackNotes = subPartDef.rubricNotes || "";
+
+      if (Array.isArray(subPartDef.criteria) && subPartDef.criteria.length > 0) {
+        subPartCriteria = subPartDef.criteria.map((c) => ({
+          id: c.id,
+          criterion: c.description,
           earned: false,
-          points: 0.0,
-          reason: "Arithmetic slip in final subtraction step.",
+          points: 0,
+          pointsPossible: c.points,
+          reason: "Pending review",
+          expectedLatex: c.expectedLatex,
+          numericTolerance: c.numericTolerance,
+          requiredUnits: c.requiredUnits,
+          requiresJustification: c.requiresJustification,
+          allowConsequentialCarryover: c.allowConsequentialCarryover,
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn("[evaluateFrqSubCropMock] Could not load .md rubric:", err);
+  }
+
+  if (subPartCriteria.length === 0) {
+    subPartCriteria = [
+      {
+        id: `${frqSubmission.questionId}-${crop.subPartLabel.toLowerCase()}-main`,
+        criterion:
+          fallbackNotes ||
+          `Part ${crop.subPartLabel} response (${totalPointsPossible} pt${
+            totalPointsPossible === 1 ? "" : "s"
+          })`,
+        earned: false,
+        points: 0,
+        pointsPossible: totalPointsPossible,
+        reason: "Pending review",
+      },
+    ];
+  }
+
+  // 2. Deterministic Blank-Box Check (when cropBuffer is provided)
+  if (cropJpegBuffer) {
+    const ink = await analyzeCropInkDensity(cropJpegBuffer);
+    if (ink.isBlank) {
+      const blankCriteria = subPartCriteria.map((c) => ({
+        ...c,
+        earned: false,
+        points: 0,
+        reason: "No written response detected (blank response box).",
+      }));
+
+      const updatedBlankCrop = await prisma.frqSubCrop.update({
+        where: { id: cropId },
+        data: {
+          transcription: "[Blank]",
+          pointsAwarded: 0,
+          pointsPossible: totalPointsPossible,
+          rubricBreakdown: blankCriteria as unknown as Prisma.InputJsonValue,
+          needsHumanAudit: Boolean(auditReasonOverride),
+          auditReason: auditReasonOverride ?? null,
         },
-      ];
+      });
 
-  const pointsAwarded = mockRubric.reduce((acc, c) => acc + (c.earned ? c.points : 0), 0);
-  const pointsPossible = mockRubric.reduce((acc, c) => acc + c.points, 0);
+      await syncParentSubmissionStatus(crop.frqSubmissionId);
+      return updatedBlankCrop;
+    }
+  }
 
-  const needsHumanAudit = Boolean(auditReasonOverride) || crop.subPartLabel === "D";
-  const auditReason =
-    auditReasonOverride ??
-    (crop.subPartLabel === "D" ? "SYNTHETIC_UNCERTAINTY_FLAG" : null);
+  // 3. Non-blank crop -> route to Human Review Queue with structured .md rubric checklist
+  const auditReason = auditReasonOverride ?? "PROOF_OF_PROCESS_HUMAN_REVIEW";
 
   const updatedCrop = await prisma.frqSubCrop.update({
     where: { id: cropId },
     data: {
-      transcription: mockTranscription,
-      pointsAwarded,
-      pointsPossible,
-      rubricBreakdown: mockRubric as any,
-      needsHumanAudit,
+      transcription: "",
+      pointsAwarded: 0,
+      pointsPossible: totalPointsPossible,
+      rubricBreakdown: subPartCriteria as unknown as Prisma.InputJsonValue,
+      needsHumanAudit: true,
       auditReason,
     },
   });
 
+  await syncParentSubmissionStatus(crop.frqSubmissionId);
+  return updatedCrop;
+}
+
+async function syncParentSubmissionStatus(frqSubmissionId: string) {
   const remainingUnevaluated = await prisma.frqSubCrop.count({
     where: {
-      frqSubmissionId: crop.frqSubmissionId,
+      frqSubmissionId,
       transcription: null,
     },
   });
@@ -92,13 +169,13 @@ export async function evaluateFrqSubCropMock(
   if (remainingUnevaluated === 0) {
     const hasAuditFlag = await prisma.frqSubCrop.count({
       where: {
-        frqSubmissionId: crop.frqSubmissionId,
+        frqSubmissionId,
         needsHumanAudit: true,
       },
     });
 
     await prisma.frqSubmission.update({
-      where: { id: crop.frqSubmissionId },
+      where: { id: frqSubmissionId },
       data: {
         status:
           hasAuditFlag > 0
@@ -107,6 +184,4 @@ export async function evaluateFrqSubCropMock(
       },
     });
   }
-
-  return updatedCrop;
 }

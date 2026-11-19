@@ -264,6 +264,55 @@ Steps by 2 pixels ($y += 2, x += 2$) to achieve sub-10ms performance on low-powe
   * **Two-Slot Sheet Pagination:** Maps `FRQ_HANDWRITTEN` sub-parts (`A, B, C, D...`) onto 2-slot physical sheets (`pageNumber = Math.floor(idx / 2) + 1`, `slotIndex = idx % 2`) with composite keys (`{sectionId}::{questionId}::p{pageNumber}`).
   * **Multi-Format Code Parsing & Validation:** `parseSelfDescribingSheetQr` parses 4-digit Code-128C `QQPP` strings (`"0101"`), pipe-delimited strings, and legacy semicolon key-value QR strings; `matchQrAgainstManifest` resolves sequential booklet page numbers (`1..12`) back to question-relative sheet indices (`1` or `2`) and flags `WRONG_FORM` or `NOT_IN_TEST` mismatches.
 
+---
+
+### `lib/frq/inkCheck.ts`
+
+* **Purpose & Scope:** Gate 1 deterministic blank-box detector executed on rectified sub-part JPEG buffers before any human audit or LLM call is scheduled.
+
+
+* **Exports:**
+  * `analyzeCropInkDensity(cropJpegBuffer: Buffer): Promise<InkDensityResult>`
+  * Interface: `InkDensityResult` (`isBlank`, `inkRatio`, `darkPixelCount`, `sampledPixelCount`)
+
+
+* **Key Logic & Edge Cases:**
+  * **Border Inset & Dot-Grid Exclusion:** Insets `16px` on all four edges to exclude response-box borders and counts pixels with grayscale luminance `< 165` (ignoring the faint `RGB(235, 235, 235)` 10% dot grid). Returns `isBlank: true` when `inkRatio < 0.0035` (`< 0.35%` dark pixels), auto-scoring empty responses to `0` with `transcription: "[Blank]"` and `needsHumanAudit: false`.
+
+---
+
+### `lib/frq/casVerifier.ts`
+
+* **Purpose & Scope:** Gate 3 pure-TypeScript Computer Algebra System (CAS) symbolic and numeric equivalence verifier built on `nerdamer` for AP math and hard-science rubric criteria and tutor audit assistance.
+
+
+* **Exports:**
+  * `normalizeLatexToCas(latex: string): string`
+  * `areExpressionsEquivalent(studentLatex: string, expectedLatex: string, numericTolerance?: number): boolean | null`
+  * `verifyStudentMathSteps(params): CasVerificationSummary`
+  * Interfaces: `EquationStepCheck`, `CasVerificationSummary`
+
+
+* **Key Logic & Edge Cases:**
+  * **LaTeX-to-CAS Normalization:** Translates nested `\frac{a}{b}`, `\sqrt{...}`, `^{...}`, trigonometric/inverse-trig functions, `\ln`, `\pi`, and differential suffixes (`\,dx`, `\,dt`) into `nerdamer` syntax.
+  * **Three-Tier Equivalence Checking:** Evaluates (1) exact symbolic difference `simplify((a) - (b)) === 0`, (2) numeric decimal evaluation within AP 3-decimal-place rounding tolerance (`±0.001` default), and (3) multi-point univariate probing (`x = 0.37, 1.13, 2.41`) for equivalent algebraic functions, plus adjacent equality chain validation (`A = B = C`) to flag arithmetic slips.
+
+---
+
+### `lib/frq/evaluator.ts`
+
+* **Purpose & Scope:** Stage-aware FRQ sub-part evaluation orchestrator supporting the three-stage progressive rollout (`STAGE_1_HUMAN_MVP`, `STAGE_2_LLM_SHADOW_AUDIT`, `STAGE_3_AUTONOMOUS`).
+
+
+* **Exports:**
+  * `evaluateFrqSubCrop(cropId: string, auditReasonOverride?: string, cropJpegBuffer?: Buffer)`
+  * Constant: `ACTIVE_GRADING_STAGE: GradingPipelineStage`
+  * Types & Interfaces: `GradingPipelineStage`, `StoredRubricCriterion`, `StoredRubricPayload`
+
+
+* **Key Logic & Edge Cases:**
+  * **Authoritative `.md` Rubric Hydration:** Loads the question prompt and sub-part atomic `criteria` directly from section Markdown frontmatter via `getSectionById`, storing them in `FrqSubCrop.rubricBreakdown` (`StoredRubricPayload`).
+  * **Blank Auto-Score vs. Stage 1 Audit Routing:** Auto-scores blank crops (`analyzeCropInkDensity`) to `0` without flagging for review, while routing all inked crops in `STAGE_1_HUMAN_MVP` to `/tgadmin/frq-audit` (`needsHumanAudit: true`, `auditReason: "STAGE_1_HUMAN_GRADING"`) for one-click criterion-checkbox grading and synchronizes parent `FrqSubmission.status` (`PENDING_AUDIT` vs. `EVALUATED`).
 
 ---
 

@@ -152,11 +152,32 @@ export interface ExamScoringConfig {
   };
 }
 
+export interface FrqRubricCriterion {
+  /** Stable identifier e.g. "q1-a-setup" */
+  id: string;
+  /** Atomic College Board scoring guideline description */
+  description: string;
+  /** Point value for this criterion (typically 1) */
+  points: number;
+  /** Optional canonical LaTeX/math expression for deterministic CAS equivalence check */
+  expectedLatex?: string;
+  /** Optional numeric tolerance for decimal answers (defaults to 0.001 per AP standard) */
+  numericTolerance?: number;
+  /** Optional required unit string (e.g., "liters", "meters/sec^2") */
+  requiredUnits?: string;
+  /** True if criterion requires verbal/theorem justification (e.g., IVT, MVT, units) */
+  requiresJustification?: boolean;
+  /** True if student can earn this point via consequential consistency from an earlier slip */
+  allowConsequentialCarryover?: boolean;
+}
+
 export interface FrqSubPartDefinition {
   /** Uppercase sub-part label matching printed sheet ("A", "B", "C", "D", etc.) */
   label: string;
   /** Maximum rubric points for this sub-part (defaults to 1.0 if omitted) */
   points?: number;
-  /** Optional rubric summary or scoring notes for future AI grader */
+  /** Optional rubric summary or scoring notes */
   rubricNotes?: string;
+  /** Optional atomic scoring criteria for deterministic CAS + LLM rubric evaluation */
+  criteria?: FrqRubricCriterion[];
 }

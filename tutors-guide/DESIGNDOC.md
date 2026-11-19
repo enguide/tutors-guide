@@ -825,3 +825,120 @@ During end-to-end integration verification on AP Calculus AB Practice Test 1 (Se
   * Transcription and point values accurately linked to child crop rows.
 
 * **Routing:** Clean transition from section completion to Section II Part B (`ap-calc-ab-t1-s2b`) with composite scores aggregated correctly.
+For a high-end service where clients pay a premium for near-zero grading error, you cannot rely on a single-pass API call. AP Calculus BC scoring is unforgiving: points hinge on subtleties like whether an integral integrand has a differential ($dx$), whether a theorem's conditions (e.g., continuity on $[a,b]$) were stated, or whether consequential consistency was credited after an arithmetic error.
+
+To deliver expert-reader accuracy while handling messy handwriting and edge cases, use a **Dual-Engine Consensus & Arbiter Pipeline** paired with **CAS (Computer Algebra System) verification**.
+
+---
+
+### 1. High-Reliability Architecture
+
+```
+[Student Response Crop (e.g., Q6-Part B)]
+                   │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+ [Engine A: Vision-OCR] [Engine B: Vision-OCR]
+ (Claude 3.7 Sonnet)     (GPT-4o / Gemini 1.5 Pro)
+         │                   │
+         └─────────┬─────────┘
+                   ▼
+       [AST / SymPy Normalizer]  <── Flags arithmetic & algebraic equivalence
+                   │
+                   ▼
+     [Consensus Check on Transcription]
+        ├─ Match ──► Proceed to Evaluator
+        └─ Mismatch / Low Legibility ──► Auto-routed to Human Review Queue
+                   │
+                   ▼
+   [Reasoning Grader: o3-mini / o1 / R1]
+   (Evaluates clean LaTeX vs. Official Rubric)
+                   │
+     Points + Rationale + Audit Trail
+
+```
+
+#### Step 1: Dual-Model Vision Consensus (OCR & Transcription)
+
+Do not ask a vision model to grade and transcribe simultaneously. Send the cropped sub-question box in parallel to two frontier vision models (e.g., Anthropic Claude 3.7 Sonnet and OpenAI GPT-4o).
+
+* **Prompt:** Extract handwritten math into standardized LaTeX and structural steps.
+* **Agreement Metric:** If both models extract the same mathematical statements (checked via string diff or symbolic tree), confidence is high.
+* **Fallback for Illegible Work:** If both models flag illegibility or disagree fundamentally on an ambiguous stroke (e.g., $t$ vs. $+$, $5$ vs. $s$), the crop is flagged immediately for a human teacher. This protects high-end clients from hallucinations.
+
+#### Step 2: Symbolic Engine Check (SymPy / CAS)
+
+Before grading, run the transcribed steps through a symbolic engine like SymPy. The CAS checks whether the student's arithmetic actually leads to their conclusion. This eliminates the #1 failure mode of LLMs: miscalculating intermediate calculus arithmetic when applying consequential grading rules.
+
+#### Step 3: Frontier Reasoning Evaluator (The "AP Reader")
+
+Pass the agreed-upon LaTeX transcription, the question prompt, and the detailed College Board scoring guidelines into a dedicated reasoning model (e.g., OpenAI o3-mini or o1).
+
+* **Evaluation Criteria:** Point breakdown (e.g., 1 pt setup, 1 pt answer with units), theorem condition checks, and explanation verification.
+* **Output:** A structured JSON object containing:
+```json
+{
+  "points_awarded": 2,
+  "points_possible": 3,
+  "rubric_breakdown": [
+    {"criterion": "Definite integral setup", "earned": true, "reason": "Correct limits [0, 4] and integrand."},
+    {"criterion": "Applies fundamental theorem", "earned": true, "reason": "Antiderivative found correctly."},
+    {"criterion": "Terminal value", "earned": false, "reason": "Arithmetic slip in final subtraction; consequential credit not allowed per rubric."}
+  ],
+  "needs_human_audit": false
+}
+
+```
+
+
+
+---
+
+### 2. Cost Analysis: 5 Full AP Calculus BC Tests
+
+Each AP Calculus BC exam has **6 FRQ questions**. Each question typically contains **3 to 4 sub-parts (A, B, C, D)**, totaling **~22 discrete student response crops per test**.
+
+For **5 full tests**:
+
+* $5 \text{ tests} \times 6 \text{ FRQs} = 30 \text{ questions}$
+* $30 \text{ questions} \times ~3.6 \text{ parts} \approx \mathbf{110 \text{ sub-question grading passes}}$
+
+#### Token Consumption per Sub-Question Crop
+
+* **Vision Ingestion (Parallel Dual Call):**
+* 1 image crop (~1,000 × 600 px) $\approx 800$ image tokens + 300 text prompt tokens.
+* Multiplied by 2 engines = ~2,200 input tokens; ~400 output tokens total.
+
+
+* **Reasoning Evaluator:**
+* Clean LaTeX input + full rubric $\approx 1,200$ input tokens.
+* Reasoning tokens + JSON output $\approx 1,000$ tokens.
+
+
+
+#### API Cost Calculation (110 Sub-Parts / 5 Tests)
+
+| Component | Models Used | Unit Cost per Sub-Part | Total Cost (5 Full Tests) |
+| --- | --- | --- | --- |
+| **Vision Consensus (Dual)** | Claude 3.7 Sonnet + GPT-4o | ~$0.012 | $1.32 |
+| **Reasoning Rubric Grader** | OpenAI o3-mini / o1-mini | ~$0.015 | $1.65 |
+| **SymPy / Python Layer** | Local script execution | $0.000 | $0.00 |
+| **Contingency / Cache buffer** | Uncached prompts / Retries | ~$0.005 | $0.55 |
+| **Total Automated Cost** |  | **~$0.032 / sub-part** | **~$3.50 total** |
+
+Even with a dual-redundant vision layer and a frontier reasoning model, the raw API cost to grade 5 full tests (all 30 multi-step FRQs) is **less than $4.00**.
+
+---
+
+### 3. Human-in-the-Loop Economics
+
+For a high-end product, the remaining cost is the human safety net:
+
+* **Expected Flag Rate:** With well-designed response boxes (using faint dot grids and clear part boundaries), handwriting disagreement or true illegibility occurs in roughly **5% to 8%** of responses.
+* For 110 crops across 5 exams, you will see approximately **5 to 9 human review flags**.
+* At a tutoring/reader rate of $30/hr, reviewing 8 isolated crops takes roughly 5–10 minutes (~$3.00 to $5.00 in human labor).
+
+### Recommendation for Production
+
+1. **Deterministic Prompts with Structured JSON Output:** Enforce strict JSON output schemas (via structured outputs/Pydantic) to eliminate parsing crashes.
+2. **Transparent Student Feedback:** Because the pipeline transcribes the math before grading it, deliver the transcribed LaTeX directly to the student alongside the scored rubric. If an edge case occurs, the student and instructor can see whether the issue was illegible handwriting or actual mathematical logic.

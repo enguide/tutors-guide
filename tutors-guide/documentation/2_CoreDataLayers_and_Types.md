@@ -110,17 +110,18 @@ This section provides a comprehensive breakdown of the application's foundationa
 
 * **Exports:**
 * `QuestionType`: `"MC" | "FR" | "FRQ_HANDWRITTEN"`
-* `QuestionLayoutMode`: `"split" | "single"`
-* `QuestionDifficulty`: `"Easy" | "Medium" | "Hard"`
-* `QuestionOption` (Interface: `id`, `text`)
-* `QuestionFrontmatter` (Interface)
-* `SectionFrontmatter` (Interface)
-* `SectionManifest` (Interface)
-* `AdaptiveRoutingRule` (Interface)
-* `AdaptiveStage` (Interface)
-* `TestMetadata` (Interface)
-* `ParsedSection` (Interface)
-* `LinearCurveMapping`, `APGradeCutoffs`, `DifficultyWeightMatrix`, `AdaptiveDomainCurveSet`, `AdaptiveScoringConfig`, `ExamScoringConfig` (Interfaces)
+* `QuestionLayoutMode`: `"split" | "single"`[cite: 41]
+* `QuestionDifficulty`: `"Easy" | "Medium" | "Hard"`[cite: 41]
+* `QuestionOption` (Interface: `id`, `text`)[cite: 41]
+* `FrqRubricCriterion`, `FrqSubPartDefinition` (Interfaces)
+* `QuestionFrontmatter` (Interface)[cite: 41]
+* `SectionFrontmatter` (Interface)[cite: 41]
+* `SectionManifest` (Interface)[cite: 41]
+* `AdaptiveRoutingRule` (Interface)[cite: 41]
+* `AdaptiveStage` (Interface)[cite: 41]
+* `TestMetadata` (Interface)[cite: 41]
+* `ParsedSection` (Interface)[cite: 41]
+* `LinearCurveMapping`, `APGradeCutoffs`, `DifficultyWeightMatrix`, `AdaptiveDomainCurveSet`, `AdaptiveScoringConfig`, `ExamScoringConfig` (Interfaces)[cite: 41]
 
 
 * **Type Definitions & Shapes:**
@@ -128,6 +129,7 @@ This section provides a comprehensive breakdown of the application's foundationa
 * `AdaptiveRoutingRule` & `AdaptiveStage`: Dictate dynamic stage movement (`threshold`, `onPass`, `onFail`), enabling multi-stage tests like the Digital SAT and section-adaptive GRE.
 * `DifficultyWeightMatrix` & `AdaptiveScoringConfig`: Configure module-tier item weights (`routing`, `hard`, `easy` $\times$ `Easy`, `Medium`, `Hard`), domain-specific normalized ability equating curves (`domainCurves`), and raw branch overrides (`branchRawCurves`).
 * `ExamScoringConfig`: Controls the evaluation engine strategy (`scaleType`: `"SAT_ADAPTIVE" | "SAT_LINEAR" | "ACT_CONCORDANCE" | "AP_WEIGHTED" | "GRE_SECTION" | "ACADEMIC_MASTERY"`), optional `percentileTable` overrides, `adaptiveConfig`, section multipliers (`apWeights`), GRE curves (`greConfig`), and raw-to-scaled mappings (`curves`).
+* `FrqSubPartDefinition` & `FrqRubricCriterion`: Define structured free-response sub-parts (`label`, `points`, `rubricNotes`) and atomic single-point scoring criteria (`id`, `description`, `points`, `expectedLatex`, `numericTolerance`, `requiredUnits`, `requiresJustification`, `allowConsequentialCarryover`) parsed from section Markdown frontmatter for deterministic CAS checking and human/AI rubric evaluation.
 
 
 * **Dependencies & Imports:** `SectionExamConfig`, `SupportedExamCategory` from `./examConfig`.

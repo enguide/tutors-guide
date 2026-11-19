@@ -27,7 +27,7 @@ import { BaseModuleTransition } from "./themes/base/BaseModuleTransition";
 export const PRESENTATION_REGISTRY: Record<string, ExamPresentationTheme> = {
   // Digital SAT (Bluebook Layout, In-canvas Check Your Work, Direct Start)
   SAT: {
-    Directions: null, // Bluebook has no interstitial directions; accessible via header dropdown
+    Directions: null,
     autoStartSection: true,
     Shell: SATLayoutAdapter,
     Review: () => null,
@@ -45,14 +45,14 @@ export const PRESENTATION_REGISTRY: Record<string, ExamPresentationTheme> = {
     Transition: BaseModuleTransition,
   },
 
-  // AP Examinations
+  // Digital AP Examinations (Bluebook Layout, In-canvas Check Your Work, Direct Start)
   AP_CALC: {
-    Directions: SectionDirectionsModal,
-    autoStartSection: false,
+    Directions: null,
+    autoStartSection: true,
     Shell: APLayoutAdapter,
-    Review: SectionReviewModal,
-    Intermission: BaseIntermissionScreen,
-    Transition: BaseModuleTransition,
+    Review: () => null,
+    Intermission: SATIntermissionScreen,
+    Transition: SATModuleTransition,
   },
 
   // GRE (ETS PowerPrep)

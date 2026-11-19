@@ -445,48 +445,35 @@ This section covers the operational business logic layer of the application, enc
 
 ### `actions/frqAudit.ts`
 
-* **Purpose & Scope:** Staff-facing review queue actions for inspecting, transcribing, and grading handwritten student responses flagged for human audit.
+* **Purpose & Scope:** Staff-facing review queue actions for inspecting and grading handwritten student responses flagged for human audit, persisting atomic rubric criterion verdicts, and re-aggregating finalized student exam scores[cite: 36].
 
 
 * **Exports:**
-* `getPendingAuditCrops(): Promise<{ success: boolean; crops?: FrqSubCrop[]; error?: string }>`
-
-
-* `resolveCropAudit(params): Promise<{ success: boolean; error?: string }>`
-
-
+  * `getPendingAuditCrops(): Promise<{ success: boolean; crops?: FrqSubCrop[]; error?: string }>`[cite: 36]
+  * `resolveCropAudit(params): Promise<{ success: boolean; error?: string }>`[cite: 36]
 
 
 * **Parameters / Props:**
-* `resolveCropAudit`: `{ cropId: string; pointsAwarded: number; transcription?: string; reviewerNotes?: string }`.
-
-
+  * `resolveCropAudit`: `{ cropId: string; pointsAwarded: number; transcription?: string; reviewerNotes?: string; rubricBreakdown?: unknown }`[cite: 36].
 
 
 * **Return Value / Emitted State:**
-* `getPendingAuditCrops`: Array of pending crop items including student profile info and exam title.
-
-
-* `resolveCropAudit`: `{ success: true }`.
-
-
+  * `getPendingAuditCrops`: Array of pending `FrqSubCrop` items including `rubricBreakdown`, `auditReason`, student profile info, and exam title[cite: 36].
+  * `resolveCropAudit`: `{ success: true }` or `{ success: false, error: string }`[cite: 36].
 
 
 * **Dependencies & Imports:**
-* `auth` from `@/lib/auth`, `prisma` from `@/lib/prisma`.
-
-
-* `revalidatePath` from `next/cache`.
-
-
+  * `auth` from `@/lib/auth`, `prisma` from `@/lib/prisma`[cite: 36].
+  * `getTestMetadata` from `@/lib/contentLoader`.
+  * `calculateSectionScaledScore`, `synthesizeExamComposite` from `@/lib/scoring/scoringEngine`.
+  * `FrqSubmissionStatus`, `Prisma` from `@prisma/client`.
+  * `revalidatePath` from `next/cache`[cite: 36].
 
 
 * **Key Logic & Edge Cases:**
-* **Staff Role Guard:** Restricts queue querying and resolution to `ADMIN`, `ORG_ADMIN`, and `TUTOR` roles.
-
-
-* **Audit Resolution:** Updates `pointsAwarded`, `transcription`, `reviewerNotes`, links `reviewedById`, and sets `needsHumanAudit: false` before clearing the Next.js router cache for `/tgadmin/frq-audit` via `revalidatePath`.
-
+  * **Staff Role Guard:** Restricts queue querying and resolution to `ADMIN`, `ORG_ADMIN`, and `TUTOR` roles[cite: 36].
+  * **Atomic Criterion Resolution & Parent Status Sync:** Updates `pointsAwarded`, `transcription`, `rubricBreakdown`, `reviewerNotes`, links `reviewedById`, and clears `needsHumanAudit: false`[cite: 36]. Transitions the parent `FrqSubmission` status to `FrqSubmissionStatus.EVALUATED` once zero crops on that sheet remain flagged.
+  * **Post-Audit Score Re-Aggregation:** If the student has already finalized the exam (`Result` rows exist), re-sums all `FrqSubCrop` points and transcriptions into `Response` and `Result.scaledScore` per FRQ section and re-synthesizes `TestSummary.compositeScore` before calling `revalidatePath("/tgadmin/frq-audit")`[cite: 36].
 
 
 
