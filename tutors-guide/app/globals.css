@@ -148,16 +148,6 @@
   font-family: KaTeX_Main, "Times New Roman", serif;
 }
 
-/* 2. Preserve zero-width containers for compound glyphs like \neq */
-.katex .rlap {
-  width: 0 !important;
-  position: relative;
-}
-
-.katex .rlap > .inner {
-  position: inherit;
-}
-
 .katex .thinbox {
   display: inline-block;
   width: 0 !important;

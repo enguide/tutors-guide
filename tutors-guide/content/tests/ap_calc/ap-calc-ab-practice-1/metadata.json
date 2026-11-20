@@ -76,7 +76,7 @@
       "timeLimit": 2700,
       "hasIntermissionAfter": false,
       "config": {
-        "layout": "single-column",
+        "layout": "split-passage",
         "calculator": "desmos-graphing",
         "hasFormulaSheet": false,
         "hasCrossOutMode": false,
@@ -92,7 +92,7 @@
       "timeLimit": 3600,
       "hasIntermissionAfter": false,
       "config": {
-        "layout": "single-column",
+        "layout": "split-passage",
         "calculator": "none",
         "hasFormulaSheet": false,
         "hasCrossOutMode": false,

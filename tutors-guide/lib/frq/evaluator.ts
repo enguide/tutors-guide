@@ -86,7 +86,17 @@ export async function evaluateFrqSubCrop(
 
     if (question) {
       questionNumber = question.questionNumber;
-      questionPrompt = question.prompt;
+
+      const rawCombinedPrompt = [question.stimulus, question.prompt]
+        .filter((part): part is string => Boolean(part && part.trim().length > 0))
+        .join("\n\n---\n\n");
+
+      const assetBase = `/content/tests/${resolvedCat}/${frqSubmission.testId}/assets`;
+
+      questionPrompt = rawCombinedPrompt.replace(
+        /\]\(\.\/assets\//g,
+        `](${assetBase}/`
+      );
     }
 
     const subPartDef = question?.subParts?.find(
