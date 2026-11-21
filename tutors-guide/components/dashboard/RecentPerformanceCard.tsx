@@ -74,7 +74,7 @@ export function RecentPerformanceCard({
                   >
                     {isPendingAudit
                       ? projectedScore !== null
-                        ? `Est. ${projectedScore}`
+                        ? `${projectedScore}`
                         : "Pending"
                       : recentSummary.compositeScore ?? "—"}
                     {isApCalc && (isPendingAudit ? projectedScore !== null : recentSummary.compositeScore !== null) && (

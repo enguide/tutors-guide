@@ -233,7 +233,7 @@ export function ScoreTargetGauge({
               {isPendingAudit ? "Projected Goal Met" : "Target Achieved"}
             </span>
             <div className="text-4xl sm:text-5xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
-              {isPendingAudit ? `Est. ${effectiveScore}` : effectiveScore}
+              {isPendingAudit ? `${effectiveScore}` : effectiveScore}
             </div>
           </div>
           <div className="text-right space-y-1 max-w-[210px]">
@@ -270,7 +270,7 @@ export function ScoreTargetGauge({
               <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
                 {isPendingAudit ? "Projected:" : "Latest Baseline:"}{" "}
                 <strong className="text-foreground">
-                  {isPendingAudit ? `Est. ${effectiveScore}` : effectiveScore}
+                  {isPendingAudit ? `${effectiveScore}` : effectiveScore}
                 </strong>
               </span>
               <span className="text-xs font-bold text-foreground">
