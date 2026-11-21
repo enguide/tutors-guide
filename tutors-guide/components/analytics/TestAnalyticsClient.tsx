@@ -194,6 +194,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
               metadata={metadata}
               sectionResults={sectionResults}
               responses={responses}
+              pendingAuditSectionIds={pendingAuditSectionIds}
               onInspectQuestions={(questionIds: string[], label: string) => {
                 setSelectedSectionId("all");
                 handleResetFilters();

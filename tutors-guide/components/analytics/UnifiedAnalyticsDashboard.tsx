@@ -1115,7 +1115,10 @@ export default function UnifiedAnalyticsDashboard({
         )}
 
         <div className={activeSectionResult ? "w-full lg:w-2/3 min-w-0" : "w-full min-w-0"}>
-          <TopicSkillAccuracyAccordion responses={activeResponses} />
+          <TopicSkillAccuracyAccordion
+            responses={activeResponses}
+            pendingAuditSectionIds={pendingAuditSectionIds}
+          />
         </div>
       </div>
     </div>

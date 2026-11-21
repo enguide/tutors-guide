@@ -20,18 +20,21 @@ import { EnrichedResponseItem } from "@/types/analytics";
 
 interface TopicSkillAccuracyAccordionProps {
   responses: EnrichedResponseItem[];
+  pendingAuditSectionIds?: string[];
 }
 
 interface SkillMetrics {
   name: string;
   correct: number;
   incorrect: number;
+  pending: number;
   total: number;
 }
 
 interface QuestionPip {
   id: string;
   isCorrect: boolean;
+  isPendingAudit: boolean;
   questionNumber: number;
 }
 
@@ -39,8 +42,9 @@ interface TopicGroup {
   topicName: string;
   totalCorrect: number;
   totalIncorrect: number;
+  totalPending: number;
   totalQuestions: number;
-  percentage: number;
+  percentage: number | null;
   skills: SkillMetrics[];
   pips: QuestionPip[];
 }
@@ -50,6 +54,7 @@ type SortOption = "most-missed" | "lowest-accuracy";
 const chartConfig = {
   correct: { label: "Correct", color: "#444444" },
   incorrect: { label: "Incorrect", color: "#ff9999" },
+  pending: { label: "Under Review", color: "#f59e0b" },
 } satisfies ChartConfig;
 
 // Helper function to split text into wrapped lines by whole words
@@ -73,12 +78,18 @@ function wrapText(text: string, maxCharsPerLine = 26): string[] {
 
 export function TopicSkillAccuracyAccordion({
   responses,
+  pendingAuditSectionIds = [],
 }: TopicSkillAccuracyAccordionProps) {
   // Sorting state: defaults to most missed questions
   const [sortBy, setSortBy] = useState<SortOption>("most-missed");
 
   // Track explicit open states
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
+
+  const pendingAuditSet = useMemo(
+    () => new Set(pendingAuditSectionIds),
+    [pendingAuditSectionIds]
+  );
 
   // Group and sort topics with primary sort + secondary tiebreaker
   const groupedTopics: TopicGroup[] = useMemo(() => {
@@ -87,8 +98,9 @@ export function TopicSkillAccuracyAccordion({
       {
         totalCorrect: number;
         totalIncorrect: number;
+        totalPending: number;
         totalQuestions: number;
-        skills: Record<string, { correct: number; incorrect: number }>;
+        skills: Record<string, { correct: number; incorrect: number; pending: number }>;
         pips: QuestionPip[];
       }
     > = {};
@@ -96,11 +108,13 @@ export function TopicSkillAccuracyAccordion({
     responses.forEach((r) => {
       const topic = r.domain || "General";
       const skill = r.skill || "General";
+      const isPendingAudit = pendingAuditSet.has(String(r.sectionId));
 
       if (!topicMap[topic]) {
         topicMap[topic] = {
           totalCorrect: 0,
           totalIncorrect: 0,
+          totalPending: 0,
           totalQuestions: 0,
           skills: {},
           pips: [],
@@ -108,17 +122,21 @@ export function TopicSkillAccuracyAccordion({
       }
 
       if (!topicMap[topic].skills[skill]) {
-        topicMap[topic].skills[skill] = { correct: 0, incorrect: 0 };
+        topicMap[topic].skills[skill] = { correct: 0, incorrect: 0, pending: 0 };
       }
 
       topicMap[topic].totalQuestions += 1;
       topicMap[topic].pips.push({
         id: r.id || `${topic}-${topicMap[topic].pips.length}`,
         isCorrect: r.isCorrect,
+        isPendingAudit,
         questionNumber: r.responseOrder,
       });
 
-      if (r.isCorrect) {
+      if (isPendingAudit) {
+        topicMap[topic].totalPending += 1;
+        topicMap[topic].skills[skill].pending += 1;
+      } else if (r.isCorrect) {
         topicMap[topic].totalCorrect += 1;
         topicMap[topic].skills[skill].correct += 1;
       } else {
@@ -134,14 +152,16 @@ export function TopicSkillAccuracyAccordion({
             name,
             correct: m.correct,
             incorrect: m.incorrect,
-            total: m.correct + m.incorrect,
+            pending: m.pending,
+            total: m.correct + m.incorrect + m.pending,
           }))
           .sort((a, b) => b.incorrect - a.incorrect);
 
+        const gradedCount = data.totalCorrect + data.totalIncorrect;
         const percentage =
-          data.totalQuestions > 0
-            ? Math.round((data.totalCorrect / data.totalQuestions) * 100)
-            : 0;
+          gradedCount > 0
+            ? Math.round((data.totalCorrect / gradedCount) * 100)
+            : null;
 
         // Keep question pips ordered chronologically by responseOrder
         const sortedPips = [...data.pips].sort(
@@ -152,6 +172,7 @@ export function TopicSkillAccuracyAccordion({
           topicName,
           totalCorrect: data.totalCorrect,
           totalIncorrect: data.totalIncorrect,
+          totalPending: data.totalPending,
           totalQuestions: data.totalQuestions,
           percentage,
           skills,
@@ -163,15 +184,15 @@ export function TopicSkillAccuracyAccordion({
           if (b.totalIncorrect !== a.totalIncorrect) {
             return b.totalIncorrect - a.totalIncorrect;
           }
-          return a.percentage - b.percentage;
+          return (a.percentage ?? 101) - (b.percentage ?? 101);
         } else {
-          if (a.percentage !== b.percentage) {
-            return a.percentage - b.percentage;
+          if ((a.percentage ?? 101) !== (b.percentage ?? 101)) {
+            return (a.percentage ?? 101) - (b.percentage ?? 101);
           }
           return b.totalIncorrect - a.totalIncorrect;
         }
       });
-  }, [responses, sortBy]);
+  }, [responses, sortBy, pendingAuditSet]);
 
   // Handler to switch sort and collapse open dropdowns
   const handleSortChange = (newSort: SortOption) => {
@@ -258,6 +279,7 @@ export function TopicSkillAccuracyAccordion({
 
         {groupedTopics.map((group) => {
           const isOpen = !!openTopics[group.topicName];
+          const isAllPending = group.percentage === null && group.totalPending > 0;
 
           return (
             <div key={group.topicName} className="w-full">
@@ -268,39 +290,54 @@ export function TopicSkillAccuracyAccordion({
                 aria-expanded={isOpen}
                 className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/40 transition-colors select-none text-left"
               >
-                {/* Left Side: Topic Title & Pip Blocks */}
+                {/* Left Side: Topic Title */}
                 <div className="flex items-center gap-3.5 flex-wrap">
                   <span className="font-semibold text-sm text-foreground">
                     {group.topicName}
                   </span>
                 </div>
 
-                {/* Right Side: Missed Badge (-X), Percentage, and Chevron */}
+                {/* Right Side: Pip Blocks, Percentage / Under Review, and Chevron */}
                 <div className="flex items-center gap-3 shrink-0">
-                  {/* {group.totalIncorrect > 0 && (
-                    <span className="text-[10px] px-1.5 py-1 font-mono font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60">
-                      -{group.totalIncorrect}
-                    </span>
-                  )} */}
                   {/* Visual Question Pip Blocks */}
                   <div
                     className="flex items-center gap-1 flex-wrap"
-                    title={`${group.totalCorrect} correct, ${group.totalIncorrect} incorrect (${group.totalQuestions} total)`}
+                    title={
+                      isAllPending
+                        ? `${group.totalPending} under review`
+                        : `${group.totalCorrect} correct, ${group.totalIncorrect} incorrect (${group.totalQuestions} total)`
+                    }
                   >
                     {group.pips.map((pip) => (
                       <span
                         key={pip.id}
-                        title={`Q${pip.questionNumber}: ${pip.isCorrect ? "Correct" : "Incorrect"}`}
+                        title={`Q${pip.questionNumber}: ${
+                          pip.isPendingAudit
+                            ? "Under Review"
+                            : pip.isCorrect
+                            ? "Correct"
+                            : "Incorrect"
+                        }`}
                         className="inline-block w-2.5 h-2.5 rounded-[1px] transition-transform hover:scale-125"
                         style={{
-                          backgroundColor: pip.isCorrect ? "#444444" : "#ff9999",
+                          backgroundColor: pip.isPendingAudit
+                            ? "#f59e0b"
+                            : pip.isCorrect
+                            ? "#444444"
+                            : "#ff9999",
                         }}
                       />
                     ))}
                   </div>
-                  <span className="text-sm font-bold text-foreground w-6 text-right">
-                    {group.percentage}%
-                  </span>
+                  {isAllPending ? (
+                    <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                      Under Review
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold text-foreground w-8 text-right">
+                      {group.percentage}%
+                    </span>
+                  )}
                   {isOpen ? (
                     <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
                   ) : (
@@ -382,6 +419,12 @@ export function TopicSkillAccuracyAccordion({
                       <Bar
                         dataKey="incorrect"
                         fill="#ff9999"
+                        stackId="a"
+                        radius={0}
+                      />
+                      <Bar
+                        dataKey="pending"
+                        fill="#f59e0b"
                         stackId="a"
                         radius={0}
                       />
