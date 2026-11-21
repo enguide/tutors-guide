@@ -1,6 +1,6 @@
 // components/dashboard/RecentPerformanceCard.tsx
 import Link from "next/link";
-import { Calendar, CheckCircle2, Layers } from "lucide-react";
+import { Calendar, CheckCircle2, Layers, Hourglass } from "lucide-react";
 
 export interface RecentSummaryItem {
   testId: string;
@@ -14,12 +14,20 @@ export interface RecentSummaryItem {
 interface RecentPerformanceCardProps {
   recentSummary: RecentSummaryItem | null;
   adaptiveTrackBadge?: string | null;
+  isPendingAudit?: boolean;
+  projectedScore?: number | null;
+  mcAccuracySummary?: string | null;
 }
 
 export function RecentPerformanceCard({
   recentSummary,
   adaptiveTrackBadge,
+  isPendingAudit = false,
+  projectedScore = null,
+  mcAccuracySummary = null,
 }: RecentPerformanceCardProps) {
+  const isApCalc = recentSummary?.category.toUpperCase() === "AP_CALC";
+
   return (
     <div className="bg-card border border-border p-5 sm:p-6 rounded-none space-y-4 flex flex-col justify-between">
       <div className="space-y-4">
@@ -48,14 +56,36 @@ export function RecentPerformanceCard({
             <div className="flex flex-wrap items-baseline justify-between gap-4 pt-1">
               <div className="flex items-baseline gap-4">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                    Score
+                  <span
+                    className={`text-[10px] uppercase font-bold block ${
+                      isPendingAudit
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {isPendingAudit ? "Projected Score" : "Score"}
                   </span>
-                  <div className="text-4xl sm:text-5xl font-black text-primary leading-none pt-1">
-                    {recentSummary.compositeScore ?? "—"}
+                  <div
+                    className={`text-4xl sm:text-5xl font-black leading-none pt-1 ${
+                      isPendingAudit
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-primary"
+                    }`}
+                  >
+                    {isPendingAudit
+                      ? projectedScore !== null
+                        ? `Est. ${projectedScore}`
+                        : "Pending"
+                      : recentSummary.compositeScore ?? "—"}
+                    {isApCalc && (isPendingAudit ? projectedScore !== null : recentSummary.compositeScore !== null) && (
+                      <span className="text-base font-normal text-muted-foreground ml-1">
+                        /5
+                      </span>
+                    )}
                   </div>
                 </div>
-                {recentSummary.percentile && (
+
+                {!isPendingAudit && recentSummary.percentile && (
                   <div>
                     <span className="text-[10px] uppercase font-bold text-muted-foreground block">
                       Percentile
@@ -65,9 +95,27 @@ export function RecentPerformanceCard({
                     </div>
                   </div>
                 )}
+
+                {isPendingAudit && mcAccuracySummary && (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                      Section I
+                    </span>
+                    <div className="text-sm font-mono font-bold text-foreground pt-1">
+                      {mcAccuracySummary}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {adaptiveTrackBadge && (
+              {isPendingAudit && (
+                <span className="text-[10px] font-mono px-2 py-1 bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 font-bold inline-flex items-center gap-1">
+                  <Hourglass size={11} />
+                  FRQs Under Review
+                </span>
+              )}
+
+              {!isPendingAudit && adaptiveTrackBadge && (
                 <span className="text-[10px] font-mono px-2 py-1 bg-primary/10 border border-primary/20 text-primary font-semibold inline-flex items-center gap-1">
                   <Layers size={11} />
                   {adaptiveTrackBadge}

@@ -12,6 +12,7 @@ import {
   BookOpen,
   Layers,
   Target,
+  Hourglass,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { Category } from "@prisma/client";
@@ -48,6 +49,18 @@ function formatCompositeScore(category: string, score: number | null): string {
   return String(score);
 }
 
+function projectApScoreFromMcAccuracy(mcCorrect: number, mcTotal: number): number {
+  const mcAccuracy = mcTotal > 0 ? mcCorrect / mcTotal : 0;
+  const projectedFrqRaw = Math.round(mcAccuracy * 54);
+  const projectedCompositeRaw = mcCorrect * 1.2 + projectedFrqRaw;
+
+  if (projectedCompositeRaw >= 68) return 5;
+  if (projectedCompositeRaw >= 54) return 4;
+  if (projectedCompositeRaw >= 41) return 3;
+  if (projectedCompositeRaw >= 30) return 2;
+  return 1;
+}
+
 async function ResultsArchiveContent({
   searchParamsPromise,
 }: {
@@ -59,32 +72,63 @@ async function ResultsArchiveContent({
     searchParamsPromise,
   ]);
 
-  const [completedSummaries, sectionResults]: [SummaryRow[], SectionResultRow[]] =
-    session?.user?.id
-      ? await Promise.all([
-          prisma.testSummary.findMany({
-            where: { profileId: session.user.id },
-            orderBy: { completedAt: "desc" },
-            select: {
-              testId: true,
-              testTitle: true,
-              compositeScore: true,
-              percentile: true,
-              completedAt: true,
-              category: true,
+  const [completedSummaries, sectionResults, frqSubmissions] = session?.user?.id
+    ? await Promise.all([
+        prisma.testSummary.findMany({
+          where: { profileId: session.user.id },
+          orderBy: { completedAt: "desc" },
+          select: {
+            testId: true,
+            testTitle: true,
+            compositeScore: true,
+            percentile: true,
+            completedAt: true,
+            category: true,
+          },
+        }),
+        prisma.result.findMany({
+          where: { profileId: session.user.id },
+          select: {
+            testId: true,
+            sectionId: true,
+            numCorrect: true,
+            totalQuestions: true,
+          },
+        }),
+        prisma.frqSubmission.findMany({
+          where: { profileId: session.user.id },
+          select: {
+            testId: true,
+            sectionId: true,
+            status: true,
+            crops: {
+              where: {
+                needsHumanAudit: true,
+                reviewedAt: null,
+              },
+              select: { id: true },
             },
-          }),
-          prisma.result.findMany({
-            where: { profileId: session.user.id },
-            select: {
-              testId: true,
-              sectionId: true,
-              numCorrect: true,
-              totalQuestions: true,
-            },
-          }),
-        ])
-      : [[], []];
+          },
+        }),
+      ])
+    : [[], [], []];
+
+  // Track which sections per test still have pending FRQ audits
+  const pendingAuditSectionsByTest = new Map<string, Set<string>>();
+  for (const sub of frqSubmissions) {
+    const isPending =
+      sub.status === "UPLOADED" ||
+      sub.status === "CROPPED" ||
+      sub.status === "PENDING_AUDIT" ||
+      sub.crops.length > 0;
+
+    if (isPending) {
+      if (!pendingAuditSectionsByTest.has(sub.testId)) {
+        pendingAuditSectionsByTest.set(sub.testId, new Set());
+      }
+      pendingAuditSectionsByTest.get(sub.testId)!.add(sub.sectionId);
+    }
+  }
 
   // Aggregate section-level telemetry (adaptive track routing + raw accuracy %) per test
   const telemetryByTest = new Map<
@@ -94,6 +138,8 @@ async function ResultsArchiveContent({
       accuracyPercent: number | null;
       numCorrect: number;
       totalQuestions: number;
+      hasPendingFrqAudit: boolean;
+      projectedApScore: number | null;
     }
   >();
 
@@ -113,16 +159,33 @@ async function ResultsArchiveContent({
       adaptiveBadge = "Standard Track (M2L)";
     }
 
-    const totalCorrect = sections.reduce((sum, s) => sum + s.numCorrect, 0);
-    const totalQs = sections.reduce((sum, s) => sum + s.totalQuestions, 0);
+    const pendingSections = pendingAuditSectionsByTest.get(testId);
+    const hasPendingFrqAudit = Boolean(pendingSections && pendingSections.size > 0);
+
+    // Exclude pending-audit FRQ sections from accuracy calculations so unaudited 0s don't skew percentages
+    const gradedSections = hasPendingFrqAudit
+      ? sections.filter((s) => !pendingSections!.has(s.sectionId))
+      : sections;
+
+    const totalCorrect = gradedSections.reduce((sum, s) => sum + s.numCorrect, 0);
+    const totalQs = gradedSections.reduce((sum, s) => sum + s.totalQuestions, 0);
     const accuracyPercent =
       totalQs > 0 ? Math.round((totalCorrect / totalQs) * 100) : null;
+
+    const summaryRecord = completedSummaries.find((s) => s.testId === testId);
+    const isApCalc = summaryRecord?.category.toUpperCase() === "AP_CALC";
+    const projectedApScore =
+      hasPendingFrqAudit && isApCalc && totalQs > 0
+        ? projectApScoreFromMcAccuracy(totalCorrect, totalQs)
+        : null;
 
     telemetryByTest.set(testId, {
       adaptiveBadge,
       accuracyPercent,
       numCorrect: totalCorrect,
       totalQuestions: totalQs,
+      hasPendingFrqAudit,
+      projectedApScore,
     });
   }
 
@@ -143,19 +206,22 @@ async function ResultsArchiveContent({
 
   const totalAttempts = filteredSummaries.length;
 
-  // Contextual Highest Score calculation
+  // Contextual Highest Score calculation (excluding pending-audit tests from finalized peak)
   const highestDisplay = (() => {
-    if (filteredSummaries.length === 0) return "—";
+    const finalizedSummaries = filteredSummaries.filter(
+      (s) => !telemetryByTest.get(s.testId)?.hasPendingFrqAudit
+    );
+    if (finalizedSummaries.length === 0) return "—";
 
     if (activeFilter !== "ALL") {
-      const top = filteredSummaries.reduce(
+      const top = finalizedSummaries.reduce(
         (max, s) => (s.compositeScore && s.compositeScore > max ? s.compositeScore : max),
         0
       );
       return top > 0 ? formatCompositeScore(activeFilter, top) : "—";
     }
 
-    const standardized = filteredSummaries.filter(
+    const standardized = finalizedSummaries.filter(
       (s) => s.category.toUpperCase() !== "ACADEMIC"
     );
     const highestStd = standardized.reduce(
@@ -164,7 +230,7 @@ async function ResultsArchiveContent({
     );
     if (highestStd > 0) return String(highestStd);
 
-    const highestAcad = filteredSummaries.reduce(
+    const highestAcad = finalizedSummaries.reduce(
       (max, s) => (s.compositeScore && s.compositeScore > max ? s.compositeScore : max),
       0
     );
@@ -289,6 +355,14 @@ async function ResultsArchiveContent({
             {filteredSummaries.map((summary) => {
               const telemetry = telemetryByTest.get(summary.testId);
               const resultsHref = `/tests/${summary.category.toLowerCase()}/${summary.testId}/results`;
+              const isPendingAudit = Boolean(telemetry?.hasPendingFrqAudit);
+
+              const scoreLabel = isPendingAudit
+                ? telemetry?.projectedApScore !== null &&
+                  telemetry?.projectedApScore !== undefined
+                  ? `Est. ${telemetry.projectedApScore}`
+                  : "Pending"
+                : formatCompositeScore(summary.category, summary.compositeScore);
 
               return (
                 <div
@@ -312,18 +386,36 @@ async function ResultsArchiveContent({
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="text-[10px] font-bold uppercase text-muted-foreground block">
-                        Score
+                      <span
+                        className={`text-[10px] font-bold uppercase block ${
+                          isPendingAudit
+                            ? "text-amber-700 dark:text-amber-300"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {isPendingAudit ? "Projected" : "Score"}
                       </span>
-                      <span className="text-2xl font-black text-primary leading-none">
-                        {formatCompositeScore(summary.category, summary.compositeScore)}
+                      <span
+                        className={`text-2xl font-black leading-none ${
+                          isPendingAudit
+                            ? "text-amber-700 dark:text-amber-300"
+                            : "text-primary"
+                        }`}
+                      >
+                        {scoreLabel}
                       </span>
                     </div>
                   </div>
 
                   {/* Secondary Telemetry Chips */}
                   <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
-                    {summary.percentile && (
+                    {isPendingAudit && (
+                      <span className="px-2 py-0.5 bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 font-bold inline-flex items-center gap-1">
+                        <Hourglass size={10} />
+                        FRQs Under Review
+                      </span>
+                    )}
+                    {!isPendingAudit && summary.percentile && (
                       <span className="px-2 py-0.5 bg-muted/50 border border-border text-muted-foreground">
                         Percentile: <strong className="text-foreground">{summary.percentile}</strong>
                       </span>
@@ -332,7 +424,7 @@ async function ResultsArchiveContent({
                       telemetry?.accuracyPercent !== undefined && (
                         <span className="px-2 py-0.5 bg-muted/50 border border-border text-muted-foreground inline-flex items-center gap-1">
                           <Target size={10} className="text-primary" />
-                          Raw:{" "}
+                          {isPendingAudit ? "MC:" : "Raw:"}{" "}
                           <strong className="text-foreground">
                             {telemetry.numCorrect}/{telemetry.totalQuestions} ({telemetry.accuracyPercent}%)
                           </strong>
@@ -377,6 +469,15 @@ async function ResultsArchiveContent({
               <tbody className="divide-y divide-border">
                 {filteredSummaries.map((summary) => {
                   const telemetry = telemetryByTest.get(summary.testId);
+                  const isPendingAudit = Boolean(telemetry?.hasPendingFrqAudit);
+
+                  const scoreLabel = isPendingAudit
+                    ? telemetry?.projectedApScore !== null &&
+                      telemetry?.projectedApScore !== undefined
+                      ? `Est. ${telemetry.projectedApScore}`
+                      : "Under Review"
+                    : formatCompositeScore(summary.category, summary.compositeScore);
+
                   return (
                     <tr key={summary.testId} className="hover:bg-muted/20 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-foreground">
@@ -392,19 +493,35 @@ async function ResultsArchiveContent({
                               {telemetry.adaptiveBadge}
                             </span>
                           )}
+                          {isPendingAudit && (
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 border border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1">
+                              <Hourglass size={10} />
+                              FRQs Under Review
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-center font-black text-sm text-primary">
-                        {formatCompositeScore(summary.category, summary.compositeScore)}
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`font-black text-sm ${
+                            isPendingAudit
+                              ? "text-amber-700 dark:text-amber-300"
+                              : "text-primary"
+                          }`}
+                        >
+                          {scoreLabel}
+                        </span>
                       </td>
                       <td className="py-3.5 px-4 text-center font-mono text-muted-foreground">
                         {telemetry?.accuracyPercent !== null &&
                         telemetry?.accuracyPercent !== undefined
-                          ? `${telemetry.numCorrect}/${telemetry.totalQuestions} (${telemetry.accuracyPercent}%)`
+                          ? `${telemetry.numCorrect}/${telemetry.totalQuestions}${
+                              isPendingAudit ? " MC" : ""
+                            } (${telemetry.accuracyPercent}%)`
                           : "—"}
                       </td>
                       <td className="py-3.5 px-4 text-center text-muted-foreground font-mono">
-                        {summary.percentile ?? "—"}
+                        {isPendingAudit ? "Pending Audit" : summary.percentile ?? "—"}
                       </td>
                       <td className="py-3.5 px-4 text-muted-foreground font-mono">
                         <div className="flex items-center gap-1.5">

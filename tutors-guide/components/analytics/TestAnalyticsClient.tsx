@@ -29,6 +29,7 @@ interface TestAnalyticsClientProps {
   sectionResults: SectionResultData[];
   responses: EnrichedResponseItem[];
   adaptiveTrajectory?: AdaptiveTrajectoryData | null;
+  pendingAuditSectionIds?: string[];
   stickyTopClass?: string;
 }
 
@@ -38,12 +39,18 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
   sectionResults,
   responses,
   adaptiveTrajectory,
+  pendingAuditSectionIds = [],
   stickyTopClass = "top-16",
 }) => {
   const [activeTab, setActiveTab] = useState<"analytics" | "action-plan" | "review">(
     "analytics"
   );
   const [selectedSectionId, setSelectedSectionId] = useState<string>("all");
+
+  const pendingAuditSet = useMemo(
+    () => new Set(pendingAuditSectionIds),
+    [pendingAuditSectionIds]
+  );
 
   // Filter injected when jumping from Study Action Plan -> Question Review
   const [flaggedCohort, setFlaggedCohort] = useState<{
@@ -76,9 +83,10 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
 
   const filteredReviewItems = useMemo(() => {
     return currentSectionResponses.filter((item) => {
+      const isPendingAudit = pendingAuditSet.has(String(item.sectionId));
       if (flaggedCohort && !flaggedCohort.ids.has(item.questionId)) return false;
-      if (statusFilter === "Correct" && !item.isCorrect) return false;
-      if (statusFilter === "Incorrect" && item.isCorrect) return false;
+      if (statusFilter === "Correct" && (isPendingAudit || !item.isCorrect)) return false;
+      if (statusFilter === "Incorrect" && (isPendingAudit || item.isCorrect)) return false;
       if (selectedDifficulty !== "All" && item.difficulty !== selectedDifficulty) return false;
       if (selectedDomain !== "All" && item.domain !== selectedDomain) return false;
       if (onlyChanged && !item.changedAnswer) return false;
@@ -87,6 +95,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
     });
   }, [
     currentSectionResponses,
+    pendingAuditSet,
     flaggedCohort,
     statusFilter,
     selectedDifficulty,
@@ -173,6 +182,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
               sectionResults={sectionResults}
               responses={responses}
               adaptiveTrajectory={adaptiveTrajectory}
+              pendingAuditSectionIds={pendingAuditSectionIds}
             />
           </div>
         )}
@@ -250,6 +260,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                 All Sections ({responses.length})
               </button>
               {sectionResults.map((sr) => {
+                const isSectionPendingAudit = pendingAuditSet.has(sr.sectionId);
                 const incorrectCount = sr.totalQuestions - sr.numCorrect;
                 const isActive = selectedSectionId === sr.sectionId;
                 return (
@@ -267,16 +278,28 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                     }`}
                   >
                     <span>{sr.section.title}</span>
-                    {incorrectCount > 0 && (
+                    {isSectionPendingAudit ? (
                       <span
                         className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                           isActive
                             ? "bg-white/20 text-white"
-                            : "bg-[#ff9999]/20 text-[#ff9999] border border-[#ff9999]/40"
+                            : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
                         }`}
                       >
-                        {incorrectCount}
+                        Under Review
                       </span>
+                    ) : (
+                      incorrectCount > 0 && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-[#ff9999]/20 text-[#ff9999] border border-[#ff9999]/40"
+                          }`}
+                        >
+                          {incorrectCount}
+                        </span>
+                      )
                     )}
                   </button>
                 );
@@ -406,6 +429,12 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                       <span className="w-2.5 h-2.5 border-2 border-[#ff9999] inline-block" />
                       Missed
                     </span>
+                    {pendingAuditSectionIds.length > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 border-2 border-amber-500 inline-block" />
+                        Under Review
+                      </span>
+                    )}
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 bg-slate-800 text-white ring-1 ring-blue-500 inline-block" />
                       Active
@@ -421,8 +450,8 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                     const sectionMeta = sectionResults.find(
                       (s) => s.sectionId === sectionId
                     );
-                    const sectionTitle =
-                      sectionMeta?.section.title || "Section";
+                    const sectionTitle = sectionMeta?.section.title || "Section";
+                    const isSectionPendingAudit = pendingAuditSet.has(String(sectionId));
 
                     const sectionQuestions = filteredReviewItems
                       .map((item, originalIndex) => ({
@@ -446,7 +475,11 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                             const isCorrect = item.isCorrect;
 
                             let buttonStyle = "";
-                            if (isCorrect) {
+                            if (isSectionPendingAudit) {
+                              buttonStyle = isCurrent
+                                ? "bg-amber-500 text-white border-2 border-amber-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-background font-extrabold scale-105"
+                                : "border-2 border-amber-500/70 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 font-bold";
+                            } else if (isCorrect) {
                               buttonStyle = isCurrent
                                 ? "bg-[#444444] text-white border-2 border-[#444444] ring-2 ring-blue-500 ring-offset-2 ring-offset-background font-extrabold scale-105"
                                 : "border-2 border-slate-700 dark:border-slate-300 text-foreground hover:bg-muted font-bold";
@@ -456,14 +489,18 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                                 : "border-2 border-[#ff9999] text-[#ff9999] bg-[#ff9999]/10 hover:bg-[#ff9999]/20 font-bold";
                             }
 
+                            const statusLabel = isSectionPendingAudit
+                              ? "Under Review"
+                              : isCorrect
+                              ? "Correct"
+                              : "Missed";
+
                             return (
                               <button
                                 key={item.id}
                                 type="button"
                                 onClick={() => setReviewIndex(indexInFiltered)}
-                                title={`Q${item.responseOrder} - ${
-                                  isCorrect ? "Correct" : "Missed"
-                                } (${item.skill})`}
+                                title={`Q${item.responseOrder} - ${statusLabel} (${item.skill})`}
                                 className={`w-9 h-9 sm:w-8 sm:h-8 text-xs flex items-center justify-center transition-all rounded-none select-none ${buttonStyle}`}
                               >
                                 {item.responseOrder}
@@ -516,6 +553,7 @@ export const TestAnalyticsClient: React.FC<TestAnalyticsClientProps> = ({
                   item={currentReviewQuestion}
                   category={metadata.category}
                   testId={metadata.id}
+                  isPendingAudit={pendingAuditSet.has(String(currentReviewQuestion.sectionId))}
                 />
               </div>
             ) : (

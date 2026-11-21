@@ -15,6 +15,7 @@ import {
   EyeOff,
   Check,
   X,
+  Hourglass,
 } from "lucide-react";
 import { QuestionExplanationEngine } from "./QuestionExplanationEngine";
 
@@ -23,6 +24,7 @@ interface QuestionResultCardProps {
   category?: string;
   testId?: string;
   targetSeconds?: number;
+  isPendingAudit?: boolean;
 }
 
 export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
@@ -30,6 +32,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
   category = "SAT",
   testId,
   targetSeconds = 80,
+  isPendingAudit = false,
 }) => {
   const [showSolution, setShowSolution] = useState(false);
 
@@ -56,8 +59,13 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
       <div className="px-4 sm:px-5 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/60 flex items-center justify-between flex-wrap gap-3">
         {/* Left Side: Outcome Status + Metadata Chips */}
         <div className="flex items-center gap-2 flex-wrap">
-          {showSolution && (
-            item.isCorrect ? (
+          {isPendingAudit ? (
+            <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-sm bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+              <Hourglass size={12} /> Under Review
+            </span>
+          ) : (
+            showSolution &&
+            (item.isCorrect ? (
               <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-sm bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 border border-neutral-900 dark:border-neutral-100">
                 <CheckCircle2 size={13} /> Correct
               </span>
@@ -65,7 +73,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
               <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-sm bg-[#ff9999]/20 text-[#ff9999] border border-[#ff9999]">
                 <XCircle size={13} /> Incorrect
               </span>
-            )
+            ))
           )}
 
           {/* Topic / Domain Chip */}
@@ -173,7 +181,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
               </div>
 
               {/* Options */}
-              {renderExamOptions(item, showSolution, category, testId)}
+              {renderExamOptions(item, showSolution, isPendingAudit, category, testId)}
             </div>
           </div>
         ) : (
@@ -191,7 +199,7 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
             </div>
 
             {/* Options */}
-            {renderExamOptions(item, showSolution, category, testId)}
+            {renderExamOptions(item, showSolution, isPendingAudit, category, testId)}
           </div>
         )}
 
@@ -215,9 +223,43 @@ export const QuestionResultCard: React.FC<QuestionResultCardProps> = ({
 function renderExamOptions(
   item: EnrichedResponseItem,
   showSolution: boolean,
+  isPendingAudit: boolean,
   category?: string,
   testId?: string
 ) {
+  // Handwritten Free Response Packet Question
+  if ((item.responseType as string) === "FRQ_HANDWRITTEN") {
+    return (
+      <div className="pt-2 space-y-3 font-sans">
+        <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          Handwritten Packet Status
+        </label>
+
+        {isPendingAudit ? (
+          <div className="p-3.5 rounded-sm border border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-200 text-xs font-medium flex items-center gap-2">
+            <Hourglass size={14} className="shrink-0" />
+            <span>
+              Your scanned response sheets for this question are currently under tutor rubric review. Scores will update automatically once grading is complete.
+            </span>
+          </div>
+        ) : showSolution ? (
+          <div className="p-3.5 rounded-sm border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-xs space-y-1.5">
+            <span className="text-[10px] uppercase font-bold text-neutral-500 block">
+              Graded Rubric Notes
+            </span>
+            <p className="font-mono text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              {item.frqUserAnswer || "Evaluated via rubric checklist."}
+            </p>
+          </div>
+        ) : (
+          <div className="p-3 rounded-sm border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/30 text-xs text-muted-foreground font-mono">
+            Handwritten FRQ graded. Click &ldquo;Reveal Solution&rdquo; to view rubric breakdown and worked solution.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Free Response / Student-Produced Response
   if (item.responseType === "FR") {
     return (

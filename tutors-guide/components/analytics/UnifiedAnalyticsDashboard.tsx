@@ -1,5 +1,5 @@
-// components/analytics/UnifiedAnalyticsDashboard.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// components/analytics/UnifiedAnalyticsDashboard.tsx
 "use client";
 
 import * as React from "react";
@@ -46,6 +46,7 @@ type PacingChartMode = "bars" | "timeline";
 const OUTCOME_COLORS = {
   correct: "#444444",
   incorrect: "#ff9999",
+  pending: "#f59e0b",
   target: "#2563eb",
 };
 
@@ -141,6 +142,7 @@ interface UnifiedAnalyticsDashboardProps {
   sectionResults: SectionResultData[];
   responses: EnrichedResponseItem[];
   adaptiveTrajectory?: AdaptiveTrajectoryData | null;
+  pendingAuditSectionIds?: string[];
 }
 
 export default function UnifiedAnalyticsDashboard({
@@ -149,9 +151,15 @@ export default function UnifiedAnalyticsDashboard({
   sectionResults,
   responses,
   adaptiveTrajectory,
+  pendingAuditSectionIds = [],
 }: UnifiedAnalyticsDashboardProps) {
   const { isLg, mounted } = useDesktopBreakpoint();
   const [chartMode, setChartMode] = React.useState<PacingChartMode>("bars");
+
+  const pendingAuditSet = React.useMemo(
+    () => new Set(pendingAuditSectionIds),
+    [pendingAuditSectionIds]
+  );
 
   const availableSections = React.useMemo(() => {
     return sectionResults.map((sr) => sr.sectionId);
@@ -173,6 +181,8 @@ export default function UnifiedAnalyticsDashboard({
       .filter((r) => r.sectionId === activeSectionId)
       .sort((a, b) => a.responseOrder - b.responseOrder);
   }, [responses, activeSectionId]);
+
+  const isActiveSectionPendingAudit = pendingAuditSet.has(activeSectionId);
 
   // Dynamically compute target pacing per question (with accommodation multiplier)
   const targetPacingSeconds = React.useMemo(() => {
@@ -213,16 +223,23 @@ export default function UnifiedAnalyticsDashboard({
     return activeResponses.map((r, index) => {
       const trueTime = r.timeSpentOnResponse || 0;
       const isClamped = trueTime > timeAxisCap;
+      const fill = isActiveSectionPendingAudit
+        ? OUTCOME_COLORS.pending
+        : r.isCorrect
+        ? OUTCOME_COLORS.correct
+        : OUTCOME_COLORS.incorrect;
+
       return {
         question: `${index + 1}`,
         trueTime,
         plottedTime: isClamped ? timeAxisCap : trueTime,
         isClamped,
-        fill: r.isCorrect ? OUTCOME_COLORS.correct : OUTCOME_COLORS.incorrect,
+        fill,
         isCorrect: r.isCorrect,
+        isPendingAudit: isActiveSectionPendingAudit,
       };
     });
-  }, [activeResponses, timeAxisCap]);
+  }, [activeResponses, timeAxisCap, isActiveSectionPendingAudit]);
 
   const clampedBarCount = React.useMemo(
     () => topChartData.filter((d) => d.isClamped).length,
@@ -295,6 +312,7 @@ export default function UnifiedAnalyticsDashboard({
         score: `${displayScore}%`,
         maxScore: null,
         subtext: percentileLabel ? `${ptsText} • ${percentileLabel}` : ptsText,
+        isPendingAudit: false,
       };
     }
 
@@ -305,6 +323,7 @@ export default function UnifiedAnalyticsDashboard({
           score: adaptiveTrajectory.compositeScore,
           maxScore: 1600,
           subtext: percentileLabel,
+          isPendingAudit: false,
         };
       }
 
@@ -331,6 +350,7 @@ export default function UnifiedAnalyticsDashboard({
         score: totalScore,
         maxScore: 1600,
         subtext: percentileLabel,
+        isPendingAudit: false,
       };
     }
 
@@ -340,10 +360,63 @@ export default function UnifiedAnalyticsDashboard({
         score: testSummary?.compositeScore ?? null,
         maxScore: 36,
         subtext: percentileLabel,
+        isPendingAudit: false,
       };
     }
 
     if (category === "AP_CALC") {
+      const hasPendingFrqAudit = sectionResults.some((sr) =>
+        pendingAuditSet.has(sr.sectionId)
+      );
+
+      if (hasPendingFrqAudit) {
+        const mcSections = sectionResults.filter(
+          (sr) => !pendingAuditSet.has(sr.sectionId)
+        );
+        const mcCorrect = mcSections.reduce(
+          (acc, sr) => acc + (sr.numCorrect || 0),
+          0
+        );
+        const mcTotal = mcSections.reduce(
+          (acc, sr) => acc + (sr.totalQuestions || 0),
+          0
+        );
+        const mcAccuracy = mcTotal > 0 ? mcCorrect / mcTotal : 0;
+
+        const apWeights = (metadata.scoring as any)?.apWeights;
+        const mcMultiplier = apWeights?.mcMultiplier ?? 1.2;
+        const frqMultiplier = apWeights?.frqMultiplier ?? 1.0;
+        const cutoffs: Record<string, number> = apWeights?.gradeCutoffs ?? {
+          "5": 68,
+          "4": 54,
+          "3": 41,
+          "2": 30,
+          "1": 0,
+        };
+
+        // Project Section II raw points (out of 54) from MC accuracy rate
+        const projectedFrqRaw = Math.round(mcAccuracy * 54);
+        const projectedCompositeRaw =
+          mcCorrect * mcMultiplier + projectedFrqRaw * frqMultiplier;
+
+        let projectedApScore = 1;
+        for (const grade of [5, 4, 3, 2, 1]) {
+          if (projectedCompositeRaw >= (cutoffs[String(grade)] ?? 0)) {
+            projectedApScore = grade;
+            break;
+          }
+        }
+
+        const pctDisplay = Math.round(mcAccuracy * 100);
+        return {
+          label: "Projected AP Score",
+          score: `Est. ${projectedApScore}`,
+          maxScore: 5,
+          subtext: `Based on ${pctDisplay}% MC accuracy • FRQs Under Review`,
+          isPendingAudit: true,
+        };
+      }
+
       const compositeRaw = sectionResults.reduce((acc, sr) => acc + (sr.rawScore || 0), 0);
       const ptsText = `${compositeRaw}/108 pts`;
       return {
@@ -351,6 +424,7 @@ export default function UnifiedAnalyticsDashboard({
         score: testSummary?.compositeScore ?? null,
         maxScore: 5,
         subtext: percentileLabel ? `${ptsText} • ${percentileLabel}` : ptsText,
+        isPendingAudit: false,
       };
     }
 
@@ -360,6 +434,7 @@ export default function UnifiedAnalyticsDashboard({
         score: testSummary?.compositeScore ?? null,
         maxScore: 340,
         subtext: percentileLabel,
+        isPendingAudit: false,
       };
     }
 
@@ -368,8 +443,9 @@ export default function UnifiedAnalyticsDashboard({
       score: testSummary?.compositeScore ?? null,
       maxScore: null,
       subtext: percentileLabel,
+      isPendingAudit: false,
     };
-  }, [metadata, sectionResults, testSummary, adaptiveTrajectory]);
+  }, [metadata, sectionResults, testSummary, adaptiveTrajectory, pendingAuditSet]);
 
   const formatNavTime = (seconds: number | string) => {
     const totalSeconds =
@@ -405,6 +481,7 @@ export default function UnifiedAnalyticsDashboard({
   }, [maxNavQuestionIdx]);
 
   const isSatCategory = metadata.category.toUpperCase() === "SAT";
+  const isApCalcCategory = metadata.category.toUpperCase() === "AP_CALC";
   const isAcademicCategory =
     metadata.category.toUpperCase() === "ACADEMIC" ||
     (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE";
@@ -473,9 +550,16 @@ export default function UnifiedAnalyticsDashboard({
               {sectionResults.map((sr, idx) => {
                 const stats = sectionStats[sr.sectionId];
                 const isCurrent = activeSectionId === sr.sectionId;
+                const isSectionPendingAudit = pendingAuditSet.has(sr.sectionId);
 
-                const displayScore = isAcademicCategory
-                  ? stats ? `${stats.percentage.toFixed(0)}%` : "0%"
+                const displayScore = isSectionPendingAudit
+                  ? "Under Review"
+                  : isAcademicCategory
+                  ? stats
+                    ? `${stats.percentage.toFixed(0)}%`
+                    : "0%"
+                  : isApCalcCategory
+                  ? `${sr.numCorrect}/${sr.totalQuestions}`
                   : sr.scaledScore !== null && sr.scaledScore !== undefined
                   ? sr.scaledScore
                   : stats
@@ -494,22 +578,40 @@ export default function UnifiedAnalyticsDashboard({
                     className={`min-h-14 flex flex-1 flex-col items-center justify-center gap-1 border-r last:border-r-0 md:last:border-r border-t border-slate-200 dark:border-slate-800 transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l ${
                       isSatCategory
                         ? "px-2.5 sm:px-3 py-2.5 md:min-w-16 lg:min-w-20 lg:px-6"
-                        : "px-3 sm:px-4 py-2.5 md:min-w-28 lg:px-6"
+                        : "px-3 sm:px-4 py-2.5 md:min-w-32 lg:px-6"
                     }`}
                     onClick={() => setSelectedSectionId(sr.sectionId)}
                   >
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-tight line-clamp-1">
                       {sectionTitle}
                     </span>
-                    <span className="text-lg sm:text-xl md:text-2xl font-bold leading-none">
-                      {displayScore}
-                    </span>
-                    {stats?.formattedTime && (
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                        <Clock className="w-2.5 h-2.5" />
-                        {stats.formattedTime}
+
+                    {isSectionPendingAudit ? (
+                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                        Under Review
+                      </span>
+                    ) : (
+                      <span className="text-lg sm:text-xl md:text-2xl font-bold leading-none">
+                        {displayScore}
                       </span>
                     )}
+
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                      {!isSectionPendingAudit && isApCalcCategory && stats && (
+                        <span className="font-semibold text-foreground/75">
+                          {stats.percentage.toFixed(0)}%
+                        </span>
+                      )}
+                      {!isSectionPendingAudit && isApCalcCategory && stats?.formattedTime && (
+                        <span>•</span>
+                      )}
+                      {stats?.formattedTime && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          {stats.formattedTime}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -549,11 +651,29 @@ export default function UnifiedAnalyticsDashboard({
 
             {/* Composite Score Card */}
             {scoreCard.score !== null && (
-              <div className="flex flex-col gap-1 justify-center items-center px-4 sm:px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-primary/5 md:min-w-32 lg:min-w-36 shrink-0">
-                <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+              <div
+                className={`flex flex-col gap-1 justify-center items-center px-4 sm:px-6 py-2.5 text-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 md:min-w-36 lg:min-w-44 shrink-0 ${
+                  scoreCard.isPendingAudit
+                    ? "bg-amber-500/10"
+                    : "bg-primary/5"
+                }`}
+              >
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider ${
+                    scoreCard.isPendingAudit
+                      ? "text-amber-700 dark:text-amber-300"
+                      : "text-primary"
+                  }`}
+                >
                   {scoreCard.label}
                 </span>
-                <span className="text-2xl md:text-3xl font-black leading-none text-primary md:text-foreground">
+                <span
+                  className={`text-2xl md:text-3xl font-black leading-none ${
+                    scoreCard.isPendingAudit
+                      ? "text-amber-700 dark:text-amber-300"
+                      : "text-primary md:text-foreground"
+                  }`}
+                >
                   {scoreCard.score}
                   {scoreCard.maxScore && (
                     <span className="text-xs text-muted-foreground font-normal ml-0.5">
@@ -562,7 +682,7 @@ export default function UnifiedAnalyticsDashboard({
                   )}
                 </span>
                 {scoreCard.subtext && (
-                  <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">
+                  <span className="text-[10px] text-muted-foreground font-semibold mt-0.5 max-w-48 leading-tight">
                     {scoreCard.subtext}
                   </span>
                 )}
@@ -856,20 +976,32 @@ export default function UnifiedAnalyticsDashboard({
               {/* Legend Strip Below Bar Chart */}
               <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-4 text-[11px] sm:text-xs font-medium bg-muted/20 border border-border/60 px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                      style={{ backgroundColor: OUTCOME_COLORS.correct }}
-                    />
-                    <span>Correct</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                      style={{ backgroundColor: OUTCOME_COLORS.incorrect }}
-                    />
-                    <span>Missed</span>
-                  </div>
+                  {isActiveSectionPendingAudit ? (
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                        style={{ backgroundColor: OUTCOME_COLORS.pending }}
+                      />
+                      <span>Under Tutor Review (Scoring Pending)</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                          style={{ backgroundColor: OUTCOME_COLORS.correct }}
+                        />
+                        <span>Correct</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                          style={{ backgroundColor: OUTCOME_COLORS.incorrect }}
+                        />
+                        <span>Missed</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {clampedBarCount > 0 && (

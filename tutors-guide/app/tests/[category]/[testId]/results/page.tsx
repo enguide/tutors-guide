@@ -165,47 +165,69 @@ async function ResultsDataContent({
     notFound();
   }
 
-  // Fetch student test results, responses, and parsed markdown sections
-  const [testSummaryRecord, sectionResultRecords, userResponseRecords, sectionFiles] =
-    await Promise.all([
-      prisma.testSummary.findUnique({
-        where: {
-          testId_profileId: {
-            testId,
-            profileId: targetProfileId,
-          },
-        },
-      }),
-      prisma.result.findMany({
-        where: {
+  // Fetch student test results, responses, parsed markdown sections, and FRQ audit status
+  const [
+    testSummaryRecord,
+    sectionResultRecords,
+    userResponseRecords,
+    sectionFiles,
+    frqSubmissionRecords,
+  ] = await Promise.all([
+    prisma.testSummary.findUnique({
+      where: {
+        testId_profileId: {
           testId,
           profileId: targetProfileId,
         },
-        orderBy: {
-          section: {
-            sectionOrder: "asc",
+      },
+    }),
+    prisma.result.findMany({
+      where: {
+        testId,
+        profileId: targetProfileId,
+      },
+      orderBy: {
+        section: {
+          sectionOrder: "asc",
+        },
+      },
+      include: {
+        section: true,
+      },
+    }),
+    prisma.response.findMany({
+      where: {
+        testId,
+        profileId: targetProfileId,
+      },
+      orderBy: [
+        { sectionOrder: "asc" },
+        { responseOrder: "asc" },
+      ],
+    }),
+    Promise.all(
+      metadata.sections.map((s) =>
+        getSectionById(rawCategory.toLowerCase(), testId, s.id)
+      )
+    ),
+    prisma.frqSubmission.findMany({
+      where: {
+        testId,
+        profileId: targetProfileId,
+      },
+      select: {
+        sectionId: true,
+        status: true,
+        crops: {
+          where: {
+            needsHumanAudit: true,
+            reviewedAt: null,
           },
+          select: { id: true },
         },
-        include: {
-          section: true,
-        },
-      }),
-      prisma.response.findMany({
-        where: {
-          testId,
-          profileId: targetProfileId,
-        },
-        orderBy: [
-          { sectionOrder: "asc" },
-          { responseOrder: "asc" },
-        ],
-      }),
-      Promise.all(
-        metadata.sections.map((s) =>
-          getSectionById(rawCategory.toLowerCase(), testId, s.id)
-        )
-      ),
-    ]);
+      },
+    }),
+  ]);
 
   if (sectionResultRecords.length === 0) {
     if (isStaffInspection) {
@@ -282,9 +304,9 @@ async function ResultsDataContent({
       timeLimit: sr.section.timeLimit,
     },
     accommodations:
-  sr.accommodations && typeof sr.accommodations === "object"
-    ? (sr.accommodations as { timeMultiplier?: number; extendedTime?: boolean })
-    : null,
+      sr.accommodations && typeof sr.accommodations === "object"
+        ? (sr.accommodations as { timeMultiplier?: number; extendedTime?: boolean })
+        : null,
   }));
 
   const formattedTestSummary: TestSummaryData | null = testSummaryRecord
@@ -331,6 +353,20 @@ async function ResultsDataContent({
     );
   }
 
+  const pendingAuditSectionIds = Array.from(
+    new Set(
+      frqSubmissionRecords
+        .filter(
+          (sub) =>
+            sub.status === "UPLOADED" ||
+            sub.status === "CROPPED" ||
+            sub.status === "PENDING_AUDIT" ||
+            sub.crops.length > 0
+        )
+        .map((sub) => sub.sectionId)
+    )
+  );
+
   return (
     <TestAnalyticsClient
       metadata={metadata}
@@ -338,6 +374,7 @@ async function ResultsDataContent({
       sectionResults={formattedSectionResults}
       responses={enrichedResponses}
       adaptiveTrajectory={adaptiveTrajectory}
+      pendingAuditSectionIds={pendingAuditSectionIds}
       stickyTopClass={stickyTopClass}
     />
   );

@@ -10,6 +10,8 @@ interface ScoreTargetGaugeProps {
   latestScore: number | null;
   latestCategory?: string | null;
   latestTestTitle: string | null;
+  isPendingAudit?: boolean;
+  projectedScore?: number | null;
 }
 
 const SCORE_BENCHMARKS: Record<string, { label: string; score: number }[]> = {
@@ -22,6 +24,11 @@ const SCORE_BENCHMARKS: Record<string, { label: string; score: number }[]> = {
     { label: "Highly Selective (Ivy+ / T20)", score: 34 },
     { label: "Competitive Honors / T50", score: 30 },
     { label: "State Flagship Baseline", score: 26 },
+  ],
+  AP_CALC: [
+    { label: "Maximum Credit (5)", score: 5 },
+    { label: "Qualified Credit (4)", score: 4 },
+    { label: "Qualifying Baseline (3)", score: 3 },
   ],
   GRE: [
     { label: "Top Graduate Tier", score: 325 },
@@ -48,6 +55,8 @@ export function ScoreTargetGauge({
   latestScore,
   latestCategory,
   latestTestTitle,
+  isPendingAudit = false,
+  projectedScore = null,
 }: ScoreTargetGaugeProps) {
   const activeProgram = propActiveProgram || latestCategory || categories?.[0] || "SAT";
 
@@ -66,23 +75,34 @@ export function ScoreTargetGauge({
   const [isEditing, setIsEditing] = useState(false);
   const [formScore, setFormScore] = useState(storedScore);
 
+  const effectiveScore =
+    isPendingAudit && projectedScore !== null ? projectedScore : latestScore;
+
   const targetScoreNum = parseInt(storedScore, 10);
   const hasTarget = !isNaN(targetScoreNum) && targetScoreNum > 0;
-  const hasBaseline = latestScore !== null && latestScore > 0;
+  const hasBaseline = effectiveScore !== null && effectiveScore > 0;
 
   const { delta, progressPercent, isGoalReached } = React.useMemo(() => {
-    if (!hasTarget || !hasBaseline) {
+    if (!hasTarget || !hasBaseline || effectiveScore === null) {
       return { delta: null, progressPercent: 0, isGoalReached: false };
     }
 
-    const diff = targetScoreNum - latestScore;
+    const diff = targetScoreNum - effectiveScore;
     const isReached = diff <= 0;
 
-    const minScale = activeProgram === "ACT" ? 1 : activeProgram === "GRE" ? 260 : 400;
+    const minScale =
+      activeProgram === "AP_CALC"
+        ? 1
+        : activeProgram === "ACT"
+        ? 1
+        : activeProgram === "GRE"
+        ? 260
+        : 400;
     const maxScale = targetScoreNum;
+    const denom = Math.max(1, maxScale - minScale);
     const percent = Math.min(
       100,
-      Math.max(0, Math.round(((latestScore - minScale) / (maxScale - minScale)) * 100))
+      Math.max(0, Math.round(((effectiveScore - minScale) / denom) * 100))
     );
 
     return {
@@ -90,7 +110,7 @@ export function ScoreTargetGauge({
       progressPercent: percent,
       isGoalReached: isReached,
     };
-  }, [hasTarget, hasBaseline, targetScoreNum, latestScore, activeProgram]);
+  }, [hasTarget, hasBaseline, targetScoreNum, effectiveScore, activeProgram]);
 
   const handleOpenEdit = () => {
     setFormScore(storedScore);
@@ -151,7 +171,13 @@ export function ScoreTargetGauge({
             </label>
             <input
               type="number"
-              placeholder={activeProgram === "ACT" ? "e.g. 34" : "e.g. 1500"}
+              placeholder={
+                activeProgram === "AP_CALC"
+                  ? "e.g. 5"
+                  : activeProgram === "ACT"
+                  ? "e.g. 34"
+                  : "e.g. 1500"
+              }
               value={formScore}
               onChange={(e) => setFormScore(e.target.value)}
               className="w-full text-xs font-semibold p-1.5 border border-input bg-background rounded-none"
@@ -204,19 +230,27 @@ export function ScoreTargetGauge({
         <div className="flex items-center justify-between gap-6 py-2">
           <div className="space-y-1">
             <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">
-              Target Achieved
+              {isPendingAudit ? "Projected Goal Met" : "Target Achieved"}
             </span>
             <div className="text-4xl sm:text-5xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
-              {latestScore}
+              {isPendingAudit ? `Est. ${effectiveScore}` : effectiveScore}
             </div>
           </div>
           <div className="text-right space-y-1 max-w-[210px]">
             <div className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-              Goal Exceeded (+{Math.abs(delta!)} pts)
+              {isPendingAudit
+                ? "Pending FRQ Confirmation"
+                : delta === 0
+                ? "Target Matched"
+                : `Goal Exceeded (+${Math.abs(delta!)} pts)`}
             </div>
-            <div className="text-sm font-bold text-foreground">Target Surpassed</div>
+            <div className="text-sm font-bold text-foreground">
+              {isPendingAudit ? "On Track for Target" : "Target Surpassed"}
+            </div>
             <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-              Your latest evaluation exceeds your target score. Consider raising your benchmark.
+              {isPendingAudit
+                ? "Your multiple-choice performance puts you on pace to hit your target once FRQs are graded."
+                : "Your latest evaluation meets or exceeds your target score."}
             </p>
           </div>
         </div>
@@ -225,7 +259,7 @@ export function ScoreTargetGauge({
           <div className="flex items-baseline justify-between gap-4">
             <div>
               <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                Point Gap
+                {isPendingAudit ? "Projected Gap" : "Point Gap"}
               </span>
               <div className="text-4xl sm:text-5xl font-black text-primary leading-none pt-1">
                 +{delta}
@@ -234,7 +268,10 @@ export function ScoreTargetGauge({
 
             <div className="text-right space-y-1">
               <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
-                Latest Baseline: <strong className="text-foreground">{latestScore}</strong>
+                {isPendingAudit ? "Projected:" : "Latest Baseline:"}{" "}
+                <strong className="text-foreground">
+                  {isPendingAudit ? `Est. ${effectiveScore}` : effectiveScore}
+                </strong>
               </span>
               <span className="text-xs font-bold text-foreground">
                 {progressPercent}% of target range

@@ -11,6 +11,7 @@ import {
   Clock,
   BookOpen,
   Coffee,
+  Hourglass,
 } from "lucide-react";
 
 interface DiagnosticCadenceCardProps {
@@ -19,6 +20,7 @@ interface DiagnosticCadenceCardProps {
   latestCategory: string | null;
   totalCompletedCount: number;
   nextTestLaunchUrl: string | null;
+  isRecentPendingAudit?: boolean;
 }
 
 function subscribeToStorage(callback: () => void) {
@@ -40,6 +42,7 @@ export function DiagnosticCadenceCard({
   latestCategory,
   totalCompletedCount,
   nextTestLaunchUrl,
+  isRecentPendingAudit = false,
 }: DiagnosticCadenceCardProps) {
   const activeProgram = propActiveProgram || latestCategory || "SAT";
 
@@ -72,6 +75,19 @@ export function DiagnosticCadenceCard({
       const last = new Date(latestCompletedAt);
       last.setHours(0, 0, 0, 0);
       daysSinceLast = Math.max(0, Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+    if (isRecentPendingAudit) {
+      return {
+        badge: "FRQ Audit In Progress",
+        title: "Handwritten Packet Under Review",
+        description:
+          "Your scanned FRQ sheets are queued for tutor rubric grading. Inspect your Section I pacing and missed items while your final composite score is finalized.",
+        actionText: "Inspect MC Telemetry",
+        actionUrl: "/dashboard/results",
+        icon: Hourglass,
+        daysSince: daysSinceLast,
+      };
     }
 
     if (daysToOfficial !== null && daysToOfficial <= 4 && daysToOfficial >= 0) {
@@ -145,7 +161,7 @@ export function DiagnosticCadenceCard({
       icon: AlertCircle,
       daysSince: daysSinceLast,
     };
-  }, [latestCompletedAt, storedDate, nextTestLaunchUrl]);
+  }, [latestCompletedAt, storedDate, nextTestLaunchUrl, isRecentPendingAudit]);
 
   if (!isHydrated) {
     return <div className="bg-card border border-border p-6 rounded-none h-52 animate-pulse" />;

@@ -45,6 +45,18 @@ function resolveActiveCategory(
   return Category.SAT;
 }
 
+function projectApScoreFromMcAccuracy(mcCorrect: number, mcTotal: number): number {
+  const mcAccuracy = mcTotal > 0 ? mcCorrect / mcTotal : 0;
+  const projectedFrqRaw = Math.round(mcAccuracy * 54);
+  const projectedCompositeRaw = mcCorrect * 1.2 + projectedFrqRaw;
+
+  if (projectedCompositeRaw >= 68) return 5;
+  if (projectedCompositeRaw >= 54) return 4;
+  if (projectedCompositeRaw >= 41) return 3;
+  if (projectedCompositeRaw >= 30) return 2;
+  return 1;
+}
+
 async function DashboardOverviewContent({
   searchParamsPromise,
 }: {
@@ -81,6 +93,7 @@ async function DashboardOverviewContent({
     responseAggregates,
     userSectionResults,
     userSectionCheckpoints,
+    userFrqSubmissions,
   ] = await Promise.all([
     getAllAvailableTests(),
     session?.user?.id
@@ -113,13 +126,35 @@ async function DashboardOverviewContent({
     session?.user?.id
       ? prisma.result.findMany({
           where: { profileId: session.user.id },
-          select: { testId: true, sectionId: true },
+          select: {
+            testId: true,
+            sectionId: true,
+            numCorrect: true,
+            totalQuestions: true,
+          },
         })
       : Promise.resolve([]),
     session?.user?.id
       ? prisma.sectionCheckpoint.findMany({
           where: { profileId: session.user.id },
           select: { testId: true, sectionId: true, updatedAt: true },
+        })
+      : Promise.resolve([]),
+    session?.user?.id
+      ? prisma.frqSubmission.findMany({
+          where: { profileId: session.user.id },
+          select: {
+            testId: true,
+            sectionId: true,
+            status: true,
+            crops: {
+              where: {
+                needsHumanAudit: true,
+                reviewedAt: null,
+              },
+              select: { id: true },
+            },
+          },
         })
       : Promise.resolve([]),
   ]);
@@ -134,6 +169,66 @@ async function DashboardOverviewContent({
     }
     completedSectionsByTest.get(r.testId)!.add(r.sectionId);
   }
+
+  // Track pending FRQ audit sections per test
+  const pendingAuditSectionsByTest = new Map<string, Set<string>>();
+  for (const sub of userFrqSubmissions) {
+    const isPending =
+      sub.status === "UPLOADED" ||
+      sub.status === "CROPPED" ||
+      sub.status === "PENDING_AUDIT" ||
+      sub.crops.length > 0;
+
+    if (isPending) {
+      if (!pendingAuditSectionsByTest.has(sub.testId)) {
+        pendingAuditSectionsByTest.set(sub.testId, new Set());
+      }
+      pendingAuditSectionsByTest.get(sub.testId)!.add(sub.sectionId);
+    }
+  }
+
+  // Evaluate pending FRQ audit state & MC projection for the most recent completed exam
+  const recentAuditState = (() => {
+    if (!recentSummary) {
+      return {
+        isPendingAudit: false,
+        projectedScore: null as number | null,
+        mcAccuracySummary: null as string | null,
+      };
+    }
+
+    const pendingSections = pendingAuditSectionsByTest.get(recentSummary.testId);
+    const isPendingAudit = Boolean(pendingSections && pendingSections.size > 0);
+
+    if (!isPendingAudit) {
+      return {
+        isPendingAudit: false,
+        projectedScore: null as number | null,
+        mcAccuracySummary: null as string | null,
+      };
+    }
+
+    const testSections = userSectionResults.filter(
+      (r) => r.testId === recentSummary.testId && !pendingSections!.has(r.sectionId)
+    );
+    const mcCorrect = testSections.reduce((sum, s) => sum + s.numCorrect, 0);
+    const mcTotal = testSections.reduce((sum, s) => sum + s.totalQuestions, 0);
+    const mcPct = mcTotal > 0 ? Math.round((mcCorrect / mcTotal) * 100) : null;
+
+    const projectedScore =
+      recentSummary.category.toUpperCase() === "AP_CALC" && mcTotal > 0
+        ? projectApScoreFromMcAccuracy(mcCorrect, mcTotal)
+        : null;
+
+    const mcAccuracySummary =
+      mcTotal > 0 ? `${mcCorrect}/${mcTotal} MC (${mcPct}%)` : null;
+
+    return {
+      isPendingAudit: true,
+      projectedScore,
+      mcAccuracySummary,
+    };
+  })();
 
   // Detect adaptive routing track (Upper/Hard vs Lower/Easy) on most recent completed exam
   const recentAdaptiveBadge = (() => {
@@ -244,11 +339,16 @@ async function DashboardOverviewContent({
           <RecentPerformanceCard
             recentSummary={recentSummary}
             adaptiveTrackBadge={recentAdaptiveBadge}
+            isPendingAudit={recentAuditState.isPendingAudit}
+            projectedScore={recentAuditState.projectedScore}
+            mcAccuracySummary={recentAuditState.mcAccuracySummary}
           />
           <ScoreTargetGauge
             activeProgram={activeProgram}
             latestScore={recentSummary?.compositeScore ?? null}
             latestTestTitle={recentSummary?.testTitle ?? null}
+            isPendingAudit={recentAuditState.isPendingAudit}
+            projectedScore={recentAuditState.projectedScore}
           />
           <div className="md:col-span-2 lg:col-span-1">
             <ExamCountdownWidget activeProgram={activeProgram} />
@@ -272,6 +372,7 @@ async function DashboardOverviewContent({
               latestCategory={activeProgram}
               totalCompletedCount={completedSummaries.length}
               nextTestLaunchUrl={nextLaunchUrl}
+              isRecentPendingAudit={recentAuditState.isPendingAudit}
             />
           </div>
         </div>
