@@ -408,15 +408,29 @@ export async function finalizeTestFrqCapture(testId: string, category: Category)
       return { success: false, error: "Test metadata not found." };
     }
 
-    const frqSubmissions = await prisma.frqSubmission.findMany({
-      where: { profileId, testId },
-      include: { crops: true },
-    });
+    const [frqSubmissions, existingResponses] = await Promise.all([
+      prisma.frqSubmission.findMany({
+        where: { profileId, testId },
+        include: { crops: true },
+      }),
+      prisma.response.findMany({
+        where: { profileId, testId },
+        select: { questionId: true, sectionId: true },
+      }),
+    ]);
 
-    // Group earned points & transcriptions by sectionId -> questionId
+    const responseIdsBySection = new Map<string, Set<string>>();
+    for (const r of existingResponses) {
+      if (!responseIdsBySection.has(r.sectionId)) {
+        responseIdsBySection.set(r.sectionId, new Set());
+      }
+      responseIdsBySection.get(r.sectionId)!.add(r.questionId);
+    }
+
+    // Group earned points & notes by sectionId -> target questionId (atomic part ID or parent ID)
     const bySection = new Map<
       string,
-      Map<string, { earned: number; possible: number; transcriptions: string[] }>
+      Map<string, { earned: number; possible: number; notes: string[] }>
     >();
 
     for (const sub of frqSubmissions) {
@@ -424,19 +438,34 @@ export async function finalizeTestFrqCapture(testId: string, category: Category)
         bySection.set(sub.sectionId, new Map());
       }
       const qMap = bySection.get(sub.sectionId)!;
-      const earned = sub.crops.reduce((acc, c) => acc + (c.pointsAwarded || 0), 0);
-      const possible = sub.crops.reduce((acc, c) => acc + (c.pointsPossible || 1), 0);
-      const texts = sub.crops
-        .map((c) => (c.transcription ? `[Part ${c.subPartLabel}]: ${c.transcription}` : null))
-        .filter((t): t is string => Boolean(t));
+      const sectionResponseIds = responseIdsBySection.get(sub.sectionId);
 
-      const existing = qMap.get(sub.questionId);
-      if (existing) {
-        existing.earned += earned;
-        existing.possible += possible;
-        existing.transcriptions.push(...texts);
-      } else {
-        qMap.set(sub.questionId, { earned, possible, transcriptions: texts });
+      for (const c of sub.crops) {
+        const atomicId = `${sub.questionId}${c.subPartLabel.trim().toLowerCase()}`;
+        const targetQuestionId = sectionResponseIds?.has(atomicId)
+          ? atomicId
+          : sub.questionId;
+
+        const earned = c.pointsAwarded || 0;
+        const possible = c.pointsPossible || 1;
+        const note = c.transcription
+          ? `[Part ${c.subPartLabel}]: ${c.transcription}`
+          : c.reviewerNotes
+          ? `[Part ${c.subPartLabel}]: ${c.reviewerNotes}`
+          : null;
+
+        const existing = qMap.get(targetQuestionId);
+        if (existing) {
+          existing.earned += earned;
+          existing.possible += possible;
+          if (note) existing.notes.push(note);
+        } else {
+          qMap.set(targetQuestionId, {
+            earned,
+            possible,
+            notes: note ? [note] : [],
+          });
+        }
       }
     }
 
@@ -455,9 +484,7 @@ export async function finalizeTestFrqCapture(testId: string, category: Category)
           data: {
             isCorrect,
             frqUserAnswer:
-              data.transcriptions.length > 0
-                ? data.transcriptions.join(" | ")
-                : undefined,
+              data.notes.length > 0 ? data.notes.join(" | ") : undefined,
           },
         });
       }

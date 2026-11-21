@@ -88,11 +88,6 @@ function formatOrdinalPercentile(percentile?: number | string | null): string | 
   return `${rounded}${suffix} Percentile`;
 }
 
-/**
- * Uses matchMedia so mobile browser chrome expansion/retraction during vertical
- * scrolling (which changes innerHeight and fires window resize) never triggers
- * unnecessary re-renders unless the 1024px breakpoint is actually crossed.
- */
 const useDesktopBreakpoint = () => {
   const [state, setState] = React.useState({
     isLg: false,
@@ -156,14 +151,193 @@ export default function UnifiedAnalyticsDashboard({
   const { isLg, mounted } = useDesktopBreakpoint();
   const [chartMode, setChartMode] = React.useState<PacingChartMode>("bars");
 
-  const pendingAuditSet = React.useMemo(
+  const isSatCategory = metadata.category.toUpperCase() === "SAT";
+  const isApCalcCategory = metadata.category.toUpperCase() === "AP_CALC";
+  const isAcademicCategory =
+    metadata.category.toUpperCase() === "ACADEMIC" ||
+    (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE";
+
+  const rawPendingAuditSet = React.useMemo(
     () => new Set(pendingAuditSectionIds),
     [pendingAuditSectionIds]
   );
 
+  // For AP_CALC: combine Part A + Part B into "Section I (Multiple Choice)" and "Section II (Free Response)"
+  const {
+    displaySectionResults,
+    displayResponses,
+    effectivePendingAuditSet,
+    effectiveMetadata,
+  } = React.useMemo(() => {
+    if (!isApCalcCategory) {
+      return {
+        displaySectionResults: sectionResults,
+        displayResponses: responses,
+        effectivePendingAuditSet: rawPendingAuditSet,
+        effectiveMetadata: metadata,
+      };
+    }
+
+    const apWeights = (metadata.scoring as any)?.apWeights;
+    const mcIds = new Set<string>(
+      apWeights?.mcSectionIds || ["ap-calc-ab-t1-s1a", "ap-calc-ab-t1-s1b"]
+    );
+    const frqIds = new Set<string>(
+      apWeights?.frqSectionIds || ["ap-calc-ab-t1-s2a", "ap-calc-ab-t1-s2b"]
+    );
+
+    const isMcSection = (sr: SectionResultData) =>
+      mcIds.has(sr.sectionId) ||
+      sr.sectionId.includes("-s1") ||
+      sr.section.title.toLowerCase().includes("section i,");
+
+    const isFrqSection = (sr: SectionResultData) =>
+      frqIds.has(sr.sectionId) ||
+      sr.sectionId.includes("-s2") ||
+      sr.section.title.toLowerCase().includes("section ii");
+
+    const mcSections = sectionResults
+      .filter(isMcSection)
+      .sort((a, b) => a.section.sectionOrder - b.section.sectionOrder);
+    const frqSections = sectionResults
+      .filter(isFrqSection)
+      .sort((a, b) => a.section.sectionOrder - b.section.sectionOrder);
+
+    if (mcSections.length === 0 && frqSections.length === 0) {
+      return {
+        displaySectionResults: sectionResults,
+        displayResponses: responses,
+        effectivePendingAuditSet: rawPendingAuditSet,
+        effectiveMetadata: metadata,
+      };
+    }
+
+    const combinedSections: SectionResultData[] = [];
+    const combinedResponses: EnrichedResponseItem[] = [];
+    const combinedPendingSet = new Set<string>();
+    const virtualManifestSections = [...(metadata.sections || [])];
+
+    const mergeGroup = (
+      groupId: string,
+      groupTitle: string,
+      groupOrder: number,
+      groupSections: SectionResultData[]
+    ) => {
+      if (groupSections.length === 0) return;
+
+      let totalCorrect = 0;
+      let totalQuestions = 0;
+      let totalRawScore = 0;
+      let totalScaledScore = 0;
+      let hasScaledScore = false;
+      let totalTimeLimit = 0;
+      let totalTimeRemaining = 0;
+      let questionOffset = 0;
+      let timeOffset = 0;
+      const mergedNavHistory: { time: number; qIdx: number }[] = [];
+
+      const groupHasPending = groupSections.some((sr) =>
+        rawPendingAuditSet.has(sr.sectionId)
+      );
+      if (groupHasPending) {
+        combinedPendingSet.add(groupId);
+      }
+
+      for (const sr of groupSections) {
+        totalCorrect += sr.numCorrect || 0;
+        totalQuestions += sr.totalQuestions || 0;
+        totalRawScore += sr.rawScore || 0;
+        if (sr.scaledScore !== null && sr.scaledScore !== undefined) {
+          totalScaledScore += sr.scaledScore;
+          hasScaledScore = true;
+        }
+
+        const manifestSec = metadata.sections?.find((s) => s.id === sr.sectionId);
+        const secLimit = manifestSec?.timeLimit || sr.section.timeLimit || 0;
+        const multiplier = (sr.accommodations as any)?.timeMultiplier ?? 1.0;
+        const allottedSec = Math.round(secLimit * multiplier);
+        const elapsedSec = Math.max(0, allottedSec - (sr.timeRemainingSeconds || 0));
+
+        totalTimeLimit += secLimit;
+        totalTimeRemaining += sr.timeRemainingSeconds || 0;
+
+        if (Array.isArray(sr.navigationHistory)) {
+          for (const entry of sr.navigationHistory) {
+            mergedNavHistory.push({
+              time: timeOffset + entry.time,
+              qIdx: questionOffset + entry.qIdx,
+            });
+          }
+        }
+
+        const secResponses = responses
+          .filter((r) => r.sectionId === sr.sectionId)
+          .sort((a, b) => a.responseOrder - b.responseOrder);
+
+        secResponses.forEach((r, idx) => {
+          combinedResponses.push({
+            ...r,
+            sectionId: groupId,
+            sectionOrder: groupOrder,
+            responseOrder: questionOffset + idx + 1,
+          });
+        });
+
+        questionOffset += secResponses.length || sr.totalQuestions || 0;
+        timeOffset += elapsedSec;
+      }
+
+      const firstSec = groupSections[0];
+      combinedSections.push({
+        id: groupId,
+        sectionId: groupId,
+        testTitle: firstSec.testTitle,
+        numCorrect: totalCorrect,
+        totalQuestions,
+        rawScore: totalRawScore,
+        scaledScore: hasScaledScore ? totalScaledScore : null,
+        timeRemainingSeconds: totalTimeRemaining,
+        navigationHistory: mergedNavHistory.length > 0 ? mergedNavHistory : null,
+        section: {
+          id: groupId,
+          title: groupTitle,
+          sectionOrder: groupOrder,
+          timeLimit: totalTimeLimit,
+        },
+        accommodations: firstSec.accommodations ?? null,
+      });
+
+      virtualManifestSections.push({
+        id: groupId,
+        file: "",
+        order: groupOrder,
+        title: groupTitle,
+        timeLimit: totalTimeLimit,
+      });
+    };
+
+    mergeGroup("ap-calc-combined-s1", "Section I: Multiple Choice", 1, mcSections);
+    mergeGroup("ap-calc-combined-s2", "Section II: Free Response", 2, frqSections);
+
+    return {
+      displaySectionResults: combinedSections,
+      displayResponses: combinedResponses,
+      effectivePendingAuditSet: combinedPendingSet,
+      effectiveMetadata: {
+        ...metadata,
+        sections: virtualManifestSections,
+      },
+    };
+  }, [isApCalcCategory, sectionResults, responses, rawPendingAuditSet, metadata]);
+
+  const effectivePendingAuditIds = React.useMemo(
+    () => Array.from(effectivePendingAuditSet),
+    [effectivePendingAuditSet]
+  );
+
   const availableSections = React.useMemo(() => {
-    return sectionResults.map((sr) => sr.sectionId);
-  }, [sectionResults]);
+    return displaySectionResults.map((sr) => sr.sectionId);
+  }, [displaySectionResults]);
 
   const [selectedSectionId, setSelectedSectionId] = React.useState<string | null>(null);
 
@@ -173,16 +347,16 @@ export default function UnifiedAnalyticsDashboard({
       : availableSections[0] || "";
 
   const activeSectionResult = React.useMemo(() => {
-    return sectionResults.find((s) => s.sectionId === activeSectionId);
-  }, [sectionResults, activeSectionId]);
+    return displaySectionResults.find((s) => s.sectionId === activeSectionId);
+  }, [displaySectionResults, activeSectionId]);
 
   const activeResponses = React.useMemo(() => {
-    return responses
+    return displayResponses
       .filter((r) => r.sectionId === activeSectionId)
       .sort((a, b) => a.responseOrder - b.responseOrder);
-  }, [responses, activeSectionId]);
+  }, [displayResponses, activeSectionId]);
 
-  const isActiveSectionPendingAudit = pendingAuditSet.has(activeSectionId);
+  const isActiveSectionPendingAudit = effectivePendingAuditSet.has(activeSectionId);
 
   // Dynamically compute target pacing per question (with accommodation multiplier)
   const targetPacingSeconds = React.useMemo(() => {
@@ -192,7 +366,7 @@ export default function UnifiedAnalyticsDashboard({
       activeResponses.length || activeSectionResult.totalQuestions || 0;
     if (questionCount === 0) return null;
 
-    const manifestSection = metadata.sections?.find(
+    const manifestSection = effectiveMetadata.sections?.find(
       (s) => s.id === activeSectionId
     );
     const baseTimeLimit =
@@ -207,9 +381,13 @@ export default function UnifiedAnalyticsDashboard({
 
     const totalAllotted = Math.round(baseTimeLimit * multiplier);
     return Math.round(totalAllotted / questionCount);
-  }, [activeSectionResult, activeResponses.length, metadata.sections, activeSectionId]);
+  }, [
+    activeSectionResult,
+    activeResponses.length,
+    effectiveMetadata.sections,
+    activeSectionId,
+  ]);
 
-  // Dynamic 0.65x–1.5x pacing corridor and 2.5x Y/X-axis ceiling rounded to nearest 10s
   const { rushedFloorSec, timeSinkCeilingSec, timeAxisCap } = React.useMemo(() => {
     const baseTarget = targetPacingSeconds ?? 80;
     return {
@@ -270,8 +448,8 @@ export default function UnifiedAnalyticsDashboard({
       { title: string; percentage: number; formattedTime: string | null }
     > = {};
 
-    sectionResults.forEach((sr) => {
-      const secResps = responses.filter((r) => r.sectionId === sr.sectionId);
+    displaySectionResults.forEach((sr) => {
+      const secResps = displayResponses.filter((r) => r.sectionId === sr.sectionId);
       const totalSeconds = secResps.reduce(
         (sum, r) => sum + (r.timeSpentOnResponse || 0),
         0
@@ -294,7 +472,7 @@ export default function UnifiedAnalyticsDashboard({
     });
 
     return stats;
-  }, [sectionResults, responses]);
+  }, [displaySectionResults, displayResponses]);
 
   const scoreCard = React.useMemo(() => {
     const category = metadata.category.toUpperCase();
@@ -366,12 +544,12 @@ export default function UnifiedAnalyticsDashboard({
 
     if (category === "AP_CALC") {
       const hasPendingFrqAudit = sectionResults.some((sr) =>
-        pendingAuditSet.has(sr.sectionId)
+        rawPendingAuditSet.has(sr.sectionId)
       );
 
       if (hasPendingFrqAudit) {
         const mcSections = sectionResults.filter(
-          (sr) => !pendingAuditSet.has(sr.sectionId)
+          (sr) => !rawPendingAuditSet.has(sr.sectionId)
         );
         const mcCorrect = mcSections.reduce(
           (acc, sr) => acc + (sr.numCorrect || 0),
@@ -394,7 +572,6 @@ export default function UnifiedAnalyticsDashboard({
           "1": 0,
         };
 
-        // Project Section II raw points (out of 54) from MC accuracy rate
         const projectedFrqRaw = Math.round(mcAccuracy * 54);
         const projectedCompositeRaw =
           mcCorrect * mcMultiplier + projectedFrqRaw * frqMultiplier;
@@ -445,7 +622,7 @@ export default function UnifiedAnalyticsDashboard({
       subtext: percentileLabel,
       isPendingAudit: false,
     };
-  }, [metadata, sectionResults, testSummary, adaptiveTrajectory, pendingAuditSet]);
+  }, [metadata, sectionResults, testSummary, adaptiveTrajectory, rawPendingAuditSet]);
 
   const formatNavTime = (seconds: number | string) => {
     const totalSeconds =
@@ -479,12 +656,6 @@ export default function UnifiedAnalyticsDashboard({
     }
     return Array.from(new Set(ticks));
   }, [maxNavQuestionIdx]);
-
-  const isSatCategory = metadata.category.toUpperCase() === "SAT";
-  const isApCalcCategory = metadata.category.toUpperCase() === "AP_CALC";
-  const isAcademicCategory =
-    metadata.category.toUpperCase() === "ACADEMIC" ||
-    (metadata.scoring as any)?.scaleType === "ACADEMIC_PERCENTAGE";
 
   const hasAdaptiveScores =
     isSatCategory &&
@@ -547,10 +718,10 @@ export default function UnifiedAnalyticsDashboard({
           <div className="flex flex-col md:flex-row items-stretch">
             {/* Section Selector Buttons */}
             <div className="flex flex-row overflow-x-auto md:overflow-visible no-scrollbar">
-              {sectionResults.map((sr, idx) => {
+              {displaySectionResults.map((sr, idx) => {
                 const stats = sectionStats[sr.sectionId];
                 const isCurrent = activeSectionId === sr.sectionId;
-                const isSectionPendingAudit = pendingAuditSet.has(sr.sectionId);
+                const isSectionPendingAudit = effectivePendingAuditSet.has(sr.sectionId);
 
                 const displayScore = isSectionPendingAudit
                   ? "Under Review"
@@ -578,7 +749,7 @@ export default function UnifiedAnalyticsDashboard({
                     className={`min-h-14 flex flex-1 flex-col items-center justify-center gap-1 border-r last:border-r-0 md:last:border-r border-t border-slate-200 dark:border-slate-800 transition-colors hover:bg-muted/50 data-[active=true]:bg-muted/50 md:border-t-0 md:border-l ${
                       isSatCategory
                         ? "px-2.5 sm:px-3 py-2.5 md:min-w-16 lg:min-w-20 lg:px-6"
-                        : "px-3 sm:px-4 py-2.5 md:min-w-32 lg:px-6"
+                        : "px-3 sm:px-4 py-2.5 md:min-w-36 lg:px-6"
                     }`}
                     onClick={() => setSelectedSectionId(sr.sectionId)}
                   >
@@ -767,10 +938,11 @@ export default function UnifiedAnalyticsDashboard({
             <div className="h-[300px] w-full animate-pulse bg-muted/20" />
           ) : chartMode === "timeline" ? (
             <SectionPacingTimeline
-              metadata={metadata}
-              sectionResults={sectionResults}
-              responses={responses}
+              metadata={effectiveMetadata}
+              sectionResults={displaySectionResults}
+              responses={displayResponses}
               activeSectionId={activeSectionId}
+              pendingAuditSectionIds={effectivePendingAuditIds}
               hideCardWrapper
               isLg={isLg}
             />
@@ -1117,7 +1289,7 @@ export default function UnifiedAnalyticsDashboard({
         <div className={activeSectionResult ? "w-full lg:w-2/3 min-w-0" : "w-full min-w-0"}>
           <TopicSkillAccuracyAccordion
             responses={activeResponses}
-            pendingAuditSectionIds={pendingAuditSectionIds}
+            pendingAuditSectionIds={effectivePendingAuditIds}
           />
         </div>
       </div>

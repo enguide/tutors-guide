@@ -127,30 +127,36 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       },
     });
 
-    // Map questionId -> { pointsEarned, pointsPossible, transcriptions[] }
+    // Map target questionId (supporting both atomic `${parentId}${part}` and parentId)
     const frqScoreMap = new Map<
       string,
       { earned: number; possible: number; transcriptions: string[] }
     >();
 
     for (const sub of frqSubmissions) {
-      const earned = sub.crops.reduce((acc, c) => acc + (c.pointsAwarded || 0), 0);
-      const possible = sub.crops.reduce((acc, c) => acc + (c.pointsPossible || 1), 0);
-      const pageTranscriptions = sub.crops
-        .map((c) => (c.transcription ? `[Part ${c.subPartLabel}]: ${c.transcription}` : null))
-        .filter((t): t is string => Boolean(t));
+      for (const c of sub.crops) {
+        const partSuffix = c.subPartLabel.trim().toLowerCase();
+        const atomicId = `${sub.questionId}${partSuffix}`;
+        const targetId = questions.some((q) => q.id === atomicId)
+          ? atomicId
+          : sub.questionId;
 
-      const existing = frqScoreMap.get(sub.questionId);
-      if (existing) {
-        existing.earned += earned;
-        existing.possible += possible;
-        existing.transcriptions.push(...pageTranscriptions);
-      } else {
-        frqScoreMap.set(sub.questionId, {
-          earned,
-          possible,
-          transcriptions: pageTranscriptions,
-        });
+        const labelText = c.transcription
+          ? `[Part ${c.subPartLabel}]: ${c.transcription}`
+          : null;
+
+        const existing = frqScoreMap.get(targetId);
+        if (existing) {
+          existing.earned += c.pointsAwarded || 0;
+          existing.possible += c.pointsPossible || 1;
+          if (labelText) existing.transcriptions.push(labelText);
+        } else {
+          frqScoreMap.set(targetId, {
+            earned: c.pointsAwarded || 0,
+            possible: c.pointsPossible || 1,
+            transcriptions: labelText ? [labelText] : [],
+          });
+        }
       }
     }
 
@@ -183,7 +189,7 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
         isCorrect = frqData.earned >= frqData.possible && frqData.possible > 0;
         totalEarnedRawScore += frqData.earned;
         if (isCorrect) numCorrect++;
-      } else {
+      } else if (!isHandwrittenFrq) {
         const standardType = q.questionType === "MC" ? "MC" : "FR";
         isCorrect = evaluateAnswer(
           standardType,
@@ -232,8 +238,6 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
     const totalQuestions = questions.length;
 
     // 7. Atomic batched transaction pipeline
-    // Dispatches Result creation, Checkpoint deletion, and all Response upserts
-    // in a single network round-trip to minimize connection hold duration under load.
     const transactionBatch: Prisma.PrismaPromise<unknown>[] = [
       prisma.result.create({
         data: {
@@ -340,10 +344,8 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
       let itemRecordsBySection: Map<string, ItemScoringRecord[]> | undefined;
 
       if (metadata.isAdaptive) {
-        // Hydrate question difficulty & domain metadata across all completed sections
         const questionMetaMap = new Map<string, { difficulty?: string; domain?: string }>();
 
-        // Seed from the current section's questions already in memory
         for (const q of questions) {
           questionMetaMap.set(q.id, {
             difficulty: q.difficulty,
@@ -351,7 +353,6 @@ export async function completeTestSection(payload: CompleteSectionPayload) {
           });
         }
 
-        // Load metadata for all previously submitted sections
         const priorSectionIds = submittedSectionIds.filter((id) => id !== sectionId);
         await Promise.all(
           priorSectionIds.map(async (secId) => {

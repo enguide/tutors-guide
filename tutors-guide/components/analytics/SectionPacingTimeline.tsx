@@ -25,6 +25,7 @@ interface SectionPacingTimelineProps {
   sectionResults: SectionResultData[];
   responses: EnrichedResponseItem[];
   activeSectionId?: string;
+  pendingAuditSectionIds?: string[];
   hideCardWrapper?: boolean;
   isLg?: boolean;
 }
@@ -146,6 +147,7 @@ interface TimelinePoint {
   plottedTime: number;
   isClamped: boolean;
   isCorrect: boolean;
+  isPendingAudit: boolean;
   difficulty: string;
   domain: string;
   skill: string;
@@ -163,15 +165,16 @@ const renderTimelineShape = (props: any) => {
   const pt = payload as TimelinePoint;
   const color = pt.domainColor;
   const diff = normalizeDifficulty(pt.difficulty);
-  const isCorrect = pt.isCorrect;
+  const isFilled = pt.isCorrect && !pt.isPendingAudit;
   const isVertical = pt.isVerticalLayout;
 
   const hollowStrokeWidth = 2.2;
-  const inset = isCorrect ? 0 : hollowStrokeWidth / 2;
+  const inset = isFilled ? 0 : hollowStrokeWidth / 2;
 
-  const fillOpacity = isCorrect ? 0.95 : 0.12;
-  const stroke = isCorrect ? "none" : color;
-  const strokeWidth = isCorrect ? 0 : hollowStrokeWidth;
+  const fillOpacity = isFilled ? 0.95 : pt.isPendingAudit ? 0.35 : 0.12;
+  const stroke = isFilled ? "none" : color;
+  const strokeWidth = isFilled ? 0 : hollowStrokeWidth;
+  const strokeDasharray = pt.isPendingAudit ? "2 1.5" : undefined;
 
   const drawX = isVertical
     ? pt.isClamped
@@ -229,6 +232,7 @@ const renderTimelineShape = (props: any) => {
         fillOpacity={fillOpacity}
         stroke={stroke}
         strokeWidth={strokeWidth}
+        strokeDasharray={strokeDasharray}
         strokeLinejoin="round"
       />
     );
@@ -244,6 +248,7 @@ const renderTimelineShape = (props: any) => {
         fillOpacity={fillOpacity}
         stroke={stroke}
         strokeWidth={strokeWidth}
+        strokeDasharray={strokeDasharray}
         strokeLinejoin="round"
       />
     );
@@ -259,6 +264,7 @@ const renderTimelineShape = (props: any) => {
         fillOpacity={fillOpacity}
         stroke={stroke}
         strokeWidth={strokeWidth}
+        strokeDasharray={strokeDasharray}
       />
     );
   }
@@ -283,12 +289,18 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
   sectionResults,
   responses,
   activeSectionId: controlledSectionId,
+  pendingAuditSectionIds = [],
   hideCardWrapper = false,
   isLg: controlledIsLg,
 }) => {
   const isLg = useDesktopBreakpoint(controlledIsLg);
   const [selectedSectionId, setSelectedSectionId] = useState<string>(
     () => String(sectionResults[0]?.sectionId ?? "")
+  );
+
+  const pendingAuditSet = useMemo(
+    () => new Set(pendingAuditSectionIds),
+    [pendingAuditSectionIds]
   );
 
   const activeSectionId = useMemo(() => {
@@ -308,6 +320,8 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
       sectionResults.find((sr) => String(sr.sectionId) === activeSectionId),
     [sectionResults, activeSectionId]
   );
+
+  const isActivePendingAudit = pendingAuditSet.has(activeSectionId);
 
   const sectionResponses = useMemo(() => {
     return responses
@@ -401,6 +415,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
       const dom = r.domain || "General";
       const trueTime = r.timeSpentOnResponse ?? 0;
       const isClamped = trueTime > yAxisCap;
+      const isPending = pendingAuditSet.has(String(r.sectionId));
       return {
         questionId: String(r.questionId),
         questionNumber: r.responseOrder || idx + 1,
@@ -408,6 +423,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
         plottedTime: isClamped ? yAxisCap : trueTime,
         isClamped,
         isCorrect: r.isCorrect,
+        isPendingAudit: isPending,
         difficulty: r.difficulty || "Medium",
         domain: dom,
         skill: r.skill || "General",
@@ -430,7 +446,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
       maxQuestionNum: maxQ,
       clampedCount: clamped,
     };
-  }, [sectionResponses, trackDomainColorMap, targetSeconds, yAxisCap, isLg]);
+  }, [sectionResponses, trackDomainColorMap, targetSeconds, yAxisCap, isLg, pendingAuditSet]);
 
   const mobileChartHeight = useMemo(
     () => Math.max(150, plotData.length * 30),
@@ -462,12 +478,14 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
           <span>Question {pt.questionNumber}</span>
           <span
             className={`font-mono font-bold ${
-              pt.isCorrect
+              pt.isPendingAudit
+                ? "text-amber-600 dark:text-amber-400"
+                : pt.isCorrect
                 ? "text-sky-600 dark:text-sky-400"
                 : "text-rose-600 dark:text-rose-400"
             }`}
           >
-            {pt.isCorrect ? "Correct" : "Missed"}
+            {pt.isPendingAudit ? "Under Review" : pt.isCorrect ? "Correct" : "Missed"}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -515,6 +533,7 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
               {sectionResults.map((sr) => {
                 const secId = String(sr.sectionId);
                 const isSelected = secId === activeSectionId;
+                const isPending = pendingAuditSet.has(secId);
                 const misses = sr.totalQuestions - sr.numCorrect;
 
                 return (
@@ -529,16 +548,28 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
                     }`}
                   >
                     <span>{sr.section.title}</span>
-                    {misses > 0 && (
+                    {isPending ? (
                       <span
                         className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                           isSelected
                             ? "bg-primary-foreground/20 text-primary-foreground"
-                            : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                            : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                         }`}
                       >
-                        {misses} missed
+                        Under Review
                       </span>
+                    ) : (
+                      misses > 0 && (
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                            isSelected
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                          }`}
+                        >
+                          {misses} missed
+                        </span>
+                      )
                     )}
                   </button>
                 );
@@ -719,33 +750,57 @@ export const SectionPacingTimeline: React.FC<SectionPacingTimelineProps> = ({
           {/* Single-Line Outcome + Difficulty (Left) & Domains (Right) Legend Strip Below Chart */}
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[11px] sm:text-xs font-medium bg-muted/20 border border-border/60 px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-              <span
-                className="flex items-center gap-1.5 text-muted-foreground"
-                title="Filled shape indicates a correct answer"
-              >
-                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                  <rect x="2" y="2" width="8" height="8" fill="currentColor" />
-                </svg>
-                Correct
-              </span>
-              <span
-                className="flex items-center gap-1.5 text-muted-foreground"
-                title="Hollow outline indicates a missed question"
-              >
-                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                  <rect
-                    x="2"
-                    y="2"
-                    width="8"
-                    height="8"
-                    fill="currentColor"
-                    fillOpacity={0.12}
-                    stroke="currentColor"
-                    strokeWidth={2.2}
-                  />
-                </svg>
-                Missed
-              </span>
+              {isActivePendingAudit ? (
+                <span
+                  className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-semibold"
+                  title="Dashed outline indicates FRQ part is under tutor review"
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                    <rect
+                      x="2"
+                      y="2"
+                      width="8"
+                      height="8"
+                      fill="currentColor"
+                      fillOpacity={0.35}
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeDasharray="2 1.5"
+                    />
+                  </svg>
+                  Under Review
+                </span>
+              ) : (
+                <>
+                  <span
+                    className="flex items-center gap-1.5 text-muted-foreground"
+                    title="Filled shape indicates a correct answer"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                      <rect x="2" y="2" width="8" height="8" fill="currentColor" />
+                    </svg>
+                    Correct
+                  </span>
+                  <span
+                    className="flex items-center gap-1.5 text-muted-foreground"
+                    title="Hollow outline indicates a missed question"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                      <rect
+                        x="2"
+                        y="2"
+                        width="8"
+                        height="8"
+                        fill="currentColor"
+                        fillOpacity={0.12}
+                        stroke="currentColor"
+                        strokeWidth={2.2}
+                      />
+                    </svg>
+                    Missed
+                  </span>
+                </>
+              )}
 
               <span className="text-border">|</span>
 

@@ -24,6 +24,11 @@ export interface QuestionFrontmatter {
   passage?: string;  // Alias for backward compatibility
   layout?: QuestionLayoutMode;
   options?: QuestionOption[];
+  /** Optional atomic FRQ part metadata linking back to the parent physical sheet */
+  parentQuestionId?: string;
+  parentQuestionNumber?: number;
+  subPartLabel?: string;
+  points?: number;
   subParts?: FrqSubPartDefinition[]; // Optional structured FRQ rubric sub-parts
   domain?: string;
   skill?: string;
@@ -72,6 +77,7 @@ export interface TestMetadata {
   status?: TestLifecycleStatus; // Defaults to "published" when omitted
   category: SupportedExamCategory;
   description: string;
+  assetBasePath?: string;
   config?: Partial<SectionExamConfig>;
   isAdaptive?: boolean;
   stages?: AdaptiveStage[];

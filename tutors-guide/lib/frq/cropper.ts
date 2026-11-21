@@ -25,7 +25,7 @@ import {
   parseSelfDescribingSheetQr,
 } from "./manifest";
 import { decodeCode128FromGrayscale } from "./code128";
-import { evaluateFrqSubCropMock } from "./mockEvaluator";
+import { evaluateFrqSubCrop } from "./evaluator";
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || process.env.R2_BUCKET_NAME || "";
 
@@ -433,7 +433,7 @@ export async function processAndCropFrqSubmission(submissionId: string) {
 
     await Promise.allSettled(
       savedCrops.map((c) =>
-        evaluateFrqSubCropMock(
+        evaluateFrqSubCrop(
           c.id,
           auditReasonOverride,
           bufferByLabel.get(c.subPartLabel)

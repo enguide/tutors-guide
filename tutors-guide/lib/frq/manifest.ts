@@ -3,6 +3,7 @@ import { FrqSubPartDefinition, QuestionFrontmatter } from "@/types/content";
 
 export interface ManifestSubPart {
   label: string;       // "A", "B", "C", "D"
+  atomicQuestionId?: string; // e.g. "ap-calc-frq-q1a" when flattened into atomic questions
   pointsPossible: number;
   pageNumber: number;  // 1-indexed sheet within this question (1 = A/B, 2 = C/D)
   slotIndex: 0 | 1;    // 0 = top box, 1 = bottom box
@@ -50,13 +51,34 @@ export interface DecodedSheetQr {
   parts: string[];
 }
 
-export function resolveQuestionSubParts(question: QuestionFrontmatter): FrqSubPartDefinition[] {
+export function resolveQuestionSubParts(
+  question: QuestionFrontmatter
+): Array<FrqSubPartDefinition & { atomicQuestionId?: string }> {
   if (Array.isArray(question.subParts) && question.subParts.length > 0) {
     return question.subParts.map((sp) => ({
       label: sp.label.trim().toUpperCase(),
-      points: typeof sp.points === "number" && sp.points > 0 ? sp.points : 1.0,
+      atomicQuestionId: question.parentQuestionId ? question.id : undefined,
+      points:
+        typeof sp.points === "number" && sp.points > 0
+          ? sp.points
+          : typeof question.points === "number" && question.points > 0
+          ? question.points
+          : 1.0,
       rubricNotes: sp.rubricNotes,
     }));
+  }
+
+  if (question.subPartLabel) {
+    return [
+      {
+        label: question.subPartLabel.trim().toUpperCase(),
+        atomicQuestionId: question.parentQuestionId ? question.id : undefined,
+        points:
+          typeof question.points === "number" && question.points > 0
+            ? question.points
+            : 1.0,
+      },
+    ];
   }
 
   const prompt = question.prompt || "";
@@ -85,14 +107,46 @@ function buildManifestQuestionsForSection(
     .filter((q) => q.questionType === "FRQ_HANDWRITTEN")
     .sort((a, b) => a.questionNumber - b.questionNumber);
 
+  // Group atomic part questions sharing parentQuestionId onto one physical sheet group;
+  // legacy multi-part questions without parentQuestionId remain their own group.
+  const groupedByPhysicalQuestion = new Map<
+    string,
+    {
+      physicalQuestionId: string;
+      physicalQuestionNumber: number;
+      items: QuestionFrontmatter[];
+    }
+  >();
+
+  for (const q of handwrittenQuestions) {
+    const physicalId = q.parentQuestionId || q.id;
+    const physicalNum = q.parentQuestionNumber ?? q.questionNumber;
+
+    const existing = groupedByPhysicalQuestion.get(physicalId);
+    if (existing) {
+      existing.items.push(q);
+    } else {
+      groupedByPhysicalQuestion.set(physicalId, {
+        physicalQuestionId: physicalId,
+        physicalQuestionNumber: physicalNum,
+        items: [q],
+      });
+    }
+  }
+
+  const sortedGroups = Array.from(groupedByPhysicalQuestion.values()).sort(
+    (a, b) => a.physicalQuestionNumber - b.physicalQuestionNumber
+  );
+
   const manifestQuestions: ManifestQuestion[] = [];
   const allSheets: ManifestSheet[] = [];
 
-  for (const q of handwrittenQuestions) {
-    const rawParts = resolveQuestionSubParts(q);
+  for (const group of sortedGroups) {
+    const rawParts = group.items.flatMap((item) => resolveQuestionSubParts(item));
 
     const subParts: ManifestSubPart[] = rawParts.map((part, idx) => ({
       label: part.label,
+      atomicQuestionId: part.atomicQuestionId,
       pointsPossible: part.points ?? 1.0,
       pageNumber: Math.floor(idx / 2) + 1,
       slotIndex: (idx % 2) as 0 | 1,
@@ -105,11 +159,11 @@ function buildManifestQuestionsForSection(
     for (let pageNum = 1; pageNum <= totalSheets; pageNum++) {
       const pageParts = subParts.filter((sp) => sp.pageNumber === pageNum);
       const sheet: ManifestSheet = {
-        sheetKey: `${sectionId}::${q.id}::p${pageNum}`,
+        sheetKey: `${sectionId}::${group.physicalQuestionId}::p${pageNum}`,
         sectionId,
         sectionTitle,
-        questionId: q.id,
-        questionNumber: q.questionNumber,
+        questionId: group.physicalQuestionId,
+        questionNumber: group.physicalQuestionNumber,
         pageNumber: pageNum,
         parts: pageParts,
       };
@@ -120,8 +174,8 @@ function buildManifestQuestionsForSection(
     manifestQuestions.push({
       sectionId,
       sectionTitle,
-      questionId: q.id,
-      questionNumber: q.questionNumber,
+      questionId: group.physicalQuestionId,
+      questionNumber: group.physicalQuestionNumber,
       totalSheets,
       subParts,
       sheets,

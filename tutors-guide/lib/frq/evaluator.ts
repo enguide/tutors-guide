@@ -80,12 +80,24 @@ export async function evaluateFrqSubCrop(
       frqSubmission.sectionId
     );
 
-    const question = parsedSection?.frontmatter.questions.find(
-      (q) => q.id === frqSubmission.questionId
-    );
+    const normalizedPartLabel = crop.subPartLabel.trim().toUpperCase();
+    const sectionQuestions = parsedSection?.frontmatter.questions || [];
+
+    // Match either an atomic part question (parentQuestionId + subPartLabel) or a legacy parent question
+    const question =
+      sectionQuestions.find(
+        (q) =>
+          q.parentQuestionId === frqSubmission.questionId &&
+          (q.subPartLabel || "").trim().toUpperCase() === normalizedPartLabel
+      ) ||
+      sectionQuestions.find(
+        (q) =>
+          q.id === `${frqSubmission.questionId}${normalizedPartLabel.toLowerCase()}`
+      ) ||
+      sectionQuestions.find((q) => q.id === frqSubmission.questionId);
 
     if (question) {
-      questionNumber = question.questionNumber;
+      questionNumber = question.parentQuestionNumber ?? question.questionNumber;
 
       const rawCombinedPrompt = [question.stimulus, question.prompt]
         .filter((part): part is string => Boolean(part && part.trim().length > 0))
@@ -100,7 +112,7 @@ export async function evaluateFrqSubCrop(
     }
 
     const subPartDef = question?.subParts?.find(
-      (sp) => sp.label.trim().toUpperCase() === crop.subPartLabel.trim().toUpperCase()
+      (sp) => sp.label.trim().toUpperCase() === normalizedPartLabel
     );
 
     if (subPartDef) {

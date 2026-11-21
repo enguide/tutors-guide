@@ -125,14 +125,28 @@ export async function resolveCropAudit({
     if (existingResults.length > 0) {
       const metadata = await getTestMetadata(category.toLowerCase(), testId);
       if (metadata) {
-        const allSubmissions = await prisma.frqSubmission.findMany({
-          where: { profileId, testId },
-          include: { crops: true },
-        });
+        const [allSubmissions, existingResponses] = await Promise.all([
+          prisma.frqSubmission.findMany({
+            where: { profileId, testId },
+            include: { crops: true },
+          }),
+          prisma.response.findMany({
+            where: { profileId, testId },
+            select: { questionId: true, sectionId: true },
+          }),
+        ]);
+
+        const responseIdsBySection = new Map<string, Set<string>>();
+        for (const r of existingResponses) {
+          if (!responseIdsBySection.has(r.sectionId)) {
+            responseIdsBySection.set(r.sectionId, new Set());
+          }
+          responseIdsBySection.get(r.sectionId)!.add(r.questionId);
+        }
 
         const bySection = new Map<
           string,
-          Map<string, { earned: number; possible: number; transcriptions: string[] }>
+          Map<string, { earned: number; possible: number; notes: string[] }>
         >();
 
         for (const sub of allSubmissions) {
@@ -140,21 +154,36 @@ export async function resolveCropAudit({
             bySection.set(sub.sectionId, new Map());
           }
           const qMap = bySection.get(sub.sectionId)!;
-          const earned = sub.crops.reduce((acc, c) => acc + (c.pointsAwarded || 0), 0);
-          const possible = sub.crops.reduce((acc, c) => acc + (c.pointsPossible || 1), 0);
-          const texts = sub.crops
-            .map((c) =>
-              c.transcription ? `[Part ${c.subPartLabel}]: ${c.transcription}` : null
-            )
-            .filter((t): t is string => Boolean(t));
+          const sectionResponseIds = responseIdsBySection.get(sub.sectionId);
 
-          const existing = qMap.get(sub.questionId);
-          if (existing) {
-            existing.earned += earned;
-            existing.possible += possible;
-            existing.transcriptions.push(...texts);
-          } else {
-            qMap.set(sub.questionId, { earned, possible, transcriptions: texts });
+          for (const c of sub.crops) {
+            const atomicId = `${sub.questionId}${c.subPartLabel.trim().toLowerCase()}`;
+            const targetQuestionId = sectionResponseIds?.has(atomicId)
+              ? atomicId
+              : sub.questionId;
+
+            const earned = c.pointsAwarded || 0;
+            const possible = c.pointsPossible || 1;
+            const statusSummary = `${earned}/${possible} pts${
+              earned >= possible ? " (Full Credit)" : ""
+            }`;
+            const detailText = c.transcription || c.reviewerNotes || "";
+            const note = detailText
+              ? `${statusSummary} — ${detailText}`
+              : statusSummary;
+
+            const existing = qMap.get(targetQuestionId);
+            if (existing) {
+              existing.earned += earned;
+              existing.possible += possible;
+              existing.notes.push(note);
+            } else {
+              qMap.set(targetQuestionId, {
+                earned,
+                possible,
+                notes: [note],
+              });
+            }
           }
         }
 
@@ -172,9 +201,7 @@ export async function resolveCropAudit({
               data: {
                 isCorrect,
                 frqUserAnswer:
-                  data.transcriptions.length > 0
-                    ? data.transcriptions.join(" | ")
-                    : undefined,
+                  data.notes.length > 0 ? data.notes.join(" | ") : undefined,
               },
             });
           }
