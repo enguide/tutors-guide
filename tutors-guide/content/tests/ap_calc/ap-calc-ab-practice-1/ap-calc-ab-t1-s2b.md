@@ -48,15 +48,15 @@ questions:
             expectedLatex: "4"
     explanation: |
       ### Takeoff: What were you asked to find?
-      Evaluate $f(5)$ using signed geometric areas from the graph of $g$, and compute $f'(5)$ using the Fundamental Theorem of Calculus[cite: 33].
+      Evaluate $f(5)$ using signed geometric areas from the graph of $g$, and compute $f'(5)$ using the Fundamental Theorem of Calculus.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Split $\displaystyle\int_{0}^{5} g(t)\,dt$ at $t = 4$ into the lower semicircle of radius $2$ on $[0, 4]$ and the triangle on $[4, 5]$, then differentiate $f(x)$ via FTC Part 1[cite: 33].
+      Split $\displaystyle\int_{0}^{5} g(t)\,dt$ at $t = 4$ into the lower semicircle of radius $2$ on $[0, 4]$ and the triangle on $[4, 5]$, then differentiate $f(x)$ via FTC Part 1.
 
       :::derivation
       == step: Part (a) — Evaluate f(5) and f'(5) (2 Points)
-      -- why: Definite integrals represent signed area, and $\dfrac{d}{dx}\displaystyle\int_{0}^{x} g(t)\,dt = g(x)$[cite: 33].
+      -- why: Definite integrals represent signed area, and $\dfrac{d}{dx}\displaystyle\int_{0}^{x} g(t)\,dt = g(x)$.
       $$
       \begin{aligned}
       f(5) &= 2(5) + \int_{0}^{4} g(t)\,dt + \int_{4}^{5} g(t)\,dt \\[.4cm]
@@ -72,7 +72,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Forgetting the Leading $2x$ Term or Negative Sign Below the $x$-Axis:** Differentiating $f(x)$ as $g(x)$ instead of $2 + g(x)$ drops the derivative of $2x$, and treating the semicircle area on $[0, 4]$ as $+2\pi$ ignores that $g(t) \le 0$[cite: 33].
+      * **Common Pitfall — Forgetting the Leading $2x$ Term or Negative Sign Below the $x$-Axis:** Differentiating $f(x)$ as $g(x)$ instead of $2 + g(x)$ drops the derivative of $2x$, and treating the semicircle area on $[0, 4]$ as $+2\pi$ ignores that $g(t) \le 0$.
 
   - id: "ap-calc-frq-q3b"
     parentQuestionId: "ap-calc-frq-q3"
@@ -113,15 +113,15 @@ questions:
             requiresJustification: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Locate and justify the absolute maximum value of $f$ on the closed interval $[-3, 2]$[cite: 33].
+      Locate and justify the absolute maximum value of $f$ on the closed interval $[-3, 2]$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Solve $f'(x) = 2 + g(x) = 0 \implies g(x) = -2$ on $[-3, 2]$ to find critical points ($x = -2$ and $x = 2$), and apply the Candidates Test on $[-3, 2]$[cite: 33].
+      Solve $f'(x) = 2 + g(x) = 0 \implies g(x) = -2$ on $[-3, 2]$ to find critical points ($x = -2$ and $x = 2$), and apply the Candidates Test on $[-3, 2]$.
 
       :::derivation
       == step: Part (b) — Find and Justify the Absolute Maximum of f on [-3, 2] (3 Points)
-      -- why: Continuous functions on closed intervals attain absolute extrema at critical points or endpoints[cite: 33].
+      -- why: Continuous functions on closed intervals attain absolute extrema at critical points or endpoints.
       $$
       \begin{aligned}
       f'(x) = 2 + g(x) &= 0 \implies g(x) = -2 \implies x = -2,\; x = 2 \\[.4cm]
@@ -130,14 +130,14 @@ questions:
       f(2) &= 2(2) + \int_{0}^{2} g(t)\,dt = 4 + {\color{#2563eb}{\left(-\frac{1}{4}\pi(2)^2\right)}} = 4 - \pi \approx 0.858
       \end{aligned}
       $$
-      Because $f$ is continuous on $[-3, 2]$ and $4 - \pi > -\dfrac{5}{2} > -\dfrac{9}{2}$, $f$ attains its maximum value on $[-3, 2]$ at $x = 2$[cite: 33].
+      Because $f$ is continuous on $[-3, 2]$ and $4 - \pi > -\dfrac{5}{2} > -\dfrac{9}{2}$, $f$ attains its maximum value on $[-3, 2]$ at $x = 2$.
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Incomplete Justification:** Saying only "$f'(2) = 0$" does not prove an **absolute** maximum on $[-3, 2]$; always compare all candidate values ($x = -3, -2, 2$)[cite: 33].
+      * **Common Pitfall — Incomplete Justification:** Saying only "$f'(2) = 0$" does not prove an **absolute** maximum on $[-3, 2]$; always compare all candidate values ($x = -3, -2, 2$).
 
   - id: "ap-calc-frq-q3c"
     parentQuestionId: "ap-calc-frq-q3"
@@ -174,29 +174,29 @@ questions:
             points: 1
     explanation: |
       ### Takeoff: What were you asked to find?
-      Determine the left-hand and right-hand limits of the derivative $g'(x)$ as $x$ approaches $0$[cite: 33].
+      Determine the left-hand and right-hand limits of the derivative $g'(x)$ as $x$ approaches $0$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Read the constant slope of the line segment on $(-3, 0)$ for $x \to 0^-$, and inspect the tangent slope of the semicircle at $(0, 0)$ for $x \to 0^+$[cite: 33].
+      Read the constant slope of the line segment on $(-3, 0)$ for $x \to 0^-$, and inspect the tangent slope of the semicircle at $(0, 0)$ for $x \to 0^+$.
 
       :::derivation
       == step: Part (c) — Evaluate One-Sided Limits of g'(x) at x = 0 (2 Points)
-      -- why: One-sided derivative limits examine the slope behavior on each side of $x = 0$[cite: 33].
+      -- why: One-sided derivative limits examine the slope behavior on each side of $x = 0$.
       $$
       \begin{aligned}
       \lim_{x \to 0^-} g'(x) &= \text{slope of line segment on } (-3, 0) = \frac{0 - 3}{0 - (-3)} = -1 \\[.4cm]
       \lim_{x \to 0^+} g'(x) &= \lim_{x \to 0^+} \frac{x - 2}{\sqrt{4 - (x - 2)^2}} = -\infty \implies \text{does not exist}
       \end{aligned}
       $$
-      As $x \to 0^+$, the semicircle approaches a **vertical tangent line** at $(0, 0)$, so $\lim\limits_{x \to 0^+} g'(x)$ does not exist[cite: 33].
+      As $x \to 0^+$, the semicircle approaches a **vertical tangent line** at $(0, 0)$, so $\lim\limits_{x \to 0^+} g'(x)$ does not exist.
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Writing $0$ for the Right-Hand Tangent Slope:** At $x = 0$, the semicircle enters $(0, 0)$ vertically, so $g'(x) \to -\infty$ and the limit does not exist[cite: 33].
+      * **Common Pitfall — Writing $0$ for the Right-Hand Tangent Slope:** At $x = 0$, the semicircle enters $(0, 0)$ vertically, so $g'(x) \to -\infty$ and the limit does not exist.
 
   - id: "ap-calc-frq-q3d"
     parentQuestionId: "ap-calc-frq-q3"
@@ -234,15 +234,15 @@ questions:
             numericTolerance: 0.001
     explanation: |
       ### Takeoff: What were you asked to find?
-      Evaluate the limit $\lim\limits_{x \to -1} \dfrac{f(x) + \frac{5}{2}}{e^{4x + 4} - 1}$ by verifying the $\dfrac{0}{0}$ indeterminate form and applying L'Hôpital's Rule[cite: 33].
+      Evaluate the limit $\lim\limits_{x \to -1} \dfrac{f(x) + \frac{5}{2}}{e^{4x + 4} - 1}$ by verifying the $\dfrac{0}{0}$ indeterminate form and applying L'Hôpital's Rule.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Verify that both numerator and denominator approach $0$ as $x \to -1$, then differentiate numerator and denominator separately[cite: 33].
+      Verify that both numerator and denominator approach $0$ as $x \to -1$, then differentiate numerator and denominator separately.
 
       :::derivation
       == step: Part (d) — Evaluate the Limit at x = -1 Using L'Hôpital's Rule (2 Points)
-      -- why: Direct substitution yields $\dfrac{0}{0}$[cite: 33].
+      -- why: Direct substitution yields $\dfrac{0}{0}$.
       $$
       \begin{aligned}
       f(-1) &= 2(-1) + \int_{0}^{-1} g(t)\,dt = -2 - \int_{-1}^{0} g(t)\,dt = -2 - {\color{#16a34a}{\frac{1}{2}(1)(1)}} = -\frac{5}{2} \\[.4cm]
@@ -256,7 +256,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Applying L'Hôpital's Rule Without Verifying $\dfrac{0}{0}$ or Forgetting the Chain Rule Factor $4$:** Always show numerator and denominator limits equal $0$ separately, and differentiate $e^{4x+4}$ as $4e^{4x+4}$[cite: 33].
+      * **Common Pitfall — Applying L'Hôpital's Rule Without Verifying $\dfrac{0}{0}$ or Forgetting the Chain Rule Factor $4$:** Always show numerator and denominator limits equal $0$ separately, and differentiate $e^{4x+4}$ as $4e^{4x+4}$.
 
   # ===========================================================================
   # QUESTION 4 PARTS (A–C)
@@ -302,15 +302,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Find the exact area of region $R$ bounded by $f(x) = \dfrac{8}{x^2 + 4}$, $y = 1$, and $x = 0$[cite: 33].
+      Find the exact area of region $R$ bounded by $f(x) = \dfrac{8}{x^2 + 4}$, $y = 1$, and $x = 0$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Solve $f(x) = 1$ for $x \ge 0$ to find the upper limit $x = 2$, integrate $\dfrac{8}{x^2 + 4} - 1$, and apply $\displaystyle\int \dfrac{1}{x^2 + a^2}\,dx = \dfrac{1}{a}\arctan\left(\dfrac{x}{a}\right)$[cite: 33].
+      Solve $f(x) = 1$ for $x \ge 0$ to find the upper limit $x = 2$, integrate $\dfrac{8}{x^2 + 4} - 1$, and apply $\displaystyle\int \dfrac{1}{x^2 + a^2}\,dx = \dfrac{1}{a}\arctan\left(\dfrac{x}{a}\right)$.
 
       :::derivation
       == step: Part (a) — Find the Intersection and Compute the Exact Area of R (3 Points)
-      -- why: Integrate top curve minus bottom curve across $[0, 2]$[cite: 33].
+      -- why: Integrate top curve minus bottom curve across $[0, 2]$.
       $$
       \begin{aligned}
       \frac{8}{x^2 + 4} = 1 \implies x^2 + 4 = 8 \implies x^2 = 4 &\implies x = {\color{#2563eb}{2}} \quad (\text{since } x \ge 0) \\[.4cm]
@@ -325,7 +325,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Forgetting the $\dfrac{1}{a} = \dfrac{1}{2}$ Factor in $\displaystyle\int \dfrac{1}{x^2 + 4}\,dx$:** Integrating $\dfrac{8}{x^2 + 4}$ gives $4\arctan\left(\dfrac{x}{2}\right)$, not $8\arctan\left(\dfrac{x}{2}\right)$[cite: 33].
+      * **Common Pitfall — Forgetting the $\dfrac{1}{a} = \dfrac{1}{2}$ Factor in $\displaystyle\int \dfrac{1}{x^2 + 4}\,dx$:** Integrating $\dfrac{8}{x^2 + 4}$ gives $4\arctan\left(\dfrac{x}{2}\right)$, not $8\arctan\left(\dfrac{x}{2}\right)$.
 
   - id: "ap-calc-frq-q4b"
     parentQuestionId: "ap-calc-frq-q4"
@@ -366,15 +366,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Set up a washer-method volume integral when region $R$ is revolved around the horizontal line $y = -1$[cite: 33].
+      Set up a washer-method volume integral when region $R$ is revolved around the horizontal line $y = -1$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Measure perpendicular distances from $y = -1$ to the outer boundary $y = f(x)$ and inner boundary $y = 1$, then form $\pi \displaystyle\int_{0}^{2} \Bigl(\bigl[R(x)\bigr]^2 - \bigl[r(x)\bigr]^2\Bigr)\,dx$[cite: 33].
+      Measure perpendicular distances from $y = -1$ to the outer boundary $y = f(x)$ and inner boundary $y = 1$, then form $\pi \displaystyle\int_{0}^{2} \Bigl(\bigl[R(x)\bigr]^2 - \bigl[r(x)\bigr]^2\Bigr)\,dx$.
 
       :::derivation
       == step: Part (b) — Set Up the Washer Volume Integral About y = -1 (3 Points)
-      -- why: Rotating around $y = -1$ shifts every vertical radius upward by $+1$ unit[cite: 33].
+      -- why: Rotating around $y = -1$ shifts every vertical radius upward by $+1$ unit.
       $$
       \begin{aligned}
       \text{Outer radius:} \quad R(x) &= f(x) - (-1) = {\color{#2563eb}{\frac{8}{x^2 + 4} + 1}} \\[.3cm]
@@ -388,7 +388,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Squaring the Difference $[R(x) - r(x)]^2$:** Washer cross-sectional area requires $\pi\bigl([R(x)]^2 - [r(x)]^2\bigr)$, never $\pi[R(x) - r(x)]^2$[cite: 33].
+      * **Common Pitfall — Squaring the Difference $[R(x) - r(x)]^2$:** Washer cross-sectional area requires $\pi\bigl([R(x)]^2 - [r(x)]^2\bigr)$, never $\pi[R(x) - r(x)]^2$.
 
   - id: "ap-calc-frq-q4c"
     parentQuestionId: "ap-calc-frq-q4"
@@ -431,15 +431,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Find the instantaneous rate of change $h'(4)$ of the vertical distance $h(x) = |f(x) - 1|$ at $x = 4$[cite: 33].
+      Find the instantaneous rate of change $h'(4)$ of the vertical distance $h(x) = |f(x) - 1|$ at $x = 4$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Because $x = 4 > 2$, $f(x) < 1$ near $x = 4$, so $h(x) = 1 - f(x)$[cite: 33].
+      Because $x = 4 > 2$, $f(x) < 1$ near $x = 4$, so $h(x) = 1 - f(x)$.
 
       :::derivation
       == step: Part (c) — Find the Rate of Change of Vertical Distance h(x) at x = 4 (3 Points)
-      -- why: Express $h(x)$ without absolute value for $x > 2$ and differentiate via the Chain Rule[cite: 33].
+      -- why: Express $h(x)$ without absolute value for $x > 2$ and differentiate via the Chain Rule.
       $$
       \begin{aligned}
       \text{For } x > 2: \quad h(x) &= 1 - f(x) = 1 - 8(x^2 + 4)^{-1} \\[.4cm]
@@ -453,7 +453,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Using $h(x) = f(x) - 1$ Instead of $1 - f(x)$ at $x = 4$:** At $x = 4$, $f(4) = \dfrac{2}{5} < 1$, so the curve lies below $y = 1$ and the distance between them is increasing at $+\dfrac{4}{25}$[cite: 33].
+      * **Common Pitfall — Using $h(x) = f(x) - 1$ Instead of $1 - f(x)$ at $x = 4$:** At $x = 4$, $f(4) = \dfrac{2}{5} < 1$, so the curve lies below $y = 1$ and the distance between them is increasing at $+\dfrac{4}{25}$.
 
   # ===========================================================================
   # QUESTION 5 PARTS (A–D)
@@ -495,15 +495,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Construct the tangent line to $y = f(t)$ at $(0, 4)$ and evaluate it at $t = 5$[cite: 33].
+      Construct the tangent line to $y = f(t)$ at $(0, 4)$ and evaluate it at $t = 5$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Substitute $y(0) = 4$ into $\dfrac{dy}{dt} = \dfrac{1}{20}(24 - y)$ to find the slope $m = 1$, then evaluate $y = 4 + t$ at $t = 5$[cite: 33].
+      Substitute $y(0) = 4$ into $\dfrac{dy}{dt} = \dfrac{1}{20}(24 - y)$ to find the slope $m = 1$, then evaluate $y = 4 + t$ at $t = 5$.
 
       :::derivation
       == step: Part (a) — Linear Approximation at t = 0 to Estimate f(5) (2 Points)
-      -- why: Tangent line at $(t_0, y_0)$ is $y = y_0 + m(t - t_0)$[cite: 33].
+      -- why: Tangent line at $(t_0, y_0)$ is $y = y_0 + m(t - t_0)$.
       $$
       \begin{aligned}
       \left.\frac{dy}{dt}\right|_{(0, 4)} &= \frac{1}{20}\bigl(24 - {\color{#2563eb}{4}}\bigr) = \frac{20}{20} = {\color{#2563eb}{1}} \\[.4cm]
@@ -517,7 +517,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Plugging $t = 0$ Instead of $y = 4$ into $\dfrac{dy}{dt}$:** Because the differential equation is autonomous, substitute $y(0) = 4$, not $t = 0$[cite: 33].
+      * **Common Pitfall — Plugging $t = 0$ Instead of $y = 4$ into $\dfrac{dy}{dt}$:** Because the differential equation is autonomous, substitute $y(0) = 4$, not $t = 0$.
 
   - id: "ap-calc-frq-q5b"
     parentQuestionId: "ap-calc-frq-q5"
@@ -554,29 +554,29 @@ questions:
             requiresJustification: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Use the second derivative $\dfrac{d^2y}{dt^2}$ derived from the differential equation to determine whether the curve shown in the figure could be the graph of $f$[cite: 33].
+      Use the second derivative $\dfrac{d^2y}{dt^2}$ derived from the differential equation to determine whether the curve shown in the figure could be the graph of $f$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Differentiate $\dfrac{dy}{dt} = \dfrac{1}{20}(24 - y)$ implicitly with respect to $t$ to determine concavity for $y < 24$[cite: 33].
+      Differentiate $\dfrac{dy}{dt} = \dfrac{1}{20}(24 - y)$ implicitly with respect to $t$ to determine concavity for $y < 24$.
 
       :::derivation
       == step: Part (b) — Test Concavity via d²y/dt² Against the Given Graph (2 Points)
-      -- why: Differentiating with respect to $t$ requires the Chain Rule factor $\dfrac{dy}{dt}$[cite: 33].
+      -- why: Differentiating with respect to $t$ requires the Chain Rule factor $\dfrac{dy}{dt}$.
       $$
       \begin{aligned}
       \frac{d^2y}{dt^2} &= \frac{d}{dt}\left[\frac{1}{20}(24 - y)\right] = -\frac{1}{20}{\color{#2563eb}{\frac{dy}{dt}}} \\[.4cm]
       &= -\frac{1}{20}\left[\frac{1}{20}(24 - y)\right] = {\color{#2563eb}{-\frac{1}{400}(24 - y)}}
       \end{aligned}
       $$
-      For $4 \le y < 24$, $24 - y > 0 \implies \dfrac{d^2y}{dt^2} < 0$, so $f$ is strictly concave down. **No**, the graph of $f$ cannot resemble the figure shown, because the shown graph is concave up initially (has an inflection point)[cite: 33].
+      For $4 \le y < 24$, $24 - y > 0 \implies \dfrac{d^2y}{dt^2} < 0$, so $f$ is strictly concave down. **No**, the graph of $f$ cannot resemble the figure shown, because the shown graph is concave up initially (has an inflection point).
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Omitting $\dfrac{dy}{dt}$ When Differentiating Implicitly:** Always include $\dfrac{dy}{dt}$ when differentiating $y$ with respect to $t$[cite: 33].
+      * **Common Pitfall — Omitting $\dfrac{dy}{dt}$ When Differentiating Implicitly:** Always include $\dfrac{dy}{dt}$ when differentiating $y$ with respect to $t$.
 
   - id: "ap-calc-frq-q5c"
     parentQuestionId: "ap-calc-frq-q5"
@@ -618,15 +618,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Solve the separable initial-value problem $\dfrac{dy}{dt} = \dfrac{1}{20}(24 - y)$, $f(0) = 4$, explicitly for $y = f(t)$[cite: 33].
+      Solve the separable initial-value problem $\dfrac{dy}{dt} = \dfrac{1}{20}(24 - y)$, $f(0) = 4$, explicitly for $y = f(t)$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Separate variables, integrate both sides (keeping the negative sign from $u = 24 - y$), apply $f(0) = 4$, and solve for $y$[cite: 33].
+      Separate variables, integrate both sides (keeping the negative sign from $u = 24 - y$), apply $f(0) = 4$, and solve for $y$.
 
       :::derivation
       == step: Part (c) — Solve the Separable Differential Equation Explicitly for y = f(t) (3 Points)
-      -- why: Separate $y$ and $t$ variables before antidifferentiating[cite: 33].
+      -- why: Separate $y$ and $t$ variables before antidifferentiating.
       $$
       \begin{aligned}
       \frac{1}{24 - y}\,dy &= \frac{1}{20}\,dt \\[.4cm]
@@ -641,7 +641,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Dropping the Negative Sign in $\displaystyle\int \dfrac{1}{24 - y}\,dy$:** Integrating $\dfrac{1}{24 - y}$ yields $-\ln|24 - y|$[cite: 33].
+      * **Common Pitfall — Dropping the Negative Sign in $\displaystyle\int \dfrac{1}{24 - y}\,dy$:** Integrating $\dfrac{1}{24 - y}$ yields $-\ln|24 - y|$.
 
   - id: "ap-calc-frq-q5d"
     parentQuestionId: "ap-calc-frq-q5"
@@ -678,29 +678,29 @@ questions:
             requiresJustification: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Determine whether the rate of change $\dfrac{dy}{dt}$ is increasing or decreasing for $t > 0$[cite: 33].
+      Determine whether the rate of change $\dfrac{dy}{dt}$ is increasing or decreasing for $t > 0$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Inspect the sign of $\dfrac{d^2y}{dt^2}$ for $t > 0$[cite: 33].
+      Inspect the sign of $\dfrac{d^2y}{dt^2}$ for $t > 0$.
 
       :::derivation
       == step: Part (d) — Determine Whether Temperature Changes at an Increasing or Decreasing Rate (2 Points)
-      -- why: A quantity's rate of change $\dfrac{dy}{dt}$ is decreasing when its derivative $\dfrac{d^2y}{dt^2}$ is negative[cite: 33].
+      -- why: A quantity's rate of change $\dfrac{dy}{dt}$ is decreasing when its derivative $\dfrac{d^2y}{dt^2}$ is negative.
       $$
       \begin{aligned}
       \frac{dy}{dt} &= \frac{d}{dt}\Bigl[24 - 20e^{-t/20}\Bigr] = e^{-t/20} > 0 \\[.4cm]
       \frac{d^2y}{dt^2} &= \frac{d}{dt}\Bigl[e^{-t/20}\Bigr] = {\color{#2563eb}{-\frac{1}{20}e^{-t/20} < 0}} \quad \text{for all } t > 0
       \end{aligned}
       $$
-      Because $\dfrac{d^2y}{dt^2} < 0$ for all $t > 0$, the rate of change $\dfrac{dy}{dt}$ is decreasing; therefore, the temperature of the sensor is changing at a **decreasing rate** for $t > 0$[cite: 33].
+      Because $\dfrac{d^2y}{dt^2} < 0$ for all $t > 0$, the rate of change $\dfrac{dy}{dt}$ is decreasing; therefore, the temperature of the sensor is changing at a **decreasing rate** for $t > 0$.
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Looking at $\dfrac{dy}{dt} > 0$ Instead of $\dfrac{d^2y}{dt^2} < 0$:** $\dfrac{dy}{dt} > 0$ shows the *temperature* is rising, whereas $\dfrac{d^2y}{dt^2} < 0$ shows the *rate* is decreasing[cite: 33].
+      * **Common Pitfall — Looking at $\dfrac{dy}{dt} > 0$ Instead of $\dfrac{d^2y}{dt^2} < 0$:** $\dfrac{dy}{dt} > 0$ shows the *temperature* is rising, whereas $\dfrac{d^2y}{dt^2} < 0$ shows the *rate* is decreasing.
 
   # ===========================================================================
   # QUESTION 6 PARTS (A–D)
@@ -738,15 +738,15 @@ questions:
             expectedLatex: "\\frac{3}{3 + \\cos y}"
     explanation: |
       ### Takeoff: What were you asked to find?
-      Verify via implicit differentiation that $\dfrac{dy}{dx} = \dfrac{3}{3 + \cos y}$[cite: 33].
+      Verify via implicit differentiation that $\dfrac{dy}{dx} = \dfrac{3}{3 + \cos y}$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Differentiate both sides of $3(x - y) = 4 + \sin y$ with respect to $x$ and isolate $\dfrac{dy}{dx}$[cite: 33].
+      Differentiate both sides of $3(x - y) = 4 + \sin y$ with respect to $x$ and isolate $\dfrac{dy}{dx}$.
 
       :::derivation
       == step: Part (a) — Verify dy/dx = 3 / (3 + cos y) via Implicit Differentiation (2 Points)
-      -- why: Attach $\dfrac{dy}{dx}$ when differentiating $y$-terms with respect to $x$[cite: 33].
+      -- why: Attach $\dfrac{dy}{dx}$ when differentiating $y$-terms with respect to $x$.
       $$
       \begin{aligned}
       \frac{d}{dx}\Bigl[3(x - y)\Bigr] &= \frac{d}{dx}\Bigl[4 + \sin y\Bigr] \\[.4cm]
@@ -761,7 +761,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Forgetting $\dfrac{dy}{dx}$ on the Left Side ($3(1 - y')$):** Missing the left-hand $\dfrac{dy}{dx}$ prevents isolating the denominator $3 + \cos y$[cite: 33].
+      * **Common Pitfall — Forgetting $\dfrac{dy}{dx}$ on the Left Side ($3(1 - y')$):** Missing the left-hand $\dfrac{dy}{dx}$ prevents isolating the denominator $3 + \cos y$.
 
   - id: "ap-calc-frq-q6b"
     parentQuestionId: "ap-calc-frq-q6"
@@ -798,15 +798,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Find the coordinates $(x, y)$ of the point $P$ with $0 < y < \pi$ where the tangent slope equals $1$[cite: 33].
+      Find the coordinates $(x, y)$ of the point $P$ with $0 < y < \pi$ where the tangent slope equals $1$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Set $\dfrac{dy}{dx} = 1$ to solve for $y \in (0, \pi)$ first, then plug $y$ back into $3(x - y) = 4 + \sin y$[cite: 33].
+      Set $\dfrac{dy}{dx} = 1$ to solve for $y \in (0, \pi)$ first, then plug $y$ back into $3(x - y) = 4 + \sin y$.
 
       :::derivation
       == step: Part (b) — Find the Coordinates of Point P Where Tangent Slope = 1 (2 Points)
-      -- why: Solve for $y$ from the slope condition, then solve for $x$ from the curve equation[cite: 33].
+      -- why: Solve for $y$ from the slope condition, then solve for $x$ from the curve equation.
       $$
       \begin{aligned}
       \frac{3}{3 + \cos y} = 1 \implies 3 + \cos y = 3 &\implies \cos y = {\color{#2563eb}{0}} \\[.3cm]
@@ -815,14 +815,14 @@ questions:
       x - \frac{\pi}{2} &= \frac{5}{3} \implies x = {\color{#2563eb}{\frac{5}{3} + \frac{\pi}{2}}}
       \end{aligned}
       $$
-      Thus, $P = \left(\dfrac{5}{3} + \dfrac{\pi}{2},\, \dfrac{\pi}{2}\right)$[cite: 33].
+      Thus, $P = \left(\dfrac{5}{3} + \dfrac{\pi}{2},\, \dfrac{\pi}{2}\right)$.
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Stopping After Finding $y = \dfrac{\pi}{2}$ or Reversing $(x, y)$:** Remember to substitute $y = \dfrac{\pi}{2}$ into the original curve equation to solve for $x$[cite: 33].
+      * **Common Pitfall — Stopping After Finding $y = \dfrac{\pi}{2}$ or Reversing $(x, y)$:** Remember to substitute $y = \dfrac{\pi}{2}$ into the original curve equation to solve for $x$.
 
   - id: "ap-calc-frq-q6c"
     parentQuestionId: "ap-calc-frq-q6"
@@ -863,15 +863,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Compute the second derivative $\dfrac{d^2y}{dx^2}$ implicitly and determine the concavity of the curve for $0 < y < \pi$[cite: 33].
+      Compute the second derivative $\dfrac{d^2y}{dx^2}$ implicitly and determine the concavity of the curve for $0 < y < \pi$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Differentiate $\dfrac{dy}{dx} = 3(3 + \cos y)^{-1}$ with respect to $x$ using the Chain Rule, substitute $\dfrac{dy}{dx} = \dfrac{3}{3 + \cos y}$, and evaluate the sign on $(0, \pi)$[cite: 33].
+      Differentiate $\dfrac{dy}{dx} = 3(3 + \cos y)^{-1}$ with respect to $x$ using the Chain Rule, substitute $\dfrac{dy}{dx} = \dfrac{3}{3 + \cos y}$, and evaluate the sign on $(0, \pi)$.
 
       :::derivation
       == step: Part (c) — Compute d²y/dx² and Determine Concavity for 0 < y < π (3 Points)
-      -- why: Differentiating a function of $y$ with respect to $x$ requires multiplying by $\dfrac{dy}{dx}$[cite: 33].
+      -- why: Differentiating a function of $y$ with respect to $x$ requires multiplying by $\dfrac{dy}{dx}$.
       $$
       \begin{aligned}
       \frac{d^2y}{dx^2} &= \frac{d}{dx}\Bigl[3(3 + \cos y)^{-1}\Bigr] \\[.4cm]
@@ -879,14 +879,14 @@ questions:
       &= \frac{3\sin y}{(3 + \cos y)^2} \cdot {\color{#2563eb}{\frac{3}{3 + \cos y}}} = {\color{#2563eb}{\frac{9\sin y}{(3 + \cos y)^3}}}
       \end{aligned}
       $$
-      For $0 < y < \pi$, $\sin y > 0$ and $(3 + \cos y)^3 > 0$, so $\dfrac{d^2y}{dx^2} > 0$ and the curve is **concave up**[cite: 33].
+      For $0 < y < \pi$, $\sin y > 0$ and $(3 + \cos y)^3 > 0$, so $\dfrac{d^2y}{dx^2} > 0$ and the curve is **concave up**.
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Omitting the Chain Rule $\dfrac{dy}{dx}$ in $\dfrac{d^2y}{dx^2}$:** Always multiply by $\dfrac{dy}{dx}$ when differentiating $\cos y$ with respect to $x$[cite: 33].
+      * **Common Pitfall — Omitting the Chain Rule $\dfrac{dy}{dx}$ in $\dfrac{d^2y}{dx^2}$:** Always multiply by $\dfrac{dy}{dx}$ when differentiating $\cos y$ with respect to $x$.
 
   - id: "ap-calc-frq-q6d"
     parentQuestionId: "ap-calc-frq-q6"
@@ -922,15 +922,15 @@ questions:
             requiresJustification: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Use the Mean Value Theorem on $[3, 3.2]$ alongside the derivative bounds $\dfrac{3}{4} \le \dfrac{dy}{dx} \le \dfrac{3}{2}$ to bound $f(3.2) - f(3)$[cite: 33].
+      Use the Mean Value Theorem on $[3, 3.2]$ alongside the derivative bounds $\dfrac{3}{4} \le \dfrac{dy}{dx} \le \dfrac{3}{2}$ to bound $f(3.2) - f(3)$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Invoke the Mean Value Theorem on $[3, 3.2]$ to write $f'(c) = \dfrac{f(3.2) - f(3)}{0.2}$ for some $c \in (3, 3.2)$, then substitute into $\dfrac{3}{4} \le f'(c) \le \dfrac{3}{2}$[cite: 33].
+      Invoke the Mean Value Theorem on $[3, 3.2]$ to write $f'(c) = \dfrac{f(3.2) - f(3)}{0.2}$ for some $c \in (3, 3.2)$, then substitute into $\dfrac{3}{4} \le f'(c) \le \dfrac{3}{2}$.
 
       :::derivation
       == step: Part (d) — Use the Mean Value Theorem on [3, 3.2] to Bound f(3.2) - f(3) (2 Points)
-      -- why: Continuity on $[3, 3.2]$ and differentiability on $(3, 3.2)$ guarantee a point $c \in (3, 3.2)$ where instantaneous slope equals average slope[cite: 33].
+      -- why: Continuity on $[3, 3.2]$ and differentiability on $(3, 3.2)$ guarantee a point $c \in (3, 3.2)$ where instantaneous slope equals average slope.
       $$
       \begin{aligned}
       \text{By MVT, } \exists\, c \in (3, 3.2) \text{ such that } f'(c) &= \frac{f(3.2) - f(3)}{3.2 - 3} = {\color{#2563eb}{\frac{f(3.2) - f(3)}{0.2}}} \\[.4cm]
@@ -946,4 +946,4 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Not Mentioning the Mean Value Theorem or Point $c \in (3, 3.2)$:** AP rubrics require explicitly invoking the Mean Value Theorem to equate $\dfrac{f(3.2) - f(3)}{0.2}$ to $f'(c)$[cite: 33].
+      * **Common Pitfall — Not Mentioning the Mean Value Theorem or Point $c \in (3, 3.2)$:** AP rubrics require explicitly invoking the Mean Value Theorem to equate $\dfrac{f(3.2) - f(3)}{0.2}$ to $f'(c)$.

@@ -51,29 +51,29 @@ questions:
             requiresJustification: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Approximate the instantaneous rate of change $H'(6)$ from the given table of values and interpret its meaning with appropriate units at $t = 6$ minutes[cite: 32].
+      Approximate the instantaneous rate of change $H'(6)$ from the given table of values and interpret its meaning with appropriate units at $t = 6$ minutes.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Bracket $t = 6$ using the two closest adjacent table entries ($t = 5$ and $t = 7$) to form the symmetric difference quotient $\dfrac{H(7) - H(5)}{7 - 5}$, then state the quantity, direction ("decreasing"), value with units ($\text{gal/min}^2$), and exact instant ($t = 6$ minutes)[cite: 32].
+      Bracket $t = 6$ using the two closest adjacent table entries ($t = 5$ and $t = 7$) to form the symmetric difference quotient $\dfrac{H(7) - H(5)}{7 - 5}$, then state the quantity, direction ("decreasing"), value with units ($\text{gal/min}^2$), and exact instant ($t = 6$ minutes).
 
       :::derivation
       == step: Part (a) — Approximate H'(6) and Interpret in Context (2 Points)
-      -- why: Use the average rate of change across $[5, 7]$ to estimate the derivative at $t = 6$[cite: 32].
+      -- why: Use the average rate of change across $[5, 7]$ to estimate the derivative at $t = 6$.
       $$
       \begin{aligned}
       H'(6) &\approx \frac{{\color{#2563eb}{H(7) - H(5)}}}{{\color{#2563eb}{7 - 5}}} \\[.4cm]
       &= \frac{{\color{#2563eb}{19.8 - 22.4}}}{2} = \frac{-2.6}{2} = -1.3\text{ gallons per minute per minute}
       \end{aligned}
       $$
-      **Contextual Interpretation:** At time $t = 6$ minutes, the rate at which honey is being pumped into the vat is **decreasing** at $1.3$ gallons per minute per minute (or $\text{gal/min}^2$)[cite: 32].
+      **Contextual Interpretation:** At time $t = 6$ minutes, the rate at which honey is being pumped into the vat is **decreasing** at $1.3$ gallons per minute per minute (or $\text{gal/min}^2$).
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Missing "Rate of Change of the Rate" or Units:** Saying "the amount of honey is decreasing at $1.3$ gal/min" describes $H(6)$ instead of $H'(6)$. Because $H(t)$ is already in gallons per minute, $H'(6)$ must state that the **rate** is decreasing with units of **gallons per minute per minute** ($\text{gal/min}^2$)[cite: 32].
+      * **Common Pitfall — Missing "Rate of Change of the Rate" or Units:** Saying "the amount of honey is decreasing at $1.3$ gal/min" describes $H(6)$ instead of $H'(6)$. Because $H(t)$ is already in gallons per minute, $H'(6)$ must state that the **rate** is decreasing with units of **gallons per minute per minute** ($\text{gal/min}^2$).
 
   - id: "ap-calc-frq-q1b"
     parentQuestionId: "ap-calc-frq-q1"
@@ -113,15 +113,15 @@ questions:
             numericTolerance: 0.001
     explanation: |
       ### Takeoff: What were you asked to find?
-      Express the total honey pumped into the vat on $[0, 10]$ as a definite integral and approximate it using a four-subinterval right Riemann sum[cite: 32].
+      Express the total honey pumped into the vat on $[0, 10]$ as a definite integral and approximate it using a four-subinterval right Riemann sum.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Multiply each subinterval's **unequal width** $\Delta t_i$ by the **right-endpoint height** $H(t_i)$ across $[0, 2]$, $[2, 5]$, $[5, 7]$, and $[7, 10]$[cite: 32].
+      Multiply each subinterval's **unequal width** $\Delta t_i$ by the **right-endpoint height** $H(t_i)$ across $[0, 2]$, $[2, 5]$, $[5, 7]$, and $[7, 10]$.
 
       :::derivation
       == step: Part (b) — Write the Accumulation Integral and Compute the Right Riemann Sum (2 Points)
-      -- why: Total accumulated inflow is $\displaystyle\int_{0}^{10} H(t)\,dt$[cite: 32].
+      -- why: Total accumulated inflow is $\displaystyle\int_{0}^{10} H(t)\,dt$.
       $$
       \begin{aligned}
       \text{Total honey pumped in} &= \int_{0}^{10} H(t)\,dt \\[.4cm]
@@ -136,7 +136,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Assuming Equal Subinterval Widths:** Notice the time stamps $0, 2, 5, 7, 10$ have widths $2, 3, 2, 3$—not uniform widths of $2.5$. Always compute $\Delta t_i = t_i - t_{i-1}$ individually for each rectangle[cite: 32].
+      * **Common Pitfall — Assuming Equal Subinterval Widths:** Notice the time stamps $0, 2, 5, 7, 10$ have widths $2, 3, 2, 3$—not uniform widths of $2.5$. Always compute $\Delta t_i = t_i - t_{i-1}$ individually for each rectangle.
 
   - id: "ap-calc-frq-q1c"
     parentQuestionId: "ap-calc-frq-q1"
@@ -183,15 +183,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Compute the remaining amount of honey in the vat at $t = 10$ by subtracting total outflow $\displaystyle\int_{0}^{10} D(t)\,dt$ from the inflow estimate in part (b)[cite: 32].
+      Compute the remaining amount of honey in the vat at $t = 10$ by subtracting total outflow $\displaystyle\int_{0}^{10} D(t)\,dt$ from the inflow estimate in part (b).
 
       :::tabs
       == tab: Solving the question with Calculus & Desmos
-      Start with the initial amount $0$ gallons, add the part (b) inflow approximation $215.5$, and subtract $\displaystyle\int_{0}^{10} D(t)\,dt$ evaluated in **radian mode**[cite: 32].
+      Start with the initial amount $0$ gallons, add the part (b) inflow approximation $215.5$, and subtract $\displaystyle\int_{0}^{10} D(t)\,dt$ evaluated in **radian mode**.
 
       :::derivation
       == step: Part (c) — Approximate Remaining Honey at t = 10 Using Desmos (3 Points)
-      -- why: Net amount = Initial + Inflow − Outflow[cite: 32].
+      -- why: Net amount = Initial + Inflow − Outflow.
       $$
       \begin{aligned}
       \text{Remaining honey at } t = 10 &\approx 0 + {\color{#2563eb}{215.5}} - \int_{0}^{10} 28\sqrt{\sin\left(\frac{\pi t}{85}\right)}\,dt \\[.4cm]
@@ -217,7 +217,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Degree Mode or Premature Rounding:** Running $\sin\left(\dfrac{\pi t}{85}\right)$ in degree mode instead of **radian mode** produces an incorrect integral, and rounding before subtracting can shift the third decimal place of $92.115$[cite: 32].
+      * **Common Pitfall — Degree Mode or Premature Rounding:** Running $\sin\left(\dfrac{\pi t}{85}\right)$ in degree mode instead of **radian mode** produces an incorrect integral, and rounding before subtracting can shift the third decimal place of $92.115$.
 
   - id: "ap-calc-frq-q1d"
     parentQuestionId: "ap-calc-frq-q1"
@@ -258,15 +258,15 @@ questions:
             requiresJustification: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Determine whether the total volume of honey in the vat is increasing or decreasing at $t = 7$ by comparing the inflow rate $H(7)$ against the outflow rate $D(7)$[cite: 32].
+      Determine whether the total volume of honey in the vat is increasing or decreasing at $t = 7$ by comparing the inflow rate $H(7)$ against the outflow rate $D(7)$.
 
       :::tabs
       == tab: Solving the question with Calculus & Desmos
-      Because the net rate of change of volume is $V'(7) = H(7) - D(7)$, evaluate $D(7)$ on your calculator and compare it to $H(7) = 19.8$[cite: 32].
+      Because the net rate of change of volume is $V'(7) = H(7) - D(7)$, evaluate $D(7)$ on your calculator and compare it to $H(7) = 19.8$.
 
       :::derivation
       == step: Part (d) — Compare Inflow and Outflow Rates at t = 7 (2 Points)
-      -- why: If $H(7) - D(7) > 0$, the total volume of honey is increasing[cite: 32].
+      -- why: If $H(7) - D(7) > 0$, the total volume of honey is increasing.
       $$
       \begin{aligned}
       H(7) &= {\color{#2563eb}{19.8\text{ gal/min}}} \\[.3cm]
@@ -274,14 +274,14 @@ questions:
       V'(7) = H(7) - D(7) &\approx 19.8 - 14.16289 = 5.637 > 0
       \end{aligned}
       $$
-      Because $H(7) - D(7) > 0$ (or $H(7) > D(7)$), the amount of honey in the vat is **increasing** at time $t = 7$ minutes[cite: 32].
+      Because $H(7) - D(7) > 0$ (or $H(7) > D(7)$), the amount of honey in the vat is **increasing** at time $t = 7$ minutes.
       :::
       :::
 
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Checking $D'(7)$ Instead of $H(7) - D(7)$:** Whether the *amount* of honey is increasing depends on the net rate $H(7) - D(7) > 0$, not on whether the drain rate $D(t)$ itself is increasing ($D'(7) > 0$)[cite: 32].
+      * **Common Pitfall — Checking $D'(7)$ Instead of $H(7) - D(7)$:** Whether the *amount* of honey is increasing depends on the net rate $H(7) - D(7) > 0$, not on whether the drain rate $D(t)$ itself is increasing ($D'(7) > 0$).
 
   # ===========================================================================
   # QUESTION 2 PARTS (A–D)
@@ -320,15 +320,15 @@ questions:
             numericTolerance: 0.001
     explanation: |
       ### Takeoff: What were you asked to find?
-      Find the glider's instantaneous acceleration $a(4) = v'(4)$ at time $t = 4$ minutes[cite: 32].
+      Find the glider's instantaneous acceleration $a(4) = v'(4)$ at time $t = 4$ minutes.
 
       :::tabs
       == tab: Solving the question with Calculus & Desmos
-      Differentiate $v(t) = 1.6\ln(1 + t^2)$ using the Chain Rule (or evaluate $\left.\dfrac{d}{dx}v(x)\right|_{x=4}$ directly on your calculator)[cite: 32].
+      Differentiate $v(t) = 1.6\ln(1 + t^2)$ using the Chain Rule (or evaluate $\left.\dfrac{d}{dx}v(x)\right|_{x=4}$ directly on your calculator).
 
       :::derivation
       == step: Part (a) — Find Instantaneous Acceleration a(4) = v'(4) (2 Points)
-      -- why: Acceleration is the first derivative of velocity with respect to time[cite: 32].
+      -- why: Acceleration is the first derivative of velocity with respect to time.
       $$
       \begin{aligned}
       a(t) = v'(t) &= 1.6 \cdot \frac{{\color{#2563eb}{2t}}}{{\color{#2563eb}{1 + t^2}}} = \frac{3.2t}{1 + t^2} \\[.4cm]
@@ -341,7 +341,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Forgetting the Chain Rule Factor $2t$:** Differentiating $1.6\ln(1 + t^2)$ as $\dfrac{1.6}{1 + t^2}$ instead of $\dfrac{1.6(2t)}{1 + t^2}$ omits the inner derivative $2t$[cite: 32].
+      * **Common Pitfall — Forgetting the Chain Rule Factor $2t$:** Differentiating $1.6\ln(1 + t^2)$ as $\dfrac{1.6}{1 + t^2}$ instead of $\dfrac{1.6(2t)}{1 + t^2}$ omits the inner derivative $2t$.
 
   - id: "ap-calc-frq-q2b"
     parentQuestionId: "ap-calc-frq-q2"
@@ -377,15 +377,15 @@ questions:
             numericTolerance: 0.002
     explanation: |
       ### Takeoff: What were you asked to find?
-      Compute the net displacement of the glider over the time interval $0 \le t \le 12$ minutes[cite: 32].
+      Compute the net displacement of the glider over the time interval $0 \le t \le 12$ minutes.
 
       :::tabs
       == tab: Solving the question with Calculus & Desmos
-      Integrate $v(t)$ from $t = 0$ to $t = 12$ on your graphing calculator and store the unrounded result $D \approx 61.91447$ for parts (c) and (d)[cite: 32].
+      Integrate $v(t)$ from $t = 0$ to $t = 12$ on your graphing calculator and store the unrounded result $D \approx 61.91447$ for parts (c) and (d).
 
       :::derivation
       == step: Part (b) — Compute Total Displacement Over [0, 12] (2 Points)
-      -- why: Displacement over $[a, b]$ is the definite integral $\displaystyle\int_{a}^{b} v(t)\,dt$[cite: 32].
+      -- why: Displacement over $[a, b]$ is the definite integral $\displaystyle\int_{a}^{b} v(t)\,dt$.
       $$
       \begin{aligned}
       \text{Displacement} &= \int_{0}^{12} v(t)\,dt \\[.4cm]
@@ -398,7 +398,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Premature Rounding:** Store the full-precision integral $61.91447$ in your calculator for use in parts (c) and (d) so rounding error does not carry forward[cite: 32].
+      * **Common Pitfall — Premature Rounding:** Store the full-precision integral $61.91447$ in your calculator for use in parts (c) and (d) so rounding error does not carry forward.
 
   - id: "ap-calc-frq-q2c"
     parentQuestionId: "ap-calc-frq-q2"
@@ -436,15 +436,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Find the time $t \in [0, 12]$ at which the glider's instantaneous velocity $v(t)$ equals its average velocity on $[0, 12]$[cite: 32].
+      Find the time $t \in [0, 12]$ at which the glider's instantaneous velocity $v(t)$ equals its average velocity on $[0, 12]$.
 
       :::tabs
       == tab: Solving the question with Calculus & Desmos
-      Compute $v_{\text{avg}} = \dfrac{1}{12 - 0}\displaystyle\int_{0}^{12} v(t)\,dt \approx 5.15954$, set $v(t) = v_{\text{avg}}$, and solve for $t \in [0, 12]$[cite: 32].
+      Compute $v_{\text{avg}} = \dfrac{1}{12 - 0}\displaystyle\int_{0}^{12} v(t)\,dt \approx 5.15954$, set $v(t) = v_{\text{avg}}$, and solve for $t \in [0, 12]$.
 
       :::derivation
       == step: Part (c) — Solve Instantaneous Velocity = Average Velocity on [0, 12] (2 Points)
-      -- why: Average velocity over $[0, 12]$ is $\dfrac{1}{12}\displaystyle\int_{0}^{12} v(t)\,dt$[cite: 32].
+      -- why: Average velocity over $[0, 12]$ is $\dfrac{1}{12}\displaystyle\int_{0}^{12} v(t)\,dt$.
       $$
       \begin{aligned}
       v_{\text{avg}} &= \frac{1}{12 - 0}\int_{0}^{12} v(t)\,dt \approx \frac{{\color{#2563eb}{61.91447}}}{12} \approx {\color{#16a34a}{5.15954\text{ m/min}}} \\[.4cm]
@@ -471,7 +471,7 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Computing Average Acceleration Instead of Average Velocity:** Using $\dfrac{v(12) - v(0)}{12 - 0}$ computes *average acceleration* rather than *average velocity* $\dfrac{1}{12}\displaystyle\int_{0}^{12} v(t)\,dt$[cite: 32].
+      * **Common Pitfall — Computing Average Acceleration Instead of Average Velocity:** Using $\dfrac{v(12) - v(0)}{12 - 0}$ computes *average acceleration* rather than *average velocity* $\dfrac{1}{12}\displaystyle\int_{0}^{12} v(t)\,dt$.
 
   - id: "ap-calc-frq-q2d"
     parentQuestionId: "ap-calc-frq-q2"
@@ -512,15 +512,15 @@ questions:
             allowConsequentialCarryover: true
     explanation: |
       ### Takeoff: What were you asked to find?
-      Find the initial velocity $K$ at $t = 9$ required for a second drone with constant acceleration $3\text{ m/min}^2$ to cover the glider's entire $12$-minute displacement during the $3$-minute interval $[9, 12]$[cite: 32].
+      Find the initial velocity $K$ at $t = 9$ required for a second drone with constant acceleration $3\text{ m/min}^2$ to cover the glider's entire $12$-minute displacement during the $3$-minute interval $[9, 12]$.
 
       :::tabs
       == tab: Solving the question with Calculus
-      Integrate $a_{\text{drone}}(t) = 3$ from $9$ to $t$ to obtain $v_{\text{drone}}(t) = K + 3(t - 9)$, integrate from $t = 9$ to $t = 12$ to get the drone's displacement, and equate it to the glider's total displacement $D \approx 61.91447$[cite: 32].
+      Integrate $a_{\text{drone}}(t) = 3$ from $9$ to $t$ to obtain $v_{\text{drone}}(t) = K + 3(t - 9)$, integrate from $t = 9$ to $t = 12$ to get the drone's displacement, and equate it to the glider's total displacement $D \approx 61.91447$.
 
       :::derivation
       == step: Part (d) — Equate Drone Displacement on [9, 12] to Glider Displacement on [0, 12] (3 Points)
-      -- why: Catching up at $t = 12$ from the same starting point means both vehicles have identical displacement at $t = 12$[cite: 32].
+      -- why: Catching up at $t = 12$ from the same starting point means both vehicles have identical displacement at $t = 12$.
       $$
       \begin{aligned}
       v_{\text{drone}}(t) &= K + \int_{9}^{t} 3\,du = {\color{#2563eb}{K + 3(t - 9)}} \\[.4cm]
@@ -536,4 +536,4 @@ questions:
       ---
 
       ### Landing: Did you give the right answer to wrong question?
-      * **Common Pitfall — Shifting Velocity with $K + 3t$ Instead of $K + 3(t - 9)$:** Because the drone's velocity is $K$ at $t = 9$ (not at $t = 0$), always anchor the elapsed time as $(t - 9)$[cite: 32].
+      * **Common Pitfall — Shifting Velocity with $K + 3t$ Instead of $K + 3(t - 9)$:** Because the drone's velocity is $K$ at $t = 9$ (not at $t = 0$), always anchor the elapsed time as $(t - 9)$.
